@@ -46,7 +46,8 @@ this list:
 
 Rules:
 
-- **Nothing imports `server`.** It is the top of the stack.
+- **No `internal` package imports `server`** — only `cmd/*` does. It is the top
+  of the stack.
 - **`internal/scan` stays dependency-free.** It is the leaf every other package
   is allowed to build on.
 - Product-specific behavior belongs at the top (`cmd/`, `internal/server`);
