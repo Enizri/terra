@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { buildFileTree, countLeaves } from "./fileTree.ts";
-import type { Component } from "../map/types.ts";
+import type { Component } from "./map/types.ts";
 
 function component(id: string, files: string[]): Component {
   return {

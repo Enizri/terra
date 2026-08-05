@@ -1,4 +1,4 @@
-import type { Component } from "../map/types";
+import type { Component } from "./map/types";
 
 /**
  * A node in the rail's Files tree. `owners` are the component ids that listed

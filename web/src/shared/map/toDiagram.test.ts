@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { MAX_NODES, MAX_PER_COL, MAX_PER_COL_ALL, toDiagram } from "./toDiagram.ts";
 import type { Component, TerraMap } from "./types.ts";
-import memos from "../data/memos.map.json" with { type: "json" };
+import memos from "../../data/memos.map.json" with { type: "json" };
 
 const golden = memos as TerraMap;
 

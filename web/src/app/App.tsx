@@ -1,6 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
-import TerraLanding from "./terra/TerraLanding";
-import Workspace, { randomSlug } from "./terra/Workspace";
+import TerraLanding from "../routes/landing/TerraLanding";
+import Workspace, { randomSlug } from "../routes/workspace/Workspace";
 
 /** /new mints a session slug once, then hands off to the workspace route. */
 function NewSession() {

@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client'
 // axis narrows the glyphs, which InterVariable renders at display sizes.
 import '@fontsource-variable/inter/opsz.css'
 import { BrowserRouter } from 'react-router-dom'
-import './styles/global.css'
+import '../shared/styles/global.css'
 import App from './App.tsx'
 
 createRoot(document.getElementById('root')!).render(

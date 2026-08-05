@@ -7,7 +7,7 @@
 
 import { motion, useReducedMotion } from "motion/react";
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { rise, spring } from "../terra/data";
+import { rise, spring } from "../../routes/landing/data";
 import TechIcon from "./TechIcon";
 
 export type DiagramKind = "frontend" | "backend" | "data" | "service";

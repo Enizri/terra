@@ -22,7 +22,7 @@ import {
   type ReactNode,
 } from "react";
 import { Link } from "react-router-dom";
-import RepoDiagram from "../map/RepoDiagram";
+import RepoDiagram from "../../shared/map/RepoDiagram";
 import HeroBackdrop from "./HeroBackdrop";
 import {
   copy,

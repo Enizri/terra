@@ -2,20 +2,20 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent, FormEvent, KeyboardEvent, ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Link, useLocation, useParams } from "react-router-dom";
-import type { Component, TerraMap } from "../map/types";
-import RepoDiagram from "../map/RepoDiagram";
-import DetailsPanel from "../map/DetailsPanel";
-import { toDiagram } from "../map/toDiagram";
-import memosFixture from "../data/memos.map.json";
-import { matchComponents } from "../map/search";
-import { LiveFrame, useFloatingDrag, useStreamingAskHint, type LiveSelection } from "./theater";
+import type { Component, TerraMap } from "../../shared/map/types";
+import RepoDiagram from "../../shared/map/RepoDiagram";
+import DetailsPanel from "../../shared/map/DetailsPanel";
+import { toDiagram } from "../../shared/map/toDiagram";
+import memosFixture from "../../data/memos.map.json";
+import { matchComponents } from "../../shared/map/search";
+import { LiveFrame, useFloatingDrag, useStreamingAskHint, type LiveSelection } from "../../shared/live";
 import { useAnalyze } from "./useAnalyze";
 import { useAsk, type AskMessage, type AskPart, type AskSelection } from "./useAsk";
-import { renderMarkdown } from "./markdown";
-import { buildFileTree, countLeaves, type FileNode } from "./fileTree";
+import { renderMarkdown } from "../../shared/markdown";
+import { buildFileTree, countLeaves, type FileNode } from "../../shared/fileTree";
 // Owns its skin import: today terra.css only loads because App statically
 // imports TerraLanding, which stops being true the moment a route is lazy.
-import "./terra.css";
+import "../landing/terra.css";
 import "./workspace.css";
 
 /** Selection cap — the theater's, for the same reason: keep the crumbs readable. */

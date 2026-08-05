@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { TerraMap } from "../map/types";
-import { ndjsonSplitter } from "./ndjson";
+import type { TerraMap } from "../../shared/map/types";
+import { ndjsonSplitter } from "../../shared/ndjson";
 
 export type AnalyzeEvent = {
   stage: "clone" | "scan" | "analyze" | "store" | "done" | "error";
