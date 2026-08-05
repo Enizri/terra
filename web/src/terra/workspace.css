@@ -1,0 +1,1076 @@
+/* Workspace shell. Colors, radii and type all come from terra.css tokens —
+   nothing new is defined here beyond layout. */
+
+.sh-ws {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr) 380px;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100dvh;
+  overflow: hidden;
+}
+
+/* ---- header ---- */
+
+.sh-ws__head {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--sh-border);
+  background: var(--sh-window);
+}
+
+.sh-ws__logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.sh-ws__crumb {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  font-size: 14px;
+}
+
+.sh-ws__crumb b {
+  font-weight: 500;
+}
+
+.sh-ws__crumb em {
+  font-style: normal;
+  color: var(--sh-muted-2);
+}
+
+.sh-ws__crumb::before {
+  content: "/";
+  color: var(--sh-border);
+  margin-right: 2px;
+}
+
+.sh-ws__chips {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.sh-ws__chips .sh-chip svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Placeholder chips: visibly present, not yet wired. */
+.sh-chip.is-disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* A chip that does something — same pill, but it presses. */
+.sh-chip--btn {
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.sh-chip--btn:hover {
+  border-color: rgba(0, 0, 0, 0.14);
+}
+
+.sh-chip--btn.is-on {
+  background: var(--color-tint);
+  color: #fff;
+  border-color: transparent;
+}
+
+/* ---- left rail ---- */
+
+.sh-ws__rail {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 20px 14px;
+  border-right: 1px solid var(--sh-border);
+  overflow-y: auto;
+}
+
+/* An open section may hold a long tree; a closed one is just its header. */
+.sh-ws__rail-section {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.sh-ws__rail-section.is-open {
+  flex: 0 1 auto;
+}
+
+.sh-ws__rail-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 0 0 8px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #525252;
+  cursor: pointer;
+}
+
+.sh-ws__rail-toggle:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color: #111;
+}
+
+.sh-ws__rail-toggle svg {
+  width: 14px;
+  height: 14px;
+  margin-left: auto;
+  rotate: -90deg;
+  transition: rotate 0.18s ease;
+}
+
+.sh-ws__rail-toggle[aria-expanded="true"] svg {
+  rotate: 0deg;
+}
+
+.sh-ws__rail-count {
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: #737373;
+}
+
+/* Scrolls itself so a deep tree can't push History off the rail. */
+.sh-ws__rail-body {
+  min-height: 0;
+  max-height: 46vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.sh-ws__rail-empty {
+  margin: 0;
+  padding: 0 6px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #525252;
+}
+
+/* ---- files tree ---- */
+
+.sh-ws__tree {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sh-ws__tree--nested {
+  padding-left: 12px;
+  border-left: 1px solid rgba(0, 0, 0, 0.07);
+  margin-left: 8px;
+}
+
+.sh-ws__file-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 3px 6px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  font: inherit;
+  font-size: 12.5px;
+  color: #333;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sh-ws__file-row:hover:not(:disabled) {
+  background: rgba(232, 64, 13, 0.08);
+  color: #111;
+}
+
+.sh-ws__file-row:disabled {
+  cursor: default;
+  color: #737373;
+}
+
+.sh-ws__file-row.is-file {
+  /* Aligns file names with the folder labels above them. */
+  padding-left: 20px;
+  color: #525252;
+}
+
+.sh-ws__file-row.is-dir {
+  font-weight: 550;
+  color: #111;
+}
+
+.sh-ws__file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sh-ws__file-chev {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 14px;
+  color: #737373;
+}
+
+.sh-ws__file-chev svg {
+  width: 12px;
+  height: 12px;
+  rotate: -90deg;
+  transition: rotate 0.18s ease;
+}
+
+.sh-ws__file-chev.is-open svg {
+  rotate: 0deg;
+}
+
+/* ---- history ---- */
+
+.sh-ws__history {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sh-ws__history-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  font: inherit;
+  text-align: left;
+  color: #111;
+  cursor: pointer;
+}
+
+.sh-ws__history-row b {
+  font-size: 13px;
+  font-weight: 550;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sh-ws__history-row em {
+  font-style: normal;
+  font-size: 11.5px;
+  color: #737373;
+}
+
+.sh-ws__history-row:hover:not(:disabled) {
+  border-color: rgba(232, 64, 13, 0.35);
+  background: #fff4f0;
+}
+
+.sh-ws__history-row.is-current {
+  border-color: rgba(0, 0, 0, 0.1);
+  background: #fff;
+  cursor: default;
+}
+
+.sh-ws__history-row:disabled:not(.is-current) {
+  opacity: 0.55;
+  cursor: default;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sh-ws__rail-toggle svg,
+  .sh-ws__file-chev svg {
+    transition: none;
+  }
+}
+
+/* ---- stage ---- */
+
+.sh-ws__stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 32px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.sh-ws-drop {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: min(560px, 100%);
+  padding: 56px 32px;
+  border: 1.5px dashed rgba(0, 0, 0, 0.28);
+  border-radius: 16px;
+  background: #fff;
+  text-align: center;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.sh-ws-drop.is-over {
+  border-color: #e8400d;
+  background: #fff;
+}
+
+/* Brand wash bleeding out from under the icon — soft enough not to wash title. */
+.sh-ws-drop__glow {
+  position: absolute;
+  top: 34px;
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: var(--sh-terra-wash);
+  filter: blur(46px);
+  opacity: 0.18;
+  pointer-events: none;
+}
+
+.sh-ws-drop__icon {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  color: #111;
+  opacity: 0.9;
+}
+
+.sh-ws-drop__title {
+  position: relative;
+  margin: 6px 0 0;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: #111;
+}
+
+.sh-ws-drop__sub {
+  position: relative;
+  margin: 0;
+  max-width: 40ch;
+  font-size: 15px;
+  line-height: 1.45;
+  color: #525252;
+}
+
+/* ---- running ---- */
+
+/* The star already transitions `rotate` on hover (terra.css); a running
+   animation outranks that, so the two never fight. */
+@keyframes sh-ws-spin {
+  to {
+    rotate: 360deg;
+  }
+}
+
+.sh-terra-mark--spin {
+  animation: sh-ws-spin 2.4s linear infinite;
+}
+
+.sh-ws__status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 38px;
+  font-size: 17px;
+}
+
+.sh-ws__status-mark {
+  width: 24px;
+  height: 24px;
+}
+
+.sh-ws__status-label {
+  display: inline-block;
+}
+
+.sh-ws__status-time {
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  color: var(--sh-muted-2);
+}
+
+.sh-ws__error {
+  margin: 0;
+  max-width: 560px;
+  color: #e8400d;
+  font-size: 14px;
+  text-align: center;
+}
+
+/* ---- result: the map fills the stage, everything else is a strip on top ---- */
+
+/* Centering suits the drop zone and the status line; the map wants the room. */
+.sh-ws__stage.is-map {
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 14px;
+  padding: 20px;
+  overflow: hidden;
+}
+
+.sh-ws__mapbar {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 15px;
+}
+
+.sh-ws__mapbar b {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.sh-ws__mapbar em {
+  flex: 1;
+  min-width: 200px;
+  font-style: normal;
+  font-size: 13px;
+  color: var(--sh-muted);
+  /* One line: every row this strip wraps to is a row the map loses. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---- find a component ---- */
+
+.sh-ws__find {
+  position: relative;
+  margin-left: auto;
+}
+
+.sh-ws__find-input {
+  width: 190px;
+  padding: 6px 10px;
+  border: 1px solid var(--sh-border);
+  border-radius: 999px;
+  background: var(--sh-window);
+  font: inherit;
+  font-size: 13px;
+  color: inherit;
+}
+
+.sh-ws__find-input:focus {
+  outline: none;
+  border-color: var(--sh-ink);
+}
+
+.sh-ws__find-list {
+  position: absolute;
+  z-index: 3;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 260px;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  border: 1px solid var(--sh-border);
+  border-radius: 12px;
+  background: var(--sh-window);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.12);
+}
+
+.sh-ws__find-hit {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.sh-ws__find-hit:hover,
+.sh-ws__find-hit:focus-visible {
+  background: var(--sh-bg);
+}
+
+.sh-ws__find-hit em {
+  margin-left: auto;
+  font-style: normal;
+  font-size: 11px;
+  color: var(--sh-muted);
+}
+
+.sh-ws__find-empty {
+  padding: 7px 9px;
+  font-size: 13px;
+  color: var(--sh-muted);
+}
+
+.sh-ws__map {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+/* The details panel overlays the right edge, which is where the storage column
+   sits. Inset the diagram instead of letting the panel cover a card — the
+   arrows re-measure on the resize, so nothing is left pointing at a stale box. */
+.sh-ws__map.has-details > .sh-diagram {
+  padding-right: 316px;
+}
+
+/* A generated purpose is a paragraph, not the landing's hand-written one-liner.
+   Clamp it to one line: the canvas clips, and a four-card middle column with
+   two-line purposes stands taller than the canvas — the first screen showed
+   every card cut off. The full text is in the details panel. */
+.sh-ws__map .sh-diagram__purpose {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  overflow: hidden;
+}
+
+/* The hint slot reserves 16px per card for a file path only shown on focus —
+   here a click opens the details panel, which lists every file. Dropping the
+   row buys the height that keeps the middle column inside the canvas. */
+.sh-ws__map .sh-diagram__hint {
+  display: none;
+}
+
+/* Two-line card names still leave the middle column a hair taller than the
+   landing's padding allows — trade breathing room for the last clipped pixels. */
+.sh-ws__map .sh-diagram__canvas {
+  padding-top: 14px;
+  padding-bottom: 14px;
+}
+
+/* Covers the map rather than splitting it: the preview is a detour, and the
+   map is still what the question is about. */
+.sh-ws__preview {
+  position: absolute;
+  inset: 0;
+  /* Above the diagram's cards, below the details panel. */
+  z-index: 2;
+  display: flex;
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--sh-window);
+  border: 1px solid var(--sh-border);
+}
+
+.sh-ws__preview .sh-live {
+  flex: 1;
+  border: 0;
+}
+
+/* Overlaid rather than a fourth column — the grid is already three deep. */
+.sh-ws__details {
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 300px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.sh-ws__url {
+  display: flex;
+  gap: 10px;
+  width: min(560px, 100%);
+}
+
+.sh-ws__input {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 16px;
+  border: 1px solid rgba(0, 0, 0, 0.16);
+  border-radius: 8px;
+  background: #fff;
+  color: #111;
+  font: inherit;
+  font-size: 15px;
+}
+
+.sh-ws__input::placeholder {
+  color: #737373;
+}
+
+.sh-ws__input:focus-visible {
+  outline: 2px solid #e8400d;
+  outline-offset: -1px;
+}
+
+/* ---- agent dock ---- */
+
+.sh-ws__dock {
+  display: flex;
+  padding: 20px;
+  border-left: 1px solid var(--sh-border);
+  min-height: 0;
+  background: var(--sh-bg);
+}
+
+/* What the next question is scoped to — click one to drop it. */
+.sh-ws__crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Fill the column instead of the floating 360x440 the theater uses. */
+.sh-ws__dock .sh-terra-chat,
+.sh-ws__dock .sh-terra-chat--open {
+  width: 100%;
+  height: 100%;
+}
+
+/* Light Claude-like skin — scoped so landing theater stays dark Cursor-like. */
+.sh-ws__dock .sh-terra-chat--ws {
+  background: #fff;
+  color: #111;
+  font-size: 14px;
+  line-height: 1.5;
+  border-radius: 14px;
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.04),
+    0 12px 32px rgba(0, 0, 0, 0.06),
+    0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+
+.sh-ws__dock .sh-terra-chat__head {
+  height: 40px;
+  padding: 0 12px;
+  justify-content: flex-start;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  background: #fafafa;
+}
+
+.sh-ws-chat__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sh-ws-chat__mark {
+  width: 18px;
+  height: 18px;
+  rotate: 0deg;
+}
+
+.sh-ws__dock .sh-terra-chat__name {
+  position: static;
+  left: auto;
+  transform: none;
+  font-size: 14px;
+  font-weight: 600;
+  color: #111;
+  pointer-events: none;
+}
+
+.sh-ws__dock .sh-terra-chat__body {
+  gap: 10px;
+  padding: 12px 14px 0;
+}
+
+.sh-ws__dock .sh-terra-chat__thread {
+  gap: 12px;
+}
+
+/* Let the work trail + answer use the column; theater caps thread for option lists. */
+.sh-ws__dock .sh-terra-chat__body:has(.sh-terra-chat__hints) .sh-terra-chat__thread {
+  flex: 1 1 auto;
+  max-height: none;
+}
+
+.sh-ws__dock .sh-terra-chat__msg {
+  max-width: 100%;
+  padding: 0;
+  border-radius: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  background: transparent;
+  border: 0;
+}
+
+.sh-ws__dock .sh-terra-chat__msg--user {
+  align-self: flex-end;
+  max-width: 92%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #f0eeea;
+  color: #111;
+}
+
+.sh-ws__dock .sh-terra-chat__msg--terra,
+.sh-ws__dock .sh-ws-turn {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  color: #111;
+  background: transparent;
+  border: 0;
+}
+
+.sh-ws__dock .sh-terra-chat__msg--error {
+  color: #b42318;
+}
+
+.sh-ws__dock .sh-terra-chat__msg--error .sh-ws-md {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(180, 35, 24, 0.28);
+  background: #fef3f2;
+  color: #b42318;
+}
+
+.sh-ws__dock .sh-terra-chat__crumb {
+  padding: 4px 10px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 999px;
+  background: #f5f3ef;
+  color: #333;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.sh-ws__dock .sh-terra-chat__crumb:hover {
+  color: #111;
+  border-color: rgba(232, 64, 13, 0.45);
+  background: #fff4f0;
+}
+
+.sh-ws__dock .sh-terra-chat__hints-label {
+  color: #737373;
+}
+
+.sh-ws__dock .sh-terra-chat__hint {
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: #fafafa;
+  color: #222;
+  font-size: 13px;
+}
+
+.sh-ws__dock .sh-terra-chat__hint:hover:not(:disabled) {
+  color: #111;
+  border-color: rgba(232, 64, 13, 0.4);
+  background: #fff4f0;
+}
+
+.sh-ws__dock .sh-terra-chat__prompt {
+  position: relative;
+  margin: 8px 12px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: #f9f8f5;
+  box-shadow: none;
+  color: #111;
+  user-select: auto;
+}
+
+.sh-ws__dock .sh-ws__ask {
+  user-select: auto;
+}
+
+/* Idle typewriter sits under the transparent input so click/focus still works. */
+.sh-ws__ask-stream {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  pointer-events: none;
+  color: #737373;
+  font-size: 14px;
+}
+
+.sh-ws__ask.is-streaming .sh-ws__ask-input {
+  position: relative;
+  z-index: 1;
+  background: transparent;
+  color: transparent;
+  caret-color: #111;
+}
+
+.sh-ws__ask-input {
+  width: 100%;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  color: #111;
+  outline: none;
+}
+
+.sh-ws__ask-input::placeholder {
+  color: #737373;
+}
+
+.sh-ws__ask-input:disabled::placeholder {
+  color: #a3a3a3;
+}
+
+/* ---- Claude-like thinking + process + markdown ---- */
+
+.sh-ws-think {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+  background: #fafafa;
+  overflow: hidden;
+}
+
+.sh-ws-think.is-done {
+  background: #fff;
+}
+
+.sh-ws-think__toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 550;
+  color: #333;
+  cursor: pointer;
+  text-align: left;
+}
+
+.sh-ws-think__mark {
+  width: 14px;
+  height: 14px;
+}
+
+.sh-ws-think__label {
+  background-image: linear-gradient(
+    110deg,
+    #e8400d 0%,
+    #c084fc 55%,
+    #ac7eff 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+.sh-ws-think.is-done .sh-ws-think__label {
+  background: none;
+  color: #525252;
+  -webkit-text-fill-color: #525252;
+}
+
+.sh-ws-think__chev {
+  margin-left: auto;
+  color: #737373;
+  font-size: 11px;
+}
+
+.sh-ws-think__body {
+  margin: 0;
+  padding: 0 12px 10px 32px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #525252;
+}
+
+.sh-ws-process {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sh-ws-process__step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #a3a3a3;
+}
+
+.sh-ws-process__step.is-active {
+  color: #111;
+  font-weight: 500;
+}
+
+.sh-ws-process__step.is-done {
+  color: #525252;
+}
+
+.sh-ws-process__step.is-skipped {
+  color: #c4c4c4;
+  text-decoration: line-through;
+}
+
+.sh-ws-process__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #d4d4d4;
+  flex-shrink: 0;
+}
+
+.sh-ws-process__step.is-active .sh-ws-process__dot {
+  background: #e8400d;
+  box-shadow: 0 0 0 3px rgba(232, 64, 13, 0.18);
+}
+
+.sh-ws-process__step.is-done .sh-ws-process__dot {
+  background: #22c55e;
+}
+
+.sh-ws-process__step.is-skipped .sh-ws-process__dot {
+  background: #e5e5e5;
+}
+
+.sh-ws-md {
+  font-size: 14px;
+  line-height: 1.55;
+  color: #111;
+}
+
+.sh-ws-md > :first-child {
+  margin-top: 0;
+}
+
+.sh-ws-md > :last-child {
+  margin-bottom: 0;
+}
+
+.sh-ws-md p,
+.sh-ws-md ul,
+.sh-ws-md ol {
+  margin: 0 0 0.7em;
+}
+
+.sh-ws-md h1,
+.sh-ws-md h2,
+.sh-ws-md h3 {
+  margin: 0.9em 0 0.4em;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.sh-ws-md h1 {
+  font-size: 1.15em;
+}
+
+.sh-ws-md h2 {
+  font-size: 1.05em;
+}
+
+.sh-ws-md h3 {
+  font-size: 1em;
+}
+
+.sh-ws-md ul,
+.sh-ws-md ol {
+  padding-left: 1.25em;
+}
+
+.sh-ws-md li + li {
+  margin-top: 0.25em;
+}
+
+.sh-ws-md code {
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  background: #f0eeea;
+  font-size: 0.9em;
+}
+
+.sh-ws-md pre {
+  margin: 0 0 0.7em;
+  padding: 10px 12px;
+  overflow-x: auto;
+  border-radius: 8px;
+  background: #f5f3ef;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.sh-ws-md pre code {
+  padding: 0;
+  background: none;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sh-ws-think__label {
+    background: none;
+    color: #e8400d;
+    -webkit-text-fill-color: #e8400d;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sh-terra-mark--spin {
+    animation: none;
+  }
+}
+
+/* ---- narrow ---- */
+
+@media (max-width: 1100px) {
+  .sh-ws {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
+  .sh-ws__rail {
+    display: none;
+  }
+
+  .sh-ws__dock {
+    border-left: 0;
+    border-top: 1px solid var(--sh-border);
+  }
+
+  .sh-ws__dock .sh-terra-chat,
+  .sh-ws__dock .sh-terra-chat--open {
+    height: 320px;
+  }
+}

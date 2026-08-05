@@ -1,0 +1,190 @@
+/* panes lead the section; the sparkle bridge above provides the spacing */
+.tight {
+  padding-top: 0;
+}
+
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 24px;
+  align-items: center;
+}
+
+/* side cards: same size, mirrored — pulled out past the container edges */
+.split > figure:first-of-type {
+  margin-left: -180px;
+  margin-right: 64px;
+}
+
+.split > figure:last-of-type {
+  margin-right: -180px;
+  margin-left: 64px;
+}
+
+.pane {
+  margin: 0;
+}
+
+.codeFrame {
+  background: var(--ink);
+  border: none;
+}
+
+.codeViewport {
+  position: relative;
+  height: 360px;
+  overflow: hidden;
+  background: var(--ink);
+}
+
+.codeTrack {
+  padding: 16px 18px;
+}
+
+.codeScroll {
+  animation: codeScroll 26s linear infinite;
+}
+
+.codeLine {
+  margin: 0;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11.5px;
+  line-height: 1.8;
+  color: rgba(251, 248, 241, 0.5);
+  white-space: pre;
+}
+
+.codeLine:nth-child(4n + 1) {
+  color: rgba(255, 197, 61, 0.6);
+}
+
+.codeLine:nth-child(5n + 2) {
+  color: rgba(224, 86, 127, 0.55);
+}
+
+.codeFade {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    var(--ink),
+    transparent 18%,
+    transparent 82%,
+    var(--ink)
+  );
+}
+
+@keyframes codeScroll {
+  to {
+    transform: translateY(-50%);
+  }
+}
+
+.mapFrame {
+  background: var(--paper);
+}
+
+.mapSvg {
+  display: block;
+  width: 100%;
+  height: auto;
+  background:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 28px 28px;
+  background-color: var(--paper);
+  padding: 12px;
+  box-sizing: border-box;
+  height: 360px;
+}
+
+.caption {
+  margin-top: 14px;
+  text-align: center;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+
+.arrow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+/* parent carries the beige fill so the canvas multiply blends against it
+   (outer reveal animations isolate blending from the page backdrop) */
+.rive {
+  width: 540px;
+  height: 540px;
+  background: var(--ivory);
+  border-radius: 18px;
+  overflow: hidden;
+  position: relative;
+}
+
+/* runtime pins the canvas layout size, so zoom via transform:
+   scaled up + cropped by the wrapper = bigger character */
+.rive canvas {
+  width: 100%;
+  height: 100%;
+  transform: scale(1.65);
+  mix-blend-mode: multiply;
+  filter: brightness(1.06);
+  /* all pointer input arrives via synthetic dispatch from the split area */
+  pointer-events: none;
+}
+
+.activate,
+.activateOn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  border-radius: var(--radius-pill);
+  padding: 10px 20px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s, color 0.2s, transform 0.2s;
+}
+
+.activate {
+  background: #fff;
+  color: var(--ink);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.activate:hover {
+  background: var(--ink);
+  color: #fff;
+  transform: scale(1.04);
+}
+
+.activateOn {
+  background: var(--ink);
+  color: #fff;
+  border: 1px solid var(--ink);
+}
+
+@media (max-width: 900px) {
+  .split {
+    grid-template-columns: 1fr;
+  }
+
+  .split > figure:first-of-type,
+  .split > figure:last-of-type {
+    margin: 0;
+  }
+
+  .arrow {
+    flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .codeScroll {
+    animation: none;
+  }
+}

@@ -1,0 +1,10 @@
+[project]
+name = "fixture"
+dependencies = [
+    "fastapi>=0.100",
+    "pydantic==2.5.0",
+]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+httpx = "^0.25"

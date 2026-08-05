@@ -1,0 +1,12 @@
+{
+  "[go]": {
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit"
+    }
+  },
+  "go.formatTool": "goimports",
+  "gopls": {
+    "formatting.local": "terra"
+  }
+}

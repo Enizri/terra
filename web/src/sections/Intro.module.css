@@ -1,0 +1,49 @@
+.section {
+  position: relative;
+  min-height: 140px;
+  overflow: hidden;
+}
+
+/* sparkles drifting down out of the hero video into this section */
+.sparkles {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 280px;
+  pointer-events: none;
+}
+
+.sparkles span {
+  position: absolute;
+  top: -24px;
+  left: var(--x);
+  font-size: var(--s);
+  color: var(--c);
+  animation: sparkleFall var(--d) linear infinite;
+  animation-delay: var(--t);
+  opacity: 0;
+}
+
+@keyframes sparkleFall {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 0.5;
+  }
+  100% {
+    transform: translateY(260px);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sparkles {
+    display: none;
+  }
+}

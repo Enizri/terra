@@ -1,0 +1,56 @@
+# Style aligned with https://github.com/usememos/memos — gofmt + goimports, no custom column padding.
+version: "2"
+
+linters:
+  enable:
+    - revive
+    - govet
+    - staticcheck
+    - misspell
+    - gocritic
+    - godot
+  disable:
+    - errcheck
+  settings:
+    staticcheck:
+      checks:
+        - all
+        - -ST1000
+        - -ST1003
+        - -ST1021
+    revive:
+      enable-all-rules: true
+      rules:
+        - name: file-header
+          disabled: true
+        - name: line-length-limit
+          disabled: true
+        - name: function-length
+          disabled: true
+        - name: max-public-structs
+          disabled: true
+        - name: function-result-limit
+          disabled: true
+        - name: argument-limit
+          disabled: true
+        - name: cognitive-complexity
+          disabled: true
+        - name: cyclomatic
+          disabled: true
+        - name: exported
+          disabled: true
+        - name: package-comments
+          disabled: true
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment
+        - shadow
+
+formatters:
+  enable:
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - terra

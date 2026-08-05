@@ -1,0 +1,31 @@
+[project]
+name = "terra-analyzer"
+version = "0.1.0"
+description = "Terra's AI layer: OpenAI-compatible agents over a local Hugging Face model"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "httpx",
+    "pydantic>=2",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+local = [
+    "torch",
+    "transformers>=4.40",
+    "accelerate",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["terra_analyzer*"]
+
+[tool.pytest.ini_options]
+markers = [
+    "slow: hits a real local HF model server (deselect with -m 'not slow')",
+]
