@@ -11,7 +11,6 @@ export default defineConfig({
   server: {
     proxy: {
       '/analyze': api,
-      '/analyses': api,
       '/preview': api,
       '/ask': api,
       '/files': api,
