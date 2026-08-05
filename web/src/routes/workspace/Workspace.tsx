@@ -15,7 +15,8 @@ import { renderMarkdown } from "../../shared/markdown";
 import { buildFileTree, countLeaves, type FileNode } from "../../shared/fileTree";
 // Owns its skin import: today terra.css only loads because App statically
 // imports TerraLanding, which stops being true the moment a route is lazy.
-import "../landing/terra.css";
+import "../../shared/styles/tokens.css";
+import "../../shared/styles/ui.css";
 import "./workspace.css";
 
 /** Selection cap — the theater's, for the same reason: keep the crumbs readable. */
@@ -524,7 +525,7 @@ function ProcessPart({ part }: { part: Extract<AskPart, { type: "process" }> }) 
       {part.steps.map((step) => (
         <li key={step.id} className={`sh-ws-process__step is-${step.status}`} data-status={step.status}>
           <span className="sh-ws-process__dot" aria-hidden />
-          <span className="sh-ws-process__label">{step.label}</span>
+          <span>{step.label}</span>
         </li>
       ))}
     </ol>

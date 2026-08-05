@@ -1,0 +1,964 @@
+/* Components used by more than one route: buttons, chips, the repo diagram,
+   the live-preview frame and the Terra chat dock. Landing-scoped overrides of
+   these classes live in routes/landing/landing.css, which loads after. */
+
+.sh-root a.sh-btn {
+  color: #fff;
+}
+
+.sh-terra-mark {
+  display: block;
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  background: var(--sh-terra-wash);
+  -webkit-mask: var(--sh-star-mask-thick) center / contain no-repeat;
+  mask: var(--sh-star-mask-thick) center / contain no-repeat;
+  rotate: 2.5deg;
+  transition:
+    rotate 0.55s cubic-bezier(0.22, 1.35, 0.36, 1),
+    scale 0.55s cubic-bezier(0.22, 1.35, 0.36, 1),
+    opacity 0.4s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+.sh-terra-mark {
+    transition: none;
+  }
+}
+
+.sh-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  background: #e8400d;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 500;
+  font-family: inherit;
+  letter-spacing: -0.2px;
+  line-height: 1.4;
+  padding: 12px 24px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: filter 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sh-btn:hover {
+  filter: brightness(1.1);
+  color: #fff;
+}
+
+.sh-btn--nav {
+  font-size: 16px;
+  letter-spacing: -0.1px;
+  padding: 14px 22px;
+  margin-left: 8px;
+}
+
+.sh-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.sh-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  font-size: 13px;
+  font-weight: 500;
+  color: #171717;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.sh-chip--tint {
+  background: var(--color-tint);
+  color: #fff;
+  border-color: transparent;
+}
+
+.sh-chip__mark {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  background: var(--color-tint);
+  flex-shrink: 0;
+}
+
+.sh-chip svg {
+  width: 16px;
+  height: 16px;
+  opacity: 0.7;
+}
+
+.sh-diagram {
+  --dg-bg: #101116;
+  --dg-grid: rgba(255, 255, 255, 0.07);
+  --dg-border: rgba(255, 255, 255, 0.12);
+  --dg-node-bg: #1c1e24;
+  --dg-text: rgba(255, 255, 255, 0.92);
+  --dg-muted: rgba(255, 255, 255, 0.45);
+  --dg-accent: var(--color-tint);
+  /* Railway vocabulary: violet selection ring, green verified dot. */
+  --dg-select: #8b7cf6;
+  --dg-ok: #12b886;
+  --dg-mono: "SF Mono", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo,
+    monospace;
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 14px 16px 12px;
+  gap: 10px;
+  box-sizing: border-box;
+  /* The card is the whole diagram — header, canvas and legend all sit inside
+     one border instead of floating on the window chrome. */
+  border-radius: 16px;
+  background: var(--dg-bg);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sh-diagram__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+}
+
+.sh-diagram__title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sh-diagram__repo {
+  font-family: var(--dg-mono);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--dg-text);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sh-diagram__meta {
+  font-size: 10.5px;
+  color: var(--dg-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sh-diagram__badge {
+  margin-left: auto;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--dg-border);
+  background: rgba(255, 255, 255, 0.03);
+  font-family: var(--dg-mono);
+  font-size: 10px;
+  color: var(--dg-muted);
+  white-space: nowrap;
+}
+
+.sh-diagram__badge::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #12b886;
+  box-shadow: 0 0 6px rgba(18, 184, 134, 0.8);
+}
+
+.sh-diagram__canvas {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  padding: 26px 22px;
+  box-sizing: border-box;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background-color: rgba(0, 0, 0, 0.18);
+  background-image: radial-gradient(var(--dg-grid) 1px, transparent 1px);
+  background-size: 20px 20px;
+  overflow: hidden;
+}
+
+.sh-diagram__scale {
+  position: absolute;
+  inset: 0;
+  padding: inherit;
+  box-sizing: border-box;
+  transform-origin: 50% 50%;
+}
+
+.sh-diagram__flow {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: clamp(34px, 7%, 90px);
+}
+
+.sh-diagram__col {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 22px;
+  min-width: 0;
+}
+
+.sh-diagram__group {
+  border: 1px solid var(--dg-border);
+  border-radius: 10px;
+  padding: 12px 14px 14px;
+  /* Left transparent on purpose: the arrows are painted underneath the flow
+     layer, so `web → api` and `memos/files → db` cross this box's padding on
+     their way to a card edge. Any fill tints them. */
+  background: transparent;
+}
+
+.sh-diagram__group-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-family: var(--dg-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.sh-diagram__group-title span {
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: rgba(255, 255, 255, 0.32);
+}
+
+.sh-diagram__group-body {
+  display: flex;
+  flex-direction: column;
+  /* 22px, not 10: a stacked vertical connector shorter than this is entirely
+     swallowed by its own arrowhead. */
+  gap: 22px;
+}
+
+.sh-diagram__node {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 196px;
+  max-width: 250px;
+  padding: 13px 14px 12px;
+  border-radius: 11px;
+  border: 1px solid var(--dg-border);
+  background: var(--dg-node-bg);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: var(--dg-text);
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    filter 0.25s ease;
+}
+
+.sh-diagram__node:hover {
+  border-color: rgba(255, 255, 255, 0.28);
+  background: #21242a;
+}
+
+.sh-diagram__node--hover-only {
+  cursor: default;
+}
+
+.sh-diagram__node-top {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.sh-diagram__icon {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-family: var(--dg-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  user-select: none;
+}
+
+.sh-diagram__icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.sh-diagram__icon--fallback {
+  color: #fff;
+  font-size: 11px;
+}
+
+.sh-diagram__name {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--dg-text);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sh-diagram__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--dg-mono);
+  font-size: 10px;
+  color: var(--dg-muted);
+}
+
+.sh-diagram__status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--dg-ok);
+  box-shadow: 0 0 6px rgba(18, 184, 134, 0.8);
+}
+
+.sh-diagram__purpose {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--dg-muted);
+}
+
+.sh-diagram__foot {
+  display: block;
+  align-self: stretch;
+  margin-top: 3px;
+  padding-top: 8px;
+  border-top: 1px solid var(--dg-border);
+  min-width: 0;
+}
+
+.sh-diagram__hint {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--dg-mono);
+  font-size: 10.5px;
+  line-height: 16px;
+  color: var(--dg-muted);
+}
+
+.sh-diagram__edges {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.sh-diagram__edge {
+  stroke: rgba(255, 255, 255, 0.35);
+  stroke-width: 1.25;
+  stroke-linejoin: round;
+  stroke-linecap: butt;
+  transition:
+    stroke 0.25s ease,
+    filter 0.25s ease;
+}
+
+.sh-diagram__edge-flow {
+  stroke: var(--dg-accent);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 22 240;
+  filter: drop-shadow(0 0 5px var(--dg-accent));
+  animation: sh-edge-stream 1.5s linear infinite;
+}
+
+@keyframes sh-edge-stream {
+  from {
+    stroke-dashoffset: 262;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.sh-diagram__arrow {
+  fill: rgba(255, 255, 255, 0.35);
+}
+
+.sh-diagram__edge-label {
+  position: absolute;
+  z-index: 2;
+  padding: 3px 7px;
+  border-radius: 5px;
+  border: 1px solid var(--dg-border);
+  background: var(--dg-node-bg);
+  font-family: var(--dg-mono);
+  font-size: 11px;
+  line-height: 1.2;
+  white-space: nowrap;
+  color: var(--dg-muted);
+  pointer-events: none;
+  transition:
+    color 0.25s ease,
+    border-color 0.25s ease,
+    filter 0.25s ease;
+}
+
+.sh-diagram__legend {
+  flex: none;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  padding-top: 2px;
+  font-family: var(--dg-mono);
+  font-size: 9.5px;
+  color: var(--dg-muted);
+}
+
+.sh-diagram__legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.sh-diagram__legend-note {
+  margin-left: auto;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.sh-diagram__dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.sh-diagram__dot--frontend {
+  background: #ff6e37;
+}
+
+.sh-diagram__dot--backend {
+  background: #0077ff;
+}
+
+.sh-diagram__dot--service {
+  background: #7c5cff;
+}
+
+.sh-diagram__dot--data {
+  background: #12b886;
+}
+
+@media (max-width: 767px) {
+.sh-diagram {
+    padding: 12px 12px 10px;
+  }
+
+.sh-diagram__canvas {
+    padding: 16px 14px;
+    overflow-y: auto;
+  }
+
+.sh-diagram__flow {
+    height: auto;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+  }
+
+.sh-diagram__col {
+    gap: 14px;
+  }
+
+.sh-diagram__col + .sh-diagram__col::before {
+    content: "";
+    display: block;
+    width: 8px;
+    height: 8px;
+    margin: 14px auto;
+    border-right: 1.5px solid rgba(255, 255, 255, 0.3);
+    border-bottom: 1.5px solid rgba(255, 255, 255, 0.3);
+    transform: rotate(45deg);
+  }
+
+.sh-diagram__node {
+    min-width: 0;
+    max-width: none;
+    width: 100%;
+  }
+
+.sh-diagram__group-body {
+    gap: 12px;
+  }
+
+.sh-diagram__edges,
+  .sh-diagram__edge-label {
+    display: none;
+  }
+
+.sh-diagram__legend-note {
+    display: none;
+  }
+
+.sh-diagram__badge {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+.sh-diagram__node,
+  .sh-diagram__hint,
+  .sh-diagram__edge,
+  .sh-diagram__edge-label {
+    transition: none;
+  }
+
+.sh-diagram__edge-flow {
+    animation: none;
+  }
+}
+
+.sh-terra-chat {
+  display: flex;
+  flex-direction: column;
+  /* Narrower + taller than a composer strip — Cursor floating agent proportions. */
+  width: min(360px, calc(100cqw - 36px));
+  height: min(440px, calc(100cqh - 64px));
+  overflow: hidden;
+  border-radius: 10px;
+  background: #14120b;
+  color: #edecec;
+  font-family: var(--font-body);
+  font-size: 13px;
+  user-select: none;
+  box-shadow:
+    0 28px 70px rgba(0, 0, 0, 0.14),
+    0 14px 32px rgba(0, 0, 0, 0.1),
+    0 0 0 1px rgba(237, 236, 236, 0.1);
+}
+
+.sh-terra-chat--open {
+  width: min(360px, calc(100cqw - 36px));
+  height: min(440px, calc(100cqh - 64px));
+}
+
+.sh-terra-chat--full {
+  width: calc(100cqw - 36px);
+  height: calc(100cqh - 72px);
+  border-radius: 10px;
+}
+
+.sh-terra-chat--full .sh-terra-chat__body,
+.sh-terra-chat--full .sh-terra-chat__prompt {
+  width: 100%;
+  max-width: 720px;
+  margin-inline: auto;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+.sh-terra-chat {
+    transition:
+      width 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+      height 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+
+.sh-terra-chat__head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  height: 28px;
+  padding: 0 8px;
+  border-bottom: 1px solid rgba(237, 236, 236, 0.1);
+  cursor: grab;
+  touch-action: none;
+}
+
+.sh-terra-chat__lights {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 48px;
+}
+
+.sh-terra-chat__lights i {
+  display: block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(237, 236, 236, 0.2);
+}
+
+.sh-terra-chat__name {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(237, 236, 236, 0.55);
+  pointer-events: none;
+}
+
+.sh-terra-chat__tools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  touch-action: auto;
+}
+
+.sh-terra-chat__ctl {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(237, 236, 236, 0.45);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  touch-action: auto;
+}
+
+.sh-terra-chat__ctl:hover {
+  background: rgba(237, 236, 236, 0.08);
+  color: #edecec;
+}
+
+.sh-terra-chat__body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-height: 0;
+  padding: 10px 12px 0;
+}
+
+.sh-terra-chat__crumb {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: rgba(237, 236, 236, 0.4);
+}
+
+.sh-terra-chat__thread {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.sh-terra-chat__msg {
+  max-width: 92%;
+  margin: 0;
+  padding: 8px 11px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.45;
+  user-select: text;
+}
+
+.sh-terra-chat__msg--user {
+  align-self: flex-end;
+  background: rgba(237, 236, 236, 0.1);
+  color: #edecec;
+}
+
+.sh-terra-chat__msg--terra {
+  align-self: flex-start;
+  background: #1b1913;
+  border: 1px solid rgba(237, 236, 236, 0.08);
+  color: rgba(237, 236, 236, 0.85);
+}
+
+.sh-terra-chat__msg--error {
+  border-color: rgba(255, 100, 90, 0.35);
+  background: rgba(179, 38, 30, 0.18);
+  color: #ffb4a8;
+}
+
+.sh-terra-chat__thinking {
+  --think-wash:
+    radial-gradient(circle at 22% 28%, rgba(232, 64, 13, 0.95), transparent 55%),
+    radial-gradient(circle at 78% 72%, rgba(208, 178, 255, 1), transparent 58%),
+    radial-gradient(circle at 58% 38%, rgba(255, 238, 216, 0.9), transparent 50%),
+    linear-gradient(160deg, #e8400d 0%, #d0b2ff 55%, #ac7eff 100%);
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 92%;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background:
+    linear-gradient(#1b1913, #1b1913) padding-box,
+    var(--think-wash) border-box;
+  background-size: auto, 240% 240%;
+  animation: sh-terra-think-wash 2.8s ease-in-out infinite;
+}
+
+.sh-terra-chat__thinking-mark {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  background: var(--think-wash);
+  background-size: 240% 240%;
+  animation: sh-terra-think-wash 2.8s ease-in-out infinite;
+  box-shadow: 0 0 14px rgba(232, 64, 13, 0.4), 0 0 18px rgba(172, 126, 255, 0.25);
+}
+
+.sh-terra-chat__thinking-label {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.35;
+  background-image: linear-gradient(
+    110deg,
+    #e8400d 0%,
+    #ffc9a8 28%,
+    #d0b2ff 55%,
+    #ac7eff 78%,
+    #e8400d 100%
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: sh-terra-think-text 2.2s linear infinite;
+}
+
+@keyframes sh-terra-think-wash {
+  0%,
+  100% {
+    background-position: 0% 40%, 100% 60%, 50% 20%, 0% 50%;
+  }
+  50% {
+    background-position: 80% 20%, 10% 90%, 70% 70%, 100% 50%;
+  }
+}
+
+@keyframes sh-terra-think-text {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 220% 50%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+.sh-terra-chat__thinking,
+  .sh-terra-chat__thinking-mark,
+  .sh-terra-chat__thinking-label {
+    animation: none;
+  }
+}
+
+.sh-terra-chat__hints {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+  flex: none;
+  padding: 4px 0 4px;
+  overflow: visible;
+}
+
+.sh-terra-chat__hints-label {
+  margin: 0 0 2px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: rgba(237, 236, 236, 0.45);
+}
+
+.sh-terra-chat__hint {
+  display: block;
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(237, 236, 236, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(237, 236, 236, 0.88);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: -0.15px;
+  line-height: 1.35;
+  text-align: left;
+  text-wrap: balance;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.sh-terra-chat__hint:hover:not(:disabled) {
+  color: #fff;
+  border-color: rgba(245, 197, 24, 0.45);
+  background: rgba(245, 197, 24, 0.1);
+}
+
+.sh-terra-chat__hint:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.sh-terra-chat__body:has(.sh-terra-chat__hints) .sh-terra-chat__thread {
+  flex: 0 1 auto;
+  max-height: 120px;
+}
+
+.sh-terra-chat__prompt {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin: auto 12px 12px;
+  min-height: 40px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(237, 236, 236, 0.1);
+  background: #1b1913;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  font-size: 13px;
+  letter-spacing: -0.01em;
+  color: rgba(237, 236, 236, 0.45);
+  user-select: none;
+  overflow: hidden;
+}
+
+.sh-terra-chat__stream {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 13px;
+  color: rgba(237, 236, 236, 0.38);
+}
+
+.sh-terra-chat__caret {
+  display: inline-block;
+  width: 1.5px;
+  height: 0.95em;
+  margin-left: 1px;
+  border-radius: 1px;
+  background: linear-gradient(180deg, #e8400d, #ac7eff);
+  animation: sh-terra-caret 0.9s steps(1) infinite;
+  vertical-align: -0.1em;
+  flex-shrink: 0;
+}
+
+@keyframes sh-terra-caret {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+.sh-terra-chat__caret {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+@media (max-width: 640px) {
+.sh-terra-chat,
+  .sh-terra-chat--open,
+  .sh-terra-chat--full {
+    width: auto;
+  }
+
+.sh-terra-chat,
+  .sh-terra-chat--open {
+    height: min(440px, calc(100cqh - 64px));
+  }
+
+.sh-terra-chat--full {
+    height: calc(100cqh - 80px);
+  }
+}
+
+.sh-live {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-height: 420px;
+  border: 0;
+  background: #fff;
+}
+
+.sh-live__status {
+  margin: auto;
+  padding: 24px;
+  font-size: 0.95rem;
+  opacity: 0.7;
+  text-align: center;
+  max-width: 32rem;
+}
+
+.sh-live__status--error {
+  color: #b3261e;
+  opacity: 1;
+  white-space: pre-wrap;
+  text-align: left;
+  font-size: 0.8rem;
+}

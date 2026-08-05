@@ -40,7 +40,9 @@ import {
   TheaterModal,
   TheaterPanel,
 } from "./theater";
-import "./terra.css";
+import "../../shared/styles/tokens.css";
+import "../../shared/styles/ui.css";
+import "./landing.css";
 
 /** Router Link that still takes motion props (CTA tap/scroll-in animations). */
 const MotionLink = motion.create(Link);

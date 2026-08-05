@@ -1,70 +1,6 @@
+/* Landing page skin. Only the landing route loads this. */
+
 /* Terra landing skin. */
-
-.sh-root {
-  --color-tint: #0077ff;
-  --color-label: #000;
-  /* Page floor — Lassie background-primary (#f9f8f5). */
-  --sh-bg: #f9f8f5;
-  --sh-window: #fafafa;
-  --sh-ink: #000;
-  --sh-muted: #525252;
-  --sh-muted-2: #737373;
-  --sh-border: rgba(0, 0, 0, 0.08);
-  /* 1x.tech-style screen geometry: near-full-bleed panels, big soft corners
-     (48px small screens → 80px desktop, same as their rounded-[48px]/[80px]). */
-  --sh-screen-radius: clamp(48px, 6vw, 80px);
-  --sh-screen-width: min(88vw, 1408px);
-  /* Brand mark wash — nav, Final glyph, hero pusher face. */
-  /* Nav/glyph star: same path, stroked so the spokes read thicker at small sizes. */
-  --sh-star-mask-thick:
-    url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 21.397 23.333'%3E%3Cpath d='M 21.397 6.601 L 21.397 6.601 M 20.498 5.066 L 21.397 6.601 L 13.749 11.458 C 13.587 11.551 13.587 11.782 13.749 11.874 L 21.397 16.732 L 20.498 18.268 L 12.495 14.11 C 12.333 14.017 12.13 14.133 12.13 14.318 L 11.598 23.333 L 9.799 23.333 L 9.521 16.357 C 9.521 16.332 9.521 16.307 9.521 16.28 C 9.521 14.922 10.812 13.505 11.135 13.151 L 8.876 14.318 L 8.877 14.326 L 0.899 18.268 L 0 16.732 L 7.707 12.108 C 7.869 12.016 7.869 11.785 7.707 11.692 L 0 6.601 L 0.899 5.066 L 8.902 9.223 C 9.064 9.316 9.267 9.2 9.267 9.016 L 9.8 0 L 11.598 0 L 12.19 9.074 C 12.19 9.259 12.392 9.374 12.555 9.282 Z' fill='%23000' stroke='%23000' stroke-width='0.9' stroke-linejoin='round'/%3E%3C/svg%3E");
-  --sh-star-mask:
-    url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-0.4 -0.4 22.197 24.133'%3E%3Cpath d='M 20.768 5.527 L 21.127 6.141 L 13.749 11.458 C 13.587 11.551 13.587 11.782 13.749 11.874 L 21.127 17.193 L 20.768 17.807 L 12.495 14.11 C 12.333 14.017 12.13 14.133 12.13 14.318 L 11.058 23.333 L 10.339 23.333 L 9.521 16.357 C 9.521 16.332 9.521 16.307 9.521 16.28 C 9.521 14.922 10.812 13.505 11.135 13.151 L 8.876 14.318 L 8.877 14.326 L 0.629 17.807 L 0.27 17.193 L 7.707 12.108 C 7.869 12.016 7.869 11.785 7.707 11.692 L 0.27 6.141 L 0.629 5.527 L 8.902 9.223 C 9.064 9.316 9.267 9.2 9.267 9.016 L 10.339 0 L 11.059 0 L 12.19 9.074 C 12.19 9.259 12.392 9.374 12.555 9.282 Z' fill='%23000' stroke='%23000' stroke-width='0.7' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E");
-  --sh-terra-wash:
-    radial-gradient(circle at 22% 28%, rgba(232, 64, 13, 0.95), transparent 55%),
-    radial-gradient(circle at 78% 72%, rgba(208, 178, 255, 1), transparent 58%),
-    radial-gradient(circle at 58% 38%, rgba(255, 238, 216, 0.9), transparent 50%),
-    linear-gradient(160deg, #e8400d 0%, #d0b2ff 55%, #ac7eff 100%);
-  --font: "Inter Variable", "InterVariable", "Inter", ui-sans-serif, system-ui, sans-serif;
-
-  font-family: var(--font);
-  /* Warm off-white page floor — no weave, nothing under the type. */
-  background-color: var(--sh-bg);
-  color: var(--sh-ink);
-  min-height: 100vh;
-  /* Horizontal clip lives on sections — keeping it off the root lets the
-     hero use position:sticky (overflow-x:clip on an ancestor breaks sticky). */
-  /* Contains the footer's bottom margin instead of letting it collapse away. */
-  display: flow-root;
-  /* Tailwind's base line-height, used site-wide */
-  line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
-}
-
-.sh-root *,
-.sh-root *::before,
-.sh-root *::after {
-  box-sizing: border-box;
-}
-
-.sh-root a {
-  color: inherit;
-  text-decoration: none;
-}
-
-.sh-root a.sh-btn {
-  color: #fff;
-}
-
-.sh-root h1,
-.sh-root h2,
-.sh-root h3 {
-  font-family: inherit;
-  font-weight: 500;
-  letter-spacing: -0.025em;
-  /* 62px type renders on a 72px line in the reference layout */
-  line-height: 1.1613;
-}
 
 /* Margins are already reset globally; re-zeroing here outranks the utility
    classes below (.sh-caption et al) and silently eats their spacing. */
@@ -108,20 +44,6 @@
 
 /* Eight-point star cut out of the brand gradient; spins 60deg on hover with a
    slight overshoot (duna.com's logo behaviour). */
-.sh-terra-mark {
-  display: block;
-  flex-shrink: 0;
-  width: 38px;
-  height: 38px;
-  background: var(--sh-terra-wash);
-  -webkit-mask: var(--sh-star-mask-thick) center / contain no-repeat;
-  mask: var(--sh-star-mask-thick) center / contain no-repeat;
-  rotate: 2.5deg;
-  transition:
-    rotate 0.55s cubic-bezier(0.22, 1.35, 0.36, 1),
-    scale 0.55s cubic-bezier(0.22, 1.35, 0.36, 1),
-    opacity 0.4s ease;
-}
 
 .sh-nav__logo:hover .sh-terra-mark,
 .sh-terra-mark:hover {
@@ -130,16 +52,11 @@
 
 /* Star spins with the nav collapse/expand — same overshoot as the hover spin.
    ponytail: rides the existing rotate transition, no extra motion values. */
+
 .sh-nav__logo .sh-terra-mark--collapsed,
 .sh-nav__logo:hover .sh-terra-mark--collapsed {
   rotate: 182.5deg;
   scale: 0.88;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .sh-terra-mark {
-    transition: none;
-  }
 }
 
 .sh-nav__links {
@@ -162,42 +79,6 @@
 
 /* Railway-style CTAs: clear rounded rects, solid fill, hairline border —
    not pills. Hover brightens instead of growing. */
-.sh-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 8px;
-  background: #e8400d;
-  color: #fff;
-  font-size: 16px;
-  font-weight: 500;
-  font-family: inherit;
-  letter-spacing: -0.2px;
-  line-height: 1.4;
-  padding: 12px 24px;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: filter 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.sh-btn:hover {
-  filter: brightness(1.1);
-  color: #fff;
-}
-
-.sh-btn--nav {
-  font-size: 16px;
-  letter-spacing: -0.1px;
-  padding: 14px 22px;
-  margin-left: 8px;
-}
-
-.sh-btn svg {
-  width: 14px;
-  height: 14px;
-}
 
 .sh-caption {
   margin-top: 8px;
@@ -225,6 +106,7 @@
 
 /* The star is fixed inside the hero's stacking context, so every later section
    needs its own layer at the same level to sit on top of it as it drifts by. */
+
 .sh-section:not(.sh-section--hero) {
   position: relative;
   z-index: 1;
@@ -232,6 +114,7 @@
 
 /* Sticky scrub track: browser-native pin blends free scroll → framed drag
    → hold → release with no JS position swaps. */
+
 .sh-hero-pin {
   position: relative;
   width: 100%;
@@ -239,6 +122,7 @@
 
 /* Hero only: sticky pin + shader canvas positioning context.
    --hero-stick-top frames the big screen card under the nav while stuck. */
+
 .sh-section--hero {
   position: sticky;
   top: var(--hero-stick-top, 0px);
@@ -256,12 +140,14 @@
    real section heights, so materialising one resized the document mid-scroll
    and yanked the page back up. `contain: paint` gets most of the win without
    ever changing layout. */
+
 .sh-section:not(.sh-section--hero) {
   contain: paint;
 }
 
 /* Terra-star wash: the shader canvas is clipped into the big star
    (--sh-star-mask) and spins slowly behind the headline. */
+
 .sh-backdrop-wrap {
   /* Fixed to the viewport so the star survives past the hero and glides
      side to side as later sections come up. */
@@ -307,6 +193,7 @@
 /* The spinning face: mask + wash live on a child so the rotation can be a
    pure-CSS compositor animation — no per-frame JS style writes. The parent
    keeps translate/scale (section tracker + dock) without fighting it. */
+
 .sh-backdrop__spin {
   position: absolute;
   inset: 0;
@@ -335,12 +222,13 @@
 }
 
 /* Hidden star = invisible work; park the animation too. */
+
 .sh-backdrop:not(.sh-backdrop--revealed) .sh-backdrop__spin {
   animation-play-state: paused;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sh-backdrop__spin {
+.sh-backdrop__spin {
     animation: none;
   }
 }
@@ -350,17 +238,20 @@
 }
 
 /* After the word handoff the star drifts further left, clear of the headline. */
+
 .sh-backdrop--parked {
   --sh-star-x: -28vw;
 }
 
 /* Docked into the Final glyph: it has arrived, so it now tracks the (scrolling)
    glyph frame-exactly — a transition here would make it lag behind the page. */
+
 .sh-backdrop--docked {
   transition: none;
 }
 
 /* The static mark steps aside while the big star occupies its slot. */
+
 .sh-final__glyph--handoff .sh-terra-mark {
   opacity: 0;
 }
@@ -393,6 +284,7 @@
 }
 
 /* Title + flight park: anchor is an invisible tile-sized slot to the right. */
+
 .sh-hero-head {
   position: relative;
   width: 100%;
@@ -409,8 +301,9 @@
 }
 
 @media (max-width: 900px) {
-  /* Keep the card on-screen when the title column is narrow. */
-  .sh-flight-anchor {
+/* Keep the card on-screen when the title column is narrow. */
+
+.sh-flight-anchor {
     left: auto;
     right: -12px;
     top: auto;
@@ -426,8 +319,10 @@
 
 /* Pencil "Try it" curl: hangs off the right edge of the Power title block and
    points down into the demo. Purely decorative — hidden when it would crowd. */
+
 /* Anchor box for the note: shrink-wraps the headline so the curl can hang off
    the last letter instead of off the (much wider) copy column. */
+
 .sh-section-title--note {
   position: relative;
   width: fit-content;
@@ -453,17 +348,19 @@
 }
 
 @media (max-width: 1180px) {
-  .sh-tryit {
+.sh-tryit {
     display: none;
   }
 }
 
 /* Safe uses sm:my-32 where the other sections use my-24 */
+
 .sh-copy--lg {
   margin: 128px auto;
 }
 
 /* Trust: headline + proof copy + logos + stage read as one unit. */
+
 .sh-copy--trust {
   margin: 96px auto 0;
   max-width: 720px;
@@ -488,11 +385,11 @@
 }
 
 @media (min-width: 640px) {
-  .sh-copy--trust {
+.sh-copy--trust {
     margin-top: 128px;
   }
 
-  .sh-section--trust .sh-stage--safe {
+.sh-section--trust .sh-stage--safe {
     margin: 56px auto 128px;
   }
 }
@@ -517,6 +414,7 @@
 }
 
 /* Anchor for the push stage; overflow visible so the bumped word stays on screen. */
+
 .sh-hero-title__swap-anchor {
   position: relative;
   overflow: visible;
@@ -529,11 +427,13 @@
 
 /* Sizer keeps the slot wide; the word itself starts at the slot's left edge so
    the sweep percentages line up with the glyphs, not with the empty gap. */
+
 .sh-hero-title__swap > .sh-hero-title__word {
   justify-self: center;
 }
 
 /* Word cell hosts the ink, its smudge, and the hand sprite in one stack. */
+
 .sh-hero-title span.sh-hero-title__word {
   display: inline-grid;
   justify-items: start;
@@ -545,6 +445,7 @@
 }
 
 /* Graphite dust the eraser leaves behind — sits under the tool, fades fast. */
+
 .sh-hero-title__smudge {
   color: #8d857d;
   opacity: 0.16;
@@ -555,6 +456,7 @@
 /* The written word is a pencil drawing, not type: hollow graphite stroke with
    the same texture filter and the same ink as the hero trail. It stays that
    way after the write — the line is hand-corrected, and it reads as such. */
+
 .sh-hero-title__ink--pencil {
   /* Faint fill so the letterforms hold at small sizes; the stroke is the drawing. */
   /* Thin sketched outline, same grain filter as the trail. Softer than the
@@ -567,6 +469,7 @@
 }
 
 /* Eraser / pencil sprites ride the sweep edge; `left` is the animated %. */
+
 .sh-hero-title span.sh-hand {
   position: absolute;
   top: 50%;
@@ -577,6 +480,7 @@
 }
 
 /* `translate` (not `transform`) — Motion owns transform for the wobble. */
+
 .sh-hand--erase {
   translate: -42% -50%;
 }
@@ -593,6 +497,7 @@
 }
 
 /* Capital "E" on "Engineers" — the star's grab point. */
+
 .sh-hero-title__word--cap::first-letter {
   text-transform: uppercase;
 }
@@ -600,8 +505,10 @@
 /* Both words share one grid cell, so the slot is always as wide as the wider
    of them: the line never reflows mid-swap and neither does the hand beside it.
    Unclipped on purpose — the bumped word travels outside the line. */
+
 /* Outranks `.sh-hero-title span { display: inline-block }` above, which would
    otherwise put the sizer beside the word instead of behind it. */
+
 .sh-hero-title span.sh-hero-title__swap {
   position: relative;
   z-index: 1;
@@ -646,6 +553,7 @@
 }
 
 /* Hero window: sits lower so it rests on the coral wash, not above it. */
+
 .sh-section--hero .sh-stage {
   margin-top: 180px;
 }
@@ -655,12 +563,13 @@
 }
 
 @media (min-width: 640px) {
-  .sh-section--hero .sh-window {
+.sh-section--hero .sh-window {
     min-height: 720px;
   }
 }
 
 /* Nudge only the white repo window up — stage/copy/flight layout stay put. */
+
 .sh-section--hero .sh-window-wrap {
   transform: translateY(-56px);
 }
@@ -675,7 +584,7 @@
 }
 
 @media (min-width: 640px) {
-  .sh-stage--wide {
+.sh-stage--wide {
     height: 760px;
     margin: 128px auto;
   }
@@ -683,6 +592,7 @@
 
 /* Ops stage — near full-bleed card. Frame ratio matches ask-terra.mp4
    (2330×1390) so the whole clip fills the card with no crop. */
+
 .sh-stage--ops {
   width: 100%;
   max-width: 1100px;
@@ -694,12 +604,13 @@
 }
 
 @media (min-width: 640px) {
-  .sh-stage--ops {
+.sh-stage--ops {
     margin: 80px auto 128px;
   }
 }
 
 /* Power stage — wide wallpaper frame; the ops window stays capped below. */
+
 .sh-stage--power {
   width: var(--sh-screen-width);
   max-width: none;
@@ -712,13 +623,14 @@
 }
 
 @media (min-width: 640px) {
-  .sh-stage--power {
+.sh-stage--power {
     margin: 80px auto 128px;
   }
 }
 
 /* Second theater: scenic wallpaper fills the wide frame; screen stays
    centered at the previous product width so only the background expands. */
+
 .sh-power-theater {
   position: relative;
   display: grid;
@@ -771,12 +683,13 @@
 }
 
 @media (max-width: 720px) {
-  .sh-power-theater__screen {
+.sh-power-theater__screen {
     padding: 28px 16px 72px;
   }
 }
 
 /* Tab bar on the scenic strip under the product screen. */
+
 .sh-power-theater__tabs {
   position: absolute;
   z-index: 4;
@@ -788,7 +701,7 @@
 }
 
 @media (max-width: 720px) {
-  .sh-power-theater__tabs {
+.sh-power-theater__tabs {
     bottom: 16px;
   }
 }
@@ -805,6 +718,7 @@
 
 /* Ops screen inside the Power of Terra window: dark diagram shell, header
    on top, preview fills the card (no caption under the frame). */
+
 .sh-power-ops {
   flex: 1;
   min-height: 0;
@@ -839,6 +753,7 @@
 
 /* Keep-alive panes: stack in the frame; inactive stays mounted (visibility
    only) so Ask's iframe/preview isn't torn down on tab switch. */
+
 .sh-ops__pane {
   position: absolute;
   inset: 0;
@@ -858,6 +773,7 @@
 
 /* Map tab: the diagram is the whole frame — its own border/radius would
    double up with the frame's. Pane padding already clears the tabs. */
+
 .sh-ops__state .sh-diagram {
   border: none;
   border-radius: 0;
@@ -905,6 +821,7 @@
 /* Ask tab embeds the web-node theater (real frontend + Terra chat). It's a
    permanent screen here, not a popover — no close/fullscreen chrome, and the
    frame's own rounding clips the panel. Leave room for the floating tabs. */
+
 .sh-ops__state .sh-theater__panel--inline {
   border-radius: 0;
   border: none;
@@ -921,6 +838,7 @@
 
 /* Let the floating chat overhang the preview onto the wallpaper. Keep the
    live stage clipped so only the dock escapes the product chrome. */
+
 .sh-power-theater .sh-window,
 .sh-power-theater .sh-window-body,
 .sh-power-theater .sh-diagram,
@@ -994,6 +912,7 @@
 }
 
 /* Ops tabs — Railway segmented control (positioned by theater / frame). */
+
 .sh-ops__tabs {
   display: flex;
   flex-wrap: nowrap;
@@ -1042,6 +961,7 @@
 }
 
 /* Hairline divider between segments — skip after the last tab. */
+
 .sh-ops__tab:not(:last-child)::after {
   content: "";
   position: absolute;
@@ -1064,6 +984,7 @@
 }
 
 /* Hide the divider on the active tab and the one before it so the pill reads clean. */
+
 .sh-ops__tab.is-active::after,
 .sh-ops__tab:has(+ .sh-ops__tab.is-active)::after {
   opacity: 0;
@@ -1078,6 +999,7 @@
    a 2×2 mirrored tile (seamless repeat) at half its pixel size, so retina gets
    full native density. Stays put once the map lands — the diagram sits on the
    same weave the empty screen had. */
+
 .sh-section--hero .sh-window::before {
   content: "";
   position: absolute;
@@ -1131,12 +1053,13 @@
 }
 
 /* The bare window's big corner radius eats the legend's ends — inset it. */
+
 .sh-window--bare .sh-diagram__legend {
   padding-inline: 28px;
 }
 
 @media (min-width: 640px) {
-  .sh-window {
+.sh-window {
     min-height: 720px;
   }
 }
@@ -1157,40 +1080,6 @@
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.sh-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: #fff;
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  font-size: 13px;
-  font-weight: 500;
-  color: #171717;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-}
-
-.sh-chip--tint {
-  background: var(--color-tint);
-  color: #fff;
-  border-color: transparent;
-}
-
-.sh-chip__mark {
-  width: 14px;
-  height: 14px;
-  border-radius: 4px;
-  background: var(--color-tint);
-  flex-shrink: 0;
-}
-
-.sh-chip svg {
-  width: 16px;
-  height: 16px;
-  opacity: 0.7;
 }
 
 .sh-zoom {
@@ -1298,10 +1187,11 @@
 }
 
 @media (min-width: 768px) {
-  .sh-canvas__col--md {
+.sh-canvas__col--md {
     display: grid;
   }
-  .sh-file--md {
+
+.sh-file--md {
     display: block;
   }
 }
@@ -1316,12 +1206,13 @@
 }
 
 @media (min-width: 768px) {
-  .sh-file--md {
+.sh-file--md {
     display: block;
   }
 }
 
 /* Component face. Drawn, not photographed: the cloned art was stock photos. */
+
 .sh-tile {
   display: grid;
   place-items: center;
@@ -1340,6 +1231,7 @@
 }
 
 /* Names stay on one line and spill past the card edge, as in the reference layout. */
+
 .sh-file__name,
 .sh-file__sub {
   width: max-content;
@@ -1383,6 +1275,7 @@
 
 /* Pencil hint from the parked GitHub card into the repo window. Shares the
    stage-centered origin with `.sh-flight`; overflow:visible does the drawing. */
+
 .sh-trail {
   position: absolute;
   left: 50%;
@@ -1397,8 +1290,9 @@
 
 /* ponytail: hidden narrow — the anchor jumps under the title and the curl
    would cross the copy. Draw a mobile variant only if it's asked for. */
+
 @media (max-width: 900px) {
-  .sh-trail {
+.sh-trail {
     display: none;
   }
 }
@@ -1421,6 +1315,7 @@
 }
 
 /* Same wash as the hero shader: coral + cream + violet, flowing + grain. */
+
 .sh-tile--github {
   position: relative;
   isolation: isolate;
@@ -1434,6 +1329,7 @@
 }
 
 /* Drifting blobs — same palette as HeroBackdrop (coral / cream / violet). */
+
 .sh-tile--github::before {
   content: "";
   position: absolute;
@@ -1452,6 +1348,7 @@
 }
 
 /* Film grain speckles over the flowing wash. */
+
 .sh-tile--github::after {
   content: "";
   position: absolute;
@@ -1477,7 +1374,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sh-tile--github::before {
+.sh-tile--github::before {
     animation: none;
     inset: -20%;
     transform: none;
@@ -1504,6 +1401,7 @@
 }
 
 /* Classic arrow parked on the bottom-right so the card reads as grabbed. */
+
 .sh-flight__pointer {
   position: absolute;
   right: -4px;
@@ -1516,10 +1414,10 @@
 .sh-tile--flight.ring-amber {
   box-shadow: 0 0 0 2px #f59e0b, 0 20px 30px rgba(0, 0, 0, 0.18);
 }
+
 .sh-tile--flight.ring-orange {
   box-shadow: 0 0 0 2px #f97316, 0 20px 30px rgba(0, 0, 0, 0.18);
 }
-
 
 /* ---- overlays / panels ---- */
 
@@ -1558,11 +1456,12 @@
 }
 
 @media (min-width: 640px) {
-  .sh-panel--share {
+.sh-panel--share {
     right: 16px;
     top: 53px;
   }
-  .sh-panel--storage {
+
+.sh-panel--storage {
     left: 32px;
     top: 50%;
     bottom: auto;
@@ -1607,6 +1506,7 @@
 }
 
 /* Intuitive preview overlay — large centered panel */
+
 .sh-preview-shell {
   position: absolute;
   left: 50%;
@@ -1626,7 +1526,7 @@
 }
 
 @media (min-width: 640px) {
-  .sh-preview-shell {
+.sh-preview-shell {
     width: 540px;
   }
 }
@@ -1697,6 +1597,7 @@
 }
 
 /* Smart command palette */
+
 .sh-cmd {
   position: relative;
   z-index: 20;
@@ -1774,7 +1675,7 @@
 }
 
 @media (min-width: 640px) {
-  .sh-smart__window {
+.sh-smart__window {
     display: flex;
   }
 }
@@ -1801,7 +1702,7 @@
 }
 
 @media (min-width: 640px) {
-  .sh-smart__cmd-wrap {
+.sh-smart__cmd-wrap {
     margin-bottom: 48px;
   }
 }
@@ -1922,7 +1823,7 @@
 }
 
 @media (min-width: 640px) {
-  .sh-logos li {
+.sh-logos li {
     padding: 0 48px;
   }
 }
@@ -1941,7 +1842,7 @@
 }
 
 @media (min-width: 640px) {
-  .sh-final {
+.sh-final {
     margin: 128px auto;
   }
 }
@@ -1952,7 +1853,7 @@
 }
 
 @media (min-width: 640px) {
-  .sh-final__glyph {
+.sh-final__glyph {
     width: 80px;
     height: 80px;
   }
@@ -1993,27 +1894,35 @@
 }
 
 /* color helpers used by data */
+
 .bg-amber {
   background: #f59e0b;
 }
+
 .bg-orange {
   background: #f97316;
 }
+
 .bg-red {
   background: #ef4444;
 }
+
 .bg-indigo {
   background: #6366f1;
 }
+
 .text-amber {
   color: #f59e0b;
 }
+
 .text-orange {
   color: #f97316;
 }
+
 .text-red {
   color: #ef4444;
 }
+
 .text-indigo {
   color: #6366f1;
 }
@@ -2022,42 +1931,14 @@
    A left→right flow on a dark agent canvas: the app people touch, a boxed
    group of the things that do the work, and where it all gets remembered. */
 
-.sh-diagram {
-  --dg-bg: #101116;
-  --dg-grid: rgba(255, 255, 255, 0.07);
-  --dg-border: rgba(255, 255, 255, 0.12);
-  --dg-node-bg: #1c1e24;
-  --dg-text: rgba(255, 255, 255, 0.92);
-  --dg-muted: rgba(255, 255, 255, 0.45);
-  --dg-accent: var(--color-tint);
-  /* Railway vocabulary: violet selection ring, green verified dot. */
-  --dg-select: #8b7cf6;
-  --dg-ok: #12b886;
-  --dg-mono: "SF Mono", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo,
-    monospace;
-
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  padding: 14px 16px 12px;
-  gap: 10px;
-  box-sizing: border-box;
-  /* The card is the whole diagram — header, canvas and legend all sit inside
-     one border instead of floating on the window chrome. */
-  border-radius: 16px;
-  background: var(--dg-bg);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
 /* With a toolbar the window is a positioned box whose height is set by chrome:
    the diagram's `height: 100%` resolves to auto and the canvas collapses. Fill
    by flex instead, and inset past the absolutely-positioned bar and zoom pill. */
+
 /* Hero map: same weave the empty screen had, so the drop lands the diagram on
    the paper rather than swapping the surface out for a dark panel. The whole
    diagram is token-driven, so a light palette is all it takes. */
+
 .sh-section--hero .sh-diagram {
   --dg-bg: transparent;
   --dg-grid: rgba(60, 55, 51, 0.10);
@@ -2074,6 +1955,7 @@
 }
 
 /* Hover adds a lift, so it needs to fade in with the rest. */
+
 .sh-section--hero .sh-diagram__node {
   transition:
     border-color 0.2s ease,
@@ -2106,6 +1988,7 @@
 /* Evidence footer per card — at hero size four of them cost a whole card of
    height and force the scale-fit down. The hero teaches the shape; the
    workspace map carries the paths. */
+
 .sh-section--hero .sh-diagram__foot {
   display: none;
 }
@@ -2120,6 +2003,7 @@
 
 /* Web App / Storage stand alone against a four-card stack — give the lone
    cards some body so the sides don't read as afterthoughts. */
+
 .sh-section--hero .sh-diagram__col:first-child .sh-diagram__node,
 .sh-section--hero .sh-diagram__col:last-child .sh-diagram__node {
   min-height: 150px;
@@ -2136,6 +2020,7 @@
 
 /* The handful of ink colours the diagram hardcodes for its dark panel — on
    paper they need to be dark, not white. */
+
 .sh-section--hero .sh-diagram,
 .sh-section--hero .sh-diagram__canvas {
   border-color: rgba(60, 55, 51, 0.12);
@@ -2147,6 +2032,7 @@
 
 /* Group box (BACKEND …): its outline has to hold against the weave, so it gets
    a stronger, slightly warm rule than the card borders. */
+
 .sh-section--hero .sh-diagram__group {
   border-color: rgba(60, 55, 51, 0.3);
   border-radius: 12px;
@@ -2163,12 +2049,14 @@
 
 /* Full-bleed the columns drift metres apart and the wires thin out into the
    weave — cap the flow so the map reads as one figure, not three islands. */
+
 .sh-section--hero .sh-diagram__flow {
   max-width: 1180px;
   margin: 0 auto;
 }
 
 /* Weave under the wires eats thin strokes — thicker than on the flat panel. */
+
 .sh-section--hero .sh-diagram__edge {
   stroke-width: 1.9;
 }
@@ -2179,6 +2067,7 @@
 
 /* Hover lifts the card off the paper — brighter and a touch more defined,
    never the dark-panel fill the default theme uses. */
+
 .sh-section--hero .sh-diagram__node:hover {
   border-color: rgba(60, 55, 51, 0.3);
   background: rgba(255, 255, 255, 0.95);
@@ -2194,6 +2083,7 @@
 }
 
 /* Caption chips sink into the weave at 11px muted — give them real ink. */
+
 .sh-section--hero .sh-diagram__edge-label {
   color: rgba(24, 22, 20, 0.75);
   border-color: rgba(60, 55, 51, 0.3);
@@ -2207,15 +2097,9 @@
   padding-bottom: 54px;
 }
 
-.sh-diagram__header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex: none;
-}
-
 /* `.sh-tile` centers itself with auto margins; in the header it belongs in the
    left group next to the repo title (the badge that balanced it is gone). */
+
 .sh-diagram__header .sh-tile {
   margin: 0;
 }
@@ -2240,174 +2124,15 @@
   height: 19px;
 }
 
-.sh-diagram__title {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.sh-diagram__repo {
-  font-family: var(--dg-mono);
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--dg-text);
-  letter-spacing: -0.01em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.sh-diagram__meta {
-  font-size: 10.5px;
-  color: var(--dg-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.sh-diagram__badge {
-  margin-left: auto;
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 9px;
-  border-radius: 999px;
-  border: 1px solid var(--dg-border);
-  background: rgba(255, 255, 255, 0.03);
-  font-family: var(--dg-mono);
-  font-size: 10px;
-  color: var(--dg-muted);
-  white-space: nowrap;
-}
-
-.sh-diagram__badge::before {
-  content: "";
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: #12b886;
-  box-shadow: 0 0 6px rgba(18, 184, 134, 0.8);
-}
-
 /* ---- canvas ---- */
-
-.sh-diagram__canvas {
-  position: relative;
-  flex: 1;
-  min-height: 0;
-  padding: 26px 22px;
-  box-sizing: border-box;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  background-color: rgba(0, 0, 0, 0.18);
-  background-image: radial-gradient(var(--dg-grid) 1px, transparent 1px);
-  background-size: 20px 20px;
-  overflow: hidden;
-}
 
 /* The content layer RepoDiagram scales down when a column outgrows the canvas.
    `padding: inherit` keeps the flow inside the same padding box it had as a
    direct child, so the measured offsets don't move. */
-.sh-diagram__scale {
-  position: absolute;
-  inset: 0;
-  padding: inherit;
-  box-sizing: border-box;
-  transform-origin: 50% 50%;
-}
-
-.sh-diagram__flow {
-  position: relative;
-  z-index: 1;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: clamp(34px, 7%, 90px);
-}
-
-.sh-diagram__col {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 22px;
-  min-width: 0;
-}
 
 /* ---- group box ---- */
 
-.sh-diagram__group {
-  border: 1px solid var(--dg-border);
-  border-radius: 10px;
-  padding: 12px 14px 14px;
-  /* Left transparent on purpose: the arrows are painted underneath the flow
-     layer, so `web → api` and `memos/files → db` cross this box's padding on
-     their way to a card edge. Any fill tints them. */
-  background: transparent;
-}
-
-.sh-diagram__group-title {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin-bottom: 12px;
-  font-family: var(--dg-mono);
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.6);
-}
-
-.sh-diagram__group-title span {
-  font-weight: 400;
-  letter-spacing: 0.02em;
-  text-transform: none;
-  color: rgba(255, 255, 255, 0.32);
-}
-
-.sh-diagram__group-body {
-  display: flex;
-  flex-direction: column;
-  /* 22px, not 10: a stacked vertical connector shorter than this is entirely
-     swallowed by its own arrowhead. */
-  gap: 22px;
-}
-
 /* ---- node ---- */
-
-.sh-diagram__node {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-  min-width: 196px;
-  max-width: 250px;
-  padding: 13px 14px 12px;
-  border-radius: 11px;
-  border: 1px solid var(--dg-border);
-  background: var(--dg-node-bg);
-  text-align: left;
-  cursor: pointer;
-  font: inherit;
-  color: var(--dg-text);
-  transition:
-    border-color 0.2s ease,
-    background 0.2s ease,
-    filter 0.25s ease;
-}
-
-.sh-diagram__node:hover {
-  border-color: rgba(255, 255, 255, 0.28);
-  background: #21242a;
-}
-
-.sh-diagram__node--hover-only {
-  cursor: default;
-}
 
 .sh-diagram__node.is-focus {
   /* Railway's clean violet ring — border plus a 1px shadow so it reads as 2px
@@ -2417,123 +2142,18 @@
 }
 
 /* Never the `opacity` property — Motion writes that inline on every card. */
+
 .sh-diagram__node.is-dim {
   filter: opacity(0.25) saturate(0.4);
 }
 
-.sh-diagram__node-top {
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  max-width: 100%;
-  min-width: 0;
-}
-
 /* The tech tile: brand colours arrive inline from TechIcon. */
-.sh-diagram__icon {
-  width: 24px;
-  height: 24px;
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-  font-family: var(--dg-mono);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  user-select: none;
-}
-
-.sh-diagram__icon svg {
-  width: 16px;
-  height: 16px;
-}
-
-.sh-diagram__icon--fallback {
-  color: #fff;
-  font-size: 11px;
-}
-
-.sh-diagram__name {
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  color: var(--dg-text);
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.sh-diagram__status {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-family: var(--dg-mono);
-  font-size: 10px;
-  color: var(--dg-muted);
-}
-
-.sh-diagram__status-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--dg-ok);
-  box-shadow: 0 0 6px rgba(18, 184, 134, 0.8);
-}
-
-.sh-diagram__purpose {
-  font-size: 12px;
-  line-height: 1.4;
-  color: var(--dg-muted);
-}
 
 /* Railway's attached-volume row: the card's evidence path lives in a footer
    sub-row under its own rule. Always visible — static card heights keep the
    measured arrows honest. */
-.sh-diagram__foot {
-  display: block;
-  align-self: stretch;
-  margin-top: 3px;
-  padding-top: 8px;
-  border-top: 1px solid var(--dg-border);
-  min-width: 0;
-}
-
-.sh-diagram__hint {
-  display: block;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-family: var(--dg-mono);
-  font-size: 10.5px;
-  line-height: 16px;
-  color: var(--dg-muted);
-}
 
 /* ---- connections ---- */
-
-.sh-diagram__edges {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.sh-diagram__edge {
-  stroke: rgba(255, 255, 255, 0.35);
-  stroke-width: 1.25;
-  stroke-linejoin: round;
-  stroke-linecap: butt;
-  transition:
-    stroke 0.25s ease,
-    filter 0.25s ease;
-}
 
 .sh-diagram__edge.is-lit {
   stroke: var(--dg-accent);
@@ -2546,55 +2166,15 @@
 
 /* Streak of light running along a lit wire, source → target. Dash lengths are
    user units, so on a short route it reads as one pulse rather than a train. */
-.sh-diagram__edge-flow {
-  stroke: var(--dg-accent);
-  stroke-width: 2.4;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-dasharray: 22 240;
-  filter: drop-shadow(0 0 5px var(--dg-accent));
-  animation: sh-edge-stream 1.5s linear infinite;
-}
 
 /* Back-routed edges are drawn end-to-start, so the light runs the other way. */
+
 .sh-diagram__edge-flow.is-back {
   animation-direction: reverse;
 }
 
-@keyframes sh-edge-stream {
-  from {
-    stroke-dashoffset: 262;
-  }
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-
-.sh-diagram__arrow {
-  fill: rgba(255, 255, 255, 0.35);
-}
-
 .sh-diagram__arrow.is-lit {
   fill: var(--dg-accent);
-}
-
-.sh-diagram__edge-label {
-  position: absolute;
-  z-index: 2;
-  padding: 3px 7px;
-  border-radius: 5px;
-  border: 1px solid var(--dg-border);
-  background: var(--dg-node-bg);
-  font-family: var(--dg-mono);
-  font-size: 11px;
-  line-height: 1.2;
-  white-space: nowrap;
-  color: var(--dg-muted);
-  pointer-events: none;
-  transition:
-    color 0.25s ease,
-    border-color 0.25s ease,
-    filter 0.25s ease;
 }
 
 .sh-diagram__edge-label.is-lit {
@@ -2608,120 +2188,10 @@
 
 /* ---- legend ---- */
 
-.sh-diagram__legend {
-  flex: none;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px 14px;
-  padding-top: 2px;
-  font-family: var(--dg-mono);
-  font-size: 9.5px;
-  color: var(--dg-muted);
-}
-
-.sh-diagram__legend span {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  white-space: nowrap;
-}
-
-.sh-diagram__legend-note {
-  margin-left: auto;
-  color: rgba(255, 255, 255, 0.3);
-}
-
-.sh-diagram__dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  flex: none;
-}
-
-.sh-diagram__dot--frontend {
-  background: #ff6e37;
-}
-.sh-diagram__dot--backend {
-  background: #0077ff;
-}
-.sh-diagram__dot--service {
-  background: #7c5cff;
-}
-.sh-diagram__dot--data {
-  background: #12b886;
-}
-
 /* ---- stacked fallback ---- */
 
 @media (max-width: 767px) {
-  .sh-diagram {
-    padding: 12px 12px 10px;
-  }
-
-  .sh-diagram__canvas {
-    padding: 16px 14px;
-    overflow-y: auto;
-  }
-
-  .sh-diagram__flow {
-    height: auto;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0;
-  }
-
-  .sh-diagram__col {
-    gap: 14px;
-  }
-
-  /* A down-chevron stands in for the arrows the stacked layout drops. */
-  .sh-diagram__col + .sh-diagram__col::before {
-    content: "";
-    display: block;
-    width: 8px;
-    height: 8px;
-    margin: 14px auto;
-    border-right: 1.5px solid rgba(255, 255, 255, 0.3);
-    border-bottom: 1.5px solid rgba(255, 255, 255, 0.3);
-    transform: rotate(45deg);
-  }
-
-  .sh-diagram__node {
-    min-width: 0;
-    max-width: none;
-    width: 100%;
-  }
-
-  .sh-diagram__group-body {
-    gap: 12px;
-  }
-
-  .sh-diagram__edges,
-  .sh-diagram__edge-label {
-    display: none;
-  }
-
-  .sh-diagram__legend-note {
-    display: none;
-  }
-
-  .sh-diagram__badge {
-    display: none;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .sh-diagram__node,
-  .sh-diagram__hint,
-  .sh-diagram__edge,
-  .sh-diagram__edge-label {
-    transition: none;
-  }
-
-  .sh-diagram__edge-flow {
-    animation: none;
-  }
+/* A down-chevron stands in for the arrows the stacked layout drops. */
 }
 
 /* ---- theater ---- */
@@ -2780,6 +2250,7 @@
 
 /* Inline: the panel covers the whole diagram card at its full size — header,
    canvas and legend included — rather than standing in for the canvas. */
+
 .sh-theater__panel--inline {
   position: absolute;
   inset: 0;
@@ -2793,12 +2264,14 @@
 
 /* The panel owns the frame while open: the window's own toolbar and zoom pill
    would otherwise collide with the panel's chips. */
+
 .sh-window:has(.sh-theater__panel--inline) > .sh-window__bar,
 .sh-window:has(.sh-theater__panel--inline) > .sh-zoom {
   display: none;
 }
 
 /* Edge-to-edge: project owns the card; chrome/dock float on top. */
+
 .sh-theater__panel--inline .sh-replica {
   padding: 0;
 }
@@ -2809,6 +2282,7 @@
 }
 
 /* Implement explore — designed Memos shell fills the stage. */
+
 .sh-theater__panel--inline .sh-replica--explore {
   padding: 0;
   overflow: hidden;
@@ -2820,7 +2294,7 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .sh-theater__panel {
+.sh-theater__panel {
     transition:
       width 0.32s cubic-bezier(0.16, 1, 0.3, 1),
       height 0.32s cubic-bezier(0.16, 1, 0.3, 1),
@@ -2829,6 +2303,7 @@
 }
 
 /* Edge-to-edge stage: the demo owns the whole panel, chrome floats on top. */
+
 .sh-theater__stage {
   position: absolute;
   inset: 0;
@@ -3020,6 +2495,7 @@
 }
 
 /* Designed Memos Explore: dark shell matching the icon rail. */
+
 .sh-replica .rp-shell {
   display: grid;
   grid-template-columns: 64px 240px minmax(0, 1fr);
@@ -3030,6 +2506,7 @@
 }
 
 /* Dark Memos icon rail — matches the live app sidebar. */
+
 .sh-replica .rp-rail {
   display: flex;
   flex-direction: column;
@@ -3299,11 +2776,11 @@
 }
 
 @media (max-width: 900px) {
-  .sh-replica .rp-shell {
+.sh-replica .rp-shell {
     grid-template-columns: 56px minmax(0, 1fr);
   }
 
-  .sh-replica .rp-explorer {
+.sh-replica .rp-explorer {
     display: none;
   }
 }
@@ -3318,6 +2795,7 @@
 }
 
 /* Theater: mock content fills the stage (no centered 640 column). */
+
 .sh-theater__stage .sh-replica:not(.sh-replica--live):not(.sh-replica--explore) {
   padding: 16px;
 }
@@ -3566,6 +3044,7 @@
 }
 
 /* Same hover color stays on Terra's focused picks (up to 3). */
+
 .sh-replica [data-sel].is-selected {
   outline: 2px solid var(--yellow);
   outline-offset: 3px;
@@ -3603,400 +3082,34 @@
 }
 
 /* Opaque dark shell — Cursor product demos never use backdrop-filter over live UI. */
-.sh-terra-chat {
-  display: flex;
-  flex-direction: column;
-  /* Narrower + taller than a composer strip — Cursor floating agent proportions. */
-  width: min(360px, calc(100cqw - 36px));
-  height: min(440px, calc(100cqh - 64px));
-  overflow: hidden;
-  border-radius: 10px;
-  background: #14120b;
-  color: #edecec;
-  font-family: var(--font-body);
-  font-size: 13px;
-  user-select: none;
-  box-shadow:
-    0 28px 70px rgba(0, 0, 0, 0.14),
-    0 14px 32px rgba(0, 0, 0, 0.1),
-    0 0 0 1px rgba(237, 236, 236, 0.1);
-}
-
-.sh-terra-chat--open {
-  width: min(360px, calc(100cqw - 36px));
-  height: min(440px, calc(100cqh - 64px));
-}
-
-.sh-terra-chat--full {
-  width: calc(100cqw - 36px);
-  height: calc(100cqh - 72px);
-  border-radius: 10px;
-}
-
-.sh-terra-chat--full .sh-terra-chat__body,
-.sh-terra-chat--full .sh-terra-chat__prompt {
-  width: 100%;
-  max-width: 720px;
-  margin-inline: auto;
-}
 
 @media (prefers-reduced-motion: no-preference) {
-  .sh-terra-chat {
-    transition:
-      width 0.22s cubic-bezier(0.16, 1, 0.3, 1),
-      height 0.22s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-
-  .sh-theater__dock.is-dragging .sh-terra-chat {
+.sh-theater__dock.is-dragging .sh-terra-chat {
     transition: none;
   }
 }
 
 /* Title bar — Cursor h-7 traffic lights + title */
-.sh-terra-chat__head {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-shrink: 0;
-  height: 28px;
-  padding: 0 8px;
-  border-bottom: 1px solid rgba(237, 236, 236, 0.1);
-  cursor: grab;
-  touch-action: none;
-}
 
 .sh-terra-chat__head:active,
 .sh-theater__dock.is-dragging .sh-terra-chat__head {
   cursor: grabbing;
 }
 
-.sh-terra-chat__lights {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: 48px;
-}
-
-.sh-terra-chat__lights i {
-  display: block;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: rgba(237, 236, 236, 0.2);
-}
-
-.sh-terra-chat__name {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 12px;
-  font-weight: 500;
-  color: rgba(237, 236, 236, 0.55);
-  pointer-events: none;
-}
-
-.sh-terra-chat__tools {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  margin-left: auto;
-  touch-action: auto;
-}
-
-.sh-terra-chat__ctl {
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: rgba(237, 236, 236, 0.45);
-  font-size: 12px;
-  line-height: 1;
-  cursor: pointer;
-  touch-action: auto;
-}
-
-.sh-terra-chat__ctl:hover {
-  background: rgba(237, 236, 236, 0.08);
-  color: #edecec;
-}
-
-.sh-terra-chat__body {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  flex: 1;
-  min-height: 0;
-  padding: 10px 12px 0;
-}
-
-.sh-terra-chat__crumb {
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  color: rgba(237, 236, 236, 0.4);
-}
-
-.sh-terra-chat__thread {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-
-.sh-terra-chat__msg {
-  max-width: 92%;
-  margin: 0;
-  padding: 8px 11px;
-  border-radius: 8px;
-  font-size: 13px;
-  line-height: 1.45;
-  user-select: text;
-}
-
-.sh-terra-chat__msg--user {
-  align-self: flex-end;
-  background: rgba(237, 236, 236, 0.1);
-  color: #edecec;
-}
-
-.sh-terra-chat__msg--terra {
-  align-self: flex-start;
-  background: #1b1913;
-  border: 1px solid rgba(237, 236, 236, 0.08);
-  color: rgba(237, 236, 236, 0.85);
-}
-
-.sh-terra-chat__msg--error {
-  border-color: rgba(255, 100, 90, 0.35);
-  background: rgba(179, 38, 30, 0.18);
-  color: #ffb4a8;
-}
-
 /* Thinking — brand wash gradients (coral → lilac), shimmer while waiting */
-.sh-terra-chat__thinking {
-  --think-wash:
-    radial-gradient(circle at 22% 28%, rgba(232, 64, 13, 0.95), transparent 55%),
-    radial-gradient(circle at 78% 72%, rgba(208, 178, 255, 1), transparent 58%),
-    radial-gradient(circle at 58% 38%, rgba(255, 238, 216, 0.9), transparent 50%),
-    linear-gradient(160deg, #e8400d 0%, #d0b2ff 55%, #ac7eff 100%);
-  align-self: flex-start;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  max-width: 92%;
-  margin: 0;
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid transparent;
-  background:
-    linear-gradient(#1b1913, #1b1913) padding-box,
-    var(--think-wash) border-box;
-  background-size: auto, 240% 240%;
-  animation: sh-terra-think-wash 2.8s ease-in-out infinite;
-}
-
-.sh-terra-chat__thinking-mark {
-  flex-shrink: 0;
-  width: 18px;
-  height: 18px;
-  border-radius: 5px;
-  background: var(--think-wash);
-  background-size: 240% 240%;
-  animation: sh-terra-think-wash 2.8s ease-in-out infinite;
-  box-shadow: 0 0 14px rgba(232, 64, 13, 0.4), 0 0 18px rgba(172, 126, 255, 0.25);
-}
-
-.sh-terra-chat__thinking-label {
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 1.35;
-  background-image: linear-gradient(
-    110deg,
-    #e8400d 0%,
-    #ffc9a8 28%,
-    #d0b2ff 55%,
-    #ac7eff 78%,
-    #e8400d 100%
-  );
-  background-size: 220% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  -webkit-text-fill-color: transparent;
-  animation: sh-terra-think-text 2.2s linear infinite;
-}
-
-@keyframes sh-terra-think-wash {
-  0%,
-  100% {
-    background-position: 0% 40%, 100% 60%, 50% 20%, 0% 50%;
-  }
-  50% {
-    background-position: 80% 20%, 10% 90%, 70% 70%, 100% 50%;
-  }
-}
-
-@keyframes sh-terra-think-text {
-  0% {
-    background-position: 0% 50%;
-  }
-  100% {
-    background-position: 220% 50%;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .sh-terra-chat__thinking,
-  .sh-terra-chat__thinking-mark,
-  .sh-terra-chat__thinking-label {
-    animation: none;
-  }
-}
 
 /* Design options — stacked in the chat, all visible (no chip scroll). */
-.sh-terra-chat__hints {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 6px;
-  flex: none;
-  padding: 4px 0 4px;
-  overflow: visible;
-}
-
-.sh-terra-chat__hints-label {
-  margin: 0 0 2px;
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  color: rgba(237, 236, 236, 0.45);
-}
-
-.sh-terra-chat__hint {
-  display: block;
-  width: 100%;
-  padding: 9px 12px;
-  border-radius: 8px;
-  border: 1px solid rgba(237, 236, 236, 0.12);
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(237, 236, 236, 0.88);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: -0.15px;
-  line-height: 1.35;
-  text-align: left;
-  text-wrap: balance;
-  cursor: pointer;
-  transition:
-    background 0.15s ease,
-    color 0.15s ease,
-    border-color 0.15s ease;
-}
-
-.sh-terra-chat__hint:hover:not(:disabled) {
-  color: #fff;
-  border-color: rgba(245, 197, 24, 0.45);
-  background: rgba(245, 197, 24, 0.1);
-}
-
-.sh-terra-chat__hint:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
 
 /* When design options are showing, keep the message thread compact so the
    full option list stays on screen without its own scrollbar. */
-.sh-terra-chat__body:has(.sh-terra-chat__hints) .sh-terra-chat__thread {
-  flex: 0 1 auto;
-  max-height: 120px;
-}
 
 /* Read-only prompt — free typing is off; idle streams suggestion animation. */
-.sh-terra-chat__prompt {
-  position: relative;
-  display: flex;
-  align-items: center;
-  margin: auto 12px 12px;
-  min-height: 40px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid rgba(237, 236, 236, 0.1);
-  background: #1b1913;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
-  font-size: 13px;
-  letter-spacing: -0.01em;
-  color: rgba(237, 236, 236, 0.45);
-  user-select: none;
-  overflow: hidden;
-}
-
-.sh-terra-chat__stream {
-  display: flex;
-  align-items: center;
-  overflow: hidden;
-  white-space: nowrap;
-  font-size: 13px;
-  color: rgba(237, 236, 236, 0.38);
-}
-
-.sh-terra-chat__caret {
-  display: inline-block;
-  width: 1.5px;
-  height: 0.95em;
-  margin-left: 1px;
-  border-radius: 1px;
-  background: linear-gradient(180deg, #e8400d, #ac7eff);
-  animation: sh-terra-caret 0.9s steps(1) infinite;
-  vertical-align: -0.1em;
-  flex-shrink: 0;
-}
-
-@keyframes sh-terra-caret {
-  0%,
-  45% {
-    opacity: 1;
-  }
-  50%,
-  100% {
-    opacity: 0;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .sh-terra-chat__caret {
-    animation: none;
-    opacity: 1;
-  }
-}
 
 @media (max-width: 640px) {
-  .sh-theater__dock {
+.sh-theater__dock {
     left: 12px;
     right: 12px;
     bottom: 48px;
-  }
-
-  .sh-terra-chat,
-  .sh-terra-chat--open,
-  .sh-terra-chat--full {
-    width: auto;
-  }
-
-  .sh-terra-chat,
-  .sh-terra-chat--open {
-    height: min(440px, calc(100cqh - 64px));
-  }
-
-  .sh-terra-chat--full {
-    height: calc(100cqh - 80px);
   }
 }
 
@@ -4043,7 +3156,7 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .sh-replica [data-sel] {
+.sh-replica [data-sel] {
     transition:
       padding 0.45s,
       gap 0.45s,
@@ -4057,7 +3170,7 @@
     transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
   }
 
-  .sh-replica .tf-pulse {
+.sh-replica .tf-pulse {
     animation: tf-pulse 0.6s ease-out;
   }
 }
@@ -4081,35 +3194,10 @@
   overflow: hidden;
 }
 
-.sh-live {
-  flex: 1;
-  width: 100%;
-  height: 100%;
-  min-height: 420px;
-  border: 0;
-  background: #fff;
-}
-
 /* Inline panel is shorter than 420px — don't force overflow. */
+
 .sh-theater__panel--inline .sh-live {
   min-height: 0;
-}
-
-.sh-live__status {
-  margin: auto;
-  padding: 24px;
-  font-size: 0.95rem;
-  opacity: 0.7;
-  text-align: center;
-  max-width: 32rem;
-}
-
-.sh-live__status--error {
-  color: #b3261e;
-  opacity: 1;
-  white-space: pre-wrap;
-  text-align: left;
-  font-size: 0.8rem;
 }
 
 /* ---- Terra playground (last screen) ----
@@ -4151,17 +3239,18 @@
 }
 
 @media (max-width: 720px) {
-  .sh-replica--playground .rp-shell {
+.sh-replica--playground .rp-shell {
     grid-template-columns: 64px minmax(0, 1fr);
   }
 
-  .sh-replica--playground .rp-explorer {
+.sh-replica--playground .rp-explorer {
     display: none;
   }
 }
 
 /* Everything a cursor can restyle eases between its two looks — including
    size, so the edit reads across the room. */
+
 .sh-playground .rp-rail,
 .sh-playground .rp-rail__item,
 .sh-playground .rp-rail__logo,
@@ -4183,6 +3272,7 @@
 }
 
 /* Selection ring while its editor is pointing, colored like their cursor. */
+
 .sh-playground[data-aim="nav"] .rp-rail {
   box-shadow: inset 0 0 0 2px #f59e0b;
 }
@@ -4197,6 +3287,7 @@
 }
 
 /* The edits themselves. */
+
 .sh-playground .rp-shell {
   transition: grid-template-columns 0.5s ease;
 }
@@ -4210,7 +3301,7 @@
 }
 
 @media (max-width: 720px) {
-  .sh-playground[data-edit-nav="1"] .rp-shell {
+.sh-playground[data-edit-nav="1"] .rp-shell {
     grid-template-columns: 88px minmax(0, 1fr);
   }
 }
@@ -4265,6 +3356,7 @@
 }
 
 /* Multiplayer cursors — pointer + name pill + chat bubble. */
+
 .sh-play-cursor {
   position: absolute;
   z-index: 30;
@@ -4302,6 +3394,7 @@
 }
 
 /* Presence pill — who is in the playground right now. */
+
 .sh-play-presence {
   position: absolute;
   top: 74px;
