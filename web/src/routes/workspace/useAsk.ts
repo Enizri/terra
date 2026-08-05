@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ask as askServer } from "../../shared/api";
+import { ask as askServer, type Selection } from "../../shared/api";
 
 export type ProcessStepStatus = "pending" | "active" | "done" | "skipped";
 
@@ -19,9 +19,6 @@ export type AskMessage = {
   parts: AskPart[];
   error?: boolean;
 };
-
-/** What the workspace knows about the component a question is scoped to. */
-export type AskSelection = Record<string, unknown>;
 
 const THINKING_COPY = "Considering the map and what you selected…";
 
@@ -61,8 +58,8 @@ function updateTerraParts(
 }
 
 function hasMeaningfulSelection(
-  selection?: AskSelection,
-  selections?: AskSelection[],
+  selection?: Selection,
+  selections?: Selection[],
 ): boolean {
   if (selections && selections.length > 0) {
     return selections.some((s) => Object.keys(s).length > 0);
@@ -107,7 +104,7 @@ export function useAsk(repoUrl: string | null) {
   }, [repoUrl]);
 
   const ask = useCallback(
-    async (question: string, selection?: AskSelection, selections?: AskSelection[]) => {
+    async (question: string, selection?: Selection, selections?: Selection[]) => {
       const q = question.trim();
       if (!q || !repoUrl || busyRef.current) return;
 

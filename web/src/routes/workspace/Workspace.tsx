@@ -9,8 +9,9 @@ import { toDiagram } from "../../shared/map/toDiagram";
 import memosFixture from "../../data/memos.map.json";
 import { matchComponents } from "../../shared/map/search";
 import { LiveFrame, useFloatingDrag, useStreamingAskHint, type LiveSelection } from "../../shared/live";
+import type { Selection } from "../../shared/api";
 import { useAnalyze } from "./useAnalyze";
-import { useAsk, type AskMessage, type AskPart, type AskSelection } from "./useAsk";
+import { useAsk, type AskMessage, type AskPart } from "./useAsk";
 import { renderMarkdown } from "../../shared/markdown";
 import { buildFileTree, countLeaves, type FileNode } from "../../shared/fileTree";
 // Owns its skin import: today terra.css only loads because App statically
@@ -614,12 +615,12 @@ function AgentDock({
         tech: c.tech,
         files: c.files,
         file: c.files[0],
-      } as AskSelection,
+      } as Selection,
     })),
     ...elements.map((el, i) => ({
       key: elementKey(el, i),
       label: el.name ?? el.tag ?? "element",
-      payload: { ...el } as AskSelection,
+      payload: { ...el } as Selection,
     })),
   ];
   const selections = crumbs.map((c) => c.payload);
