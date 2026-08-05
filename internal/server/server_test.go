@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"terra/internal/graph"
-	"terra/internal/scan"
+	"github.com/Enizri/terra/internal/graph"
+	"github.com/Enizri/terra/internal/scan"
 )
 
 func testServer(t *testing.T) (*Server, *httptest.Server) {

@@ -25,7 +25,7 @@ import (
 	"syscall"
 	"time"
 
-	"terra/internal/scan"
+	"github.com/Enizri/terra/internal/scan"
 )
 
 //go:embed select.js

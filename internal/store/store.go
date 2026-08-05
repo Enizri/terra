@@ -8,8 +8,8 @@ import (
 
 	_ "modernc.org/sqlite" // pure-Go driver, registered as "sqlite"
 
-	"terra/internal/graph"
-	"terra/internal/scan"
+	"github.com/Enizri/terra/internal/graph"
+	"github.com/Enizri/terra/internal/scan"
 )
 
 // ponytail: created on open, no versioning. When the shape changes, delete

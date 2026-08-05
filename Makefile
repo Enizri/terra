@@ -1,4 +1,4 @@
-.PHONY: run-analyzer run-server run-llm run-web build-web test test-go test-py fmt-go venv venv-local
+.PHONY: run-analyzer run-server run-llm run-web build-web test test-go test-py lint fmt-go venv venv-local
 
 # Three-terminal quickstart:
 #   terminal 1: make run-llm         (loads HF model behind OpenAI-compatible /v1)
@@ -32,6 +32,9 @@ build-web:
 	cd web && npm install && npm run build
 
 test: test-go test-py
+
+lint:
+	golangci-lint run
 
 fmt-go:
 	gofmt -w $$(find . -name '*.go' -not -path './analyzer/*')

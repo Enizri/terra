@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"terra/internal/scan"
+	"github.com/Enizri/terra/internal/scan"
 )
 
 func testScan() *scan.Result {

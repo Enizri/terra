@@ -8,11 +8,11 @@ import (
 	"os/signal"
 	"syscall"
 
-	"terra/internal/graph"
-	"terra/internal/preview"
-	"terra/internal/scan"
-	"terra/internal/server"
-	"terra/internal/store"
+	"github.com/Enizri/terra/internal/graph"
+	"github.com/Enizri/terra/internal/preview"
+	"github.com/Enizri/terra/internal/scan"
+	"github.com/Enizri/terra/internal/server"
+	"github.com/Enizri/terra/internal/store"
 )
 
 const usage = `usage:

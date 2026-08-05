@@ -11,7 +11,7 @@ import (
 	"time"
 	"unicode"
 
-	"terra/internal/scan"
+	"github.com/Enizri/terra/internal/scan"
 )
 
 // DefaultAnalyzerURL is where the Python analyzer service listens; override
