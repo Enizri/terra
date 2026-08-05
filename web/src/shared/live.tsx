@@ -4,6 +4,7 @@
  * dock drag, and the idle prompt typewriter. Nothing here may import a route.
  */
 import { useEffect, useRef, useState, type RefObject, type PointerEvent as ReactPointerEvent } from "react";
+import { preview } from "./api";
 
 /* ---------- live preview ---------- */
 
@@ -42,24 +43,13 @@ export function LiveFrame({
   const [error, setError] = useState("");
 
   useEffect(() => {
-    let cancelled = false;
-    fetch("/preview", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ repo_url: repoUrl }),
-    })
-      .then(async (r) => {
-        const data = await r.json();
-        if (cancelled) return;
-        if (data.url) setUrl(data.url);
-        else setError(data.error ?? "preview failed");
-      })
-      .catch((e) => {
-        if (!cancelled) setError(String(e));
+    const ac = new AbortController();
+    preview(repoUrl, ac.signal)
+      .then(setUrl)
+      .catch((e: Error) => {
+        if (e.name !== "AbortError") setError(e.message);
       });
-    return () => {
-      cancelled = true;
-    };
+    return () => ac.abort();
   }, [repoUrl]);
 
   const sendMode = () => {

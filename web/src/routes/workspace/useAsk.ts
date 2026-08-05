@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ask as askServer } from "../../shared/api";
 
 export type ProcessStepStatus = "pending" | "active" | "done" | "skipped";
 
@@ -143,22 +144,7 @@ export function useAsk(repoUrl: string | null) {
       }, 700);
 
       try {
-        const res = await fetch("/ask", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            repo_url: repoUrl,
-            question: q,
-            selection: selection ?? {},
-            // Sent only when there is more than one: the Go side falls back to
-            // `selection` on its own, and an echoed single entry is noise.
-            ...(selections && selections.length > 1 ? { selections } : {}),
-          }),
-          signal: ac.signal,
-        });
-        const data = await res.json().catch(() => null);
-        if (!res.ok || data?.error) throw new Error(data?.error ?? `ask failed (${res.status})`);
-        const answer = (data?.answer as string) ?? "No answer.";
+        const answer = await askServer(repoUrl, q, selections ?? (selection ? [selection] : []), ac.signal);
         clearStageTimer();
         setMessages((msgs) => {
           const idx = msgs.length - 1;

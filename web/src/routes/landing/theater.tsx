@@ -10,6 +10,7 @@ import {
   useStreamingAskHint,
   type LiveSelection,
 } from "../../shared/live";
+import { ask as askServer, files } from "../../shared/api";
 import { spring } from "../../shared/motion";
 import { LIVE_NODE_ID, REPO_URL, type DiagramNode } from "./data";
 
@@ -363,13 +364,15 @@ function LiveFiles() {
   const [entries, setEntries] = useState<FileEntry[]>([]);
   const [file, setFile] = useState<{ path: string; content: string } | null>(null);
   const [status, setStatus] = useState("");
+  const abortRef = useRef<AbortController | null>(null);
 
   const load = (path: string) => {
     setStatus("");
-    fetch(`/files?repo_url=${encodeURIComponent(REPO_URL)}&path=${encodeURIComponent(path)}`)
-      .then((r) => r.json())
+    abortRef.current?.abort();
+    const ac = new AbortController();
+    abortRef.current = ac;
+    files(REPO_URL, path, ac.signal)
       .then((data) => {
-        if (data.error) return setStatus(data.error);
         if (data.starting) return setStatus("Starting the dev server… the tree opens once the checkout is ready.");
         if (data.entries) {
           setEntries(data.entries);
@@ -379,11 +382,16 @@ function LiveFiles() {
           setFile({ path: data.path ?? path, content: data.content ?? "" });
         }
       })
-      .catch((e) => setStatus(String(e)));
+      .catch((e: Error) => {
+        if (e.name !== "AbortError") setStatus(e.message);
+      });
   };
 
   // The server serves paths relative to the frontend dir, so "" is the app root.
-  useEffect(() => load(""), []);
+  useEffect(() => {
+    load("");
+    return () => abortRef.current?.abort();
+  }, []);
 
   const up = dir.split("/").slice(0, -1).join("/");
 
@@ -792,19 +800,7 @@ export function TheaterPanel({
     }
     if (live) {
       const sels = selected.map((s) => s.sel).filter(Boolean) as LiveSelection[];
-      const r = await fetch("/ask", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          repo_url: REPO_URL,
-          question: q,
-          selection: sels[sels.length - 1] ?? {},
-          selections: sels,
-        }),
-      });
-      const data = await r.json();
-      if (data.error) throw new Error(data.error);
-      return (data.answer as string) ?? "No answer.";
+      return askServer(REPO_URL, q, sels);
     }
     await new Promise((done) => setTimeout(done, 900));
     return applyDesignTransform(q);

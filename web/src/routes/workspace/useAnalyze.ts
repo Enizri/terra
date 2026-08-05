@@ -1,12 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { TerraMap } from "../../shared/map/types";
-import { ndjsonSplitter } from "../../shared/ndjson";
+import { analyze, type AnalyzeEvent } from "../../shared/api";
 
-export type AnalyzeEvent = {
-  stage: "clone" | "scan" | "analyze" | "store" | "done" | "error";
-  label?: string;
-  map?: TerraMap;
-};
+export type { AnalyzeEvent };
 
 /**
  * Drives POST /analyze in its NDJSON mode. Only the latest stage is kept —
@@ -41,30 +37,9 @@ export function useAnalyze() {
     setRunning(true);
 
     try {
-      const res = await fetch("/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/x-ndjson" },
-        body: JSON.stringify({ repo_url: repoUrl }),
-        signal: ac.signal,
-      });
-
-      // A rejected URL never reaches the stream — it comes back as {"error"}.
-      if (!res.ok || !res.body) {
-        const detail = await res.json().catch(() => null);
-        throw new Error(detail?.error ?? `analyze failed (${res.status})`);
-      }
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      const feed = ndjsonSplitter<AnalyzeEvent>();
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        for (const ev of feed(decoder.decode(value, { stream: true }))) {
-          if (ev.stage === "error") throw new Error(ev.label ?? "analysis failed");
-          setStatus(ev);
-          if (ev.stage === "done" && ev.map) setMap(ev.map);
-        }
+      for await (const ev of analyze(repoUrl, ac.signal)) {
+        setStatus(ev);
+        if (ev.stage === "done" && ev.map) setMap(ev.map);
       }
     } catch (e) {
       if ((e as Error).name === "AbortError") return;
