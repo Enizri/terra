@@ -5,27 +5,6 @@ export const REPO_URL = "github.com/usememos/memos";
 /** Diagram node that gets the live preview instead of a replica. */
 export const LIVE_NODE_ID = "web";
 
-export const spring = { type: "spring", damping: 60, stiffness: 400 } as const;
-
-// Section reveal trigger: fires when ~40% of the section is visible
-// (headings reveal around mid-viewport on tall sections, near the bottom
-// edge on short ones like the footer).
-export const inView = { once: true, amount: 0.4 } as const;
-
-export const stagger = {
-  show: { transition: { staggerChildren: 0.1 } },
-} as const;
-
-export const rise = {
-  hidden: { opacity: 0, y: 150 },
-  show: { opacity: 1, y: 0, transition: spring },
-} as const;
-
-export const pop = {
-  hidden: { opacity: 0, scale: 0.5 },
-  show: { opacity: 1, scale: 1, transition: spring },
-} as const;
-
 export type User = {
   id: string;
   name: string;
@@ -260,28 +239,6 @@ export const diagramEdges: DiagramEdge[] = [
   { from: "memos", to: "db", label: "saves & reads" },
   { from: "files", to: "db" },
 ];
-
-/** Smart section: faded window rises to 60% opacity (st variant). */
-export const fadeRise = {
-  hidden: { opacity: 0, y: 150 },
-  show: { opacity: 0.6, y: 0, transition: spring },
-} as const;
-
-/** Intuitive preview pop — delayed shared-element style entrance. */
-export const previewPop = {
-  hidden: (centered: boolean) => ({
-    opacity: 0,
-    scale: 0.5,
-    x: centered ? "-20%" : "-80%",
-    y: centered ? "-60%" : "-50%",
-  }),
-  show: (centered: boolean) => ({
-    opacity: 1,
-    scale: 1,
-    x: centered ? "-50%" : "-80%",
-    y: "-50%",
-  }),
-} as const;
 
 /** Citations shown in the Map section's Evidence panel. */
 export const evidence = [

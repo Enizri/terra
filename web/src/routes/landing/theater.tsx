@@ -10,7 +10,8 @@ import {
   useStreamingAskHint,
   type LiveSelection,
 } from "../../shared/live";
-import { LIVE_NODE_ID, REPO_URL, spring, type DiagramNode } from "./data";
+import { spring } from "../../shared/motion";
+import { LIVE_NODE_ID, REPO_URL, type DiagramNode } from "./data";
 
 type Picked = { id: string; label: string; sel?: LiveSelection };
 

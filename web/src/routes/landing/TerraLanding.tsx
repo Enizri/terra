@@ -24,15 +24,12 @@ import {
 import { Link } from "react-router-dom";
 import RepoDiagram from "../../shared/map/RepoDiagram";
 import HeroBackdrop from "./HeroBackdrop";
+import { inView, rise, spring, stagger } from "../../shared/motion";
 import {
   copy,
   diagramEdges,
   diagramGroups,
   diagramNodes,
-  inView,
-  rise,
-  spring,
-  stagger,
   users,
   type DiagramNode,
   type User,
