@@ -30,6 +30,9 @@ Go and Python never import each other — they talk over HTTP. The analyzer
 talks to the model only through the **OpenAI-compatible** Chat Completions API,
 so a laptop HF server, vLLM, or a hosted provider are drop-in replacements.
 
+`ARCHITECTURE.md` has the folder maps, the import rules between them, and what
+to add for a new product under this repo.
+
 ## Quickstart
 
 ```sh
@@ -60,7 +63,7 @@ Ollama’s OpenAI mode) without changing analyzer code.
 |---|---|
 | `terra scan <url>` | Clone + deterministic scan, JSON to stdout |
 | `terra map <url>` | Scan, ask the analyzer for a map, store in `terra.db` |
-| `terra serve` | HTTP API: `POST /analyze`, `GET /analyses`, `GET /analyses/{id}` |
+| `terra serve` | HTTP API: `POST /analyze`, `GET /analyses`, `GET /analyses/{id}`, `POST /preview`, `POST /ask`, `GET /files` |
 
 ## Environment variables
 

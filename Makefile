@@ -1,4 +1,4 @@
-.PHONY: run-analyzer run-server run-llm run-web build-web test test-go test-py lint fmt-go venv venv-local
+.PHONY: run-analyzer run-server run-llm run-web build-web test test-fixtures test-go test-py lint fmt-go venv venv-local
 
 # Three-terminal quickstart:
 #   terminal 1: make run-llm         (loads HF model behind OpenAI-compatible /v1)
@@ -31,7 +31,12 @@ run-web:
 build-web:
 	cd web && npm install && npm run build
 
-test: test-go test-py
+test: test-fixtures test-go test-py
+
+# web/src/data/memos.map.json is a hand-copy of the golden map with no
+# regeneration path, so nothing but this stops the two drifting apart.
+test-fixtures:
+	diff -q case-studies/memos.map.json web/src/data/memos.map.json
 
 lint:
 	golangci-lint run
