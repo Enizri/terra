@@ -4,8 +4,10 @@
  * the selection (labels, payloads) is rendering, and lives with the view.
  */
 
-/** Cap on stacked cards — the theater's, for the same reason: readable crumbs. */
-export const MAX_SELECTED = 3;
+import { MAX_SELECTIONS } from "../../shared/limits.ts";
+
+/** Cap on stacked cards — the shared rule, re-exported under this module's name. */
+export const MAX_SELECTED = MAX_SELECTIONS;
 
 /**
  * Clicking a picked card unpicks it. A plain click replaces the selection; an

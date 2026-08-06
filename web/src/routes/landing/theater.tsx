@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 import { motion } from "motion/react";
+import { MAX_SELECTIONS } from "../../shared/limits";
 import {
   LiveFrame,
-  MAX_SELECTIONS,
   liveSelectionId,
   selectionLabel,
   useFloatingDrag,

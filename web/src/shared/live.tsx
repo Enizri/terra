@@ -18,9 +18,6 @@ export type LiveSelection = {
   text?: string;
 };
 
-/** Web demo cap — keep inspect focus readable. */
-export const MAX_SELECTIONS = 3;
-
 export function selectionLabel(sel: LiveSelection): string {
   return sel.name ?? sel.tag ?? "element";
 }

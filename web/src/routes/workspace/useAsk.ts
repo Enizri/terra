@@ -1,71 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ask as askServer, type Selection } from "../../shared/api";
+import {
+  buildProcess,
+  advanceProcess,
+  completeProcess,
+  updateTerraParts,
+  hasMeaningfulSelection,
+  type AskMessage,
+  type AskPart,
+} from "./askProcess.ts";
 
-export type ProcessStepStatus = "pending" | "active" | "done" | "skipped";
-
-export type ProcessStep = {
-  id: string;
-  label: string;
-  status: ProcessStepStatus;
-};
-
-export type AskPart =
-  | { type: "text"; text: string }
-  | { type: "thinking"; text: string; done?: boolean }
-  | { type: "process"; steps: ProcessStep[] };
-
-export type AskMessage = {
-  role: "user" | "terra";
-  parts: AskPart[];
-  error?: boolean;
-};
+export type { AskMessage, AskPart, ProcessStep, ProcessStepStatus } from "./askProcess.ts";
 
 const THINKING_COPY = "Considering the map and what you selected…";
-
-function buildProcess(hasSelection: boolean): ProcessStep[] {
-  return [
-    { id: "map", label: "Reading map", status: "active" },
-    {
-      id: "files",
-      label: "Checking selection / files",
-      status: hasSelection ? "pending" : "skipped",
-    },
-    { id: "answer", label: "Answering", status: "pending" },
-  ];
-}
-
-function advanceProcess(steps: ProcessStep[]): ProcessStep[] {
-  const active = steps.findIndex((s) => s.status === "active");
-  if (active < 0) return steps;
-  const next = steps.map((s, i) => (i === active ? { ...s, status: "done" as const } : s));
-  const upcoming = next.findIndex((s) => s.status === "pending");
-  if (upcoming < 0) return next;
-  return next.map((s, i) => (i === upcoming ? { ...s, status: "active" as const } : s));
-}
-
-function completeProcess(steps: ProcessStep[]): ProcessStep[] {
-  return steps.map((s) =>
-    s.status === "skipped" ? s : { ...s, status: "done" as const },
-  );
-}
-
-function updateTerraParts(
-  messages: AskMessage[],
-  terraIndex: number,
-  update: (parts: AskPart[]) => AskPart[],
-): AskMessage[] {
-  return messages.map((m, i) => (i === terraIndex ? { ...m, parts: update(m.parts) } : m));
-}
-
-function hasMeaningfulSelection(
-  selection?: Selection,
-  selections?: Selection[],
-): boolean {
-  if (selections && selections.length > 0) {
-    return selections.some((s) => Object.keys(s).length > 0);
-  }
-  return Boolean(selection && Object.keys(selection).length > 0);
-}
 
 /**
  * Drives POST /ask for one repo. Plain JSON, not NDJSON — /ask answers in one
