@@ -31,6 +31,9 @@ import (
 //go:embed select.js
 var selectJS []byte
 
+//go:embed hook.js
+var hookJS []byte
+
 // loadSelectJS prefers the on-disk script when present so inspect-highlight
 // edits apply without rebuilding terra (embed remains the fallback).
 func loadSelectJS() []byte {
@@ -51,6 +54,75 @@ func loadSelectJS() []byte {
 		}
 	}
 	return selectJS
+}
+
+// hookJSPath returns an absolute path to hook.js for NODE_OPTIONS --require —
+// on-disk candidates first (like loadSelectJS, so edits apply without a
+// rebuild), falling back to the embedded copy written to the OS temp dir.
+func hookJSPath() (string, error) {
+	candidates := []string{
+		"internal/preview/hook.js",
+		filepath.Join("..", "internal", "preview", "hook.js"),
+	}
+	if exe, err := os.Executable(); err == nil {
+		candidates = append(candidates,
+			filepath.Join(filepath.Dir(exe), "internal", "preview", "hook.js"),
+			filepath.Join(filepath.Dir(exe), "..", "internal", "preview", "hook.js"),
+		)
+	}
+	for _, p := range candidates {
+		if b, err := os.ReadFile(p); err == nil && len(b) > 0 {
+			return filepath.Abs(p)
+		}
+	}
+	p := filepath.Join(os.TempDir(), "terra-hook.js")
+	if err := os.WriteFile(p, hookJS, 0o644); err != nil {
+		return "", err
+	}
+	return p, nil
+}
+
+// mergeNodeOptions extends an existing NODE_OPTIONS value with the hook's
+// --require, preserving whatever the app's environment already set. Paths
+// with spaces get NODE_OPTIONS-style double quotes.
+func mergeNodeOptions(existing, hookPath string) string {
+	if strings.Contains(hookPath, " ") {
+		hookPath = `"` + hookPath + `"`
+	}
+	opt := "--require " + hookPath
+	if existing == "" {
+		return opt
+	}
+	return existing + " " + opt
+}
+
+// terraPort is the port the previewed app reports spans back to.
+// ponytail: TERRA_ADDR env or "8080" — the serve --addr flag isn't plumbed
+// through to here. Upgrade: cmd/terra exports TERRA_ADDR from its flag.
+func terraPort() string {
+	addr := os.Getenv("TERRA_ADDR")
+	if addr == "" {
+		return "8080"
+	}
+	if i := strings.LastIndex(addr, ":"); i >= 0 {
+		return addr[i+1:]
+	}
+	return addr
+}
+
+// traceEnv is the env that arms hook.js inside the previewed app's Node
+// processes: preload it, and tell it where and as whom to report spans.
+// Best-effort — an unwritable temp dir just means no in-process spans.
+func traceEnv(repoKey string) []string {
+	hook, err := hookJSPath()
+	if err != nil {
+		return nil
+	}
+	return []string{
+		"NODE_OPTIONS=" + mergeNodeOptions(os.Getenv("NODE_OPTIONS"), hook),
+		"TERRA_TRACE_URL=http://localhost:" + terraPort() + "/traces/ingest",
+		"TERRA_TRACE_REPO=" + repoKey,
+	}
 }
 
 type instance struct {
@@ -142,6 +214,7 @@ func Start(repoURL string) (string, error) {
 	cmd.Dir = appDir
 	cmd.Env = append(os.Environ(), "PORT="+strconv.Itoa(devPort), "BROWSER=none")
 	cmd.Env = append(cmd.Env, apiEnv...)
+	cmd.Env = append(cmd.Env, traceEnv(key)...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	logs := &boundedBuf{}
 	cmd.Stdout = logs

@@ -390,6 +390,88 @@ func TestTracesStreamsSpansAsSSE(t *testing.T) {
 	}
 }
 
+// Spans POSTed by the in-process hook must come out of the same hub the map
+// subscribes to, with Repo normalized and Time stamped server-side.
+func TestIngestPublishesSpansOnTheHub(t *testing.T) {
+	_, ts := testServer(t)
+
+	_, ch, cancel := trace.Subscribe("https://github.com/acme/ingested")
+	defer cancel()
+
+	body := `{"repo_url":"github.com/acme/ingested","spans":[
+		{"kind":"server","method":"POST","path":"/api/v1/memos","status":200,"dur_ms":12},
+		{"kind":"client","method":"GET","path":"localhost:9090/api/v1/users","status":200,"dur_ms":3}]}`
+	resp, err := http.Post(ts.URL+"/traces/ingest", "application/json", strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("status = %d, want 204", resp.StatusCode)
+	}
+
+	var spans []trace.Span
+	for len(spans) < 2 {
+		select {
+		case span := <-ch:
+			spans = append(spans, span)
+		case <-time.After(2 * time.Second):
+			t.Fatalf("got %d spans, want 2", len(spans))
+		}
+	}
+	if spans[0].Kind != "server" || spans[0].Path != "/api/v1/memos" || spans[0].DurMS != 12 {
+		t.Errorf("span[0] = %+v", spans[0])
+	}
+	if spans[1].Kind != "client" || spans[1].Method != "GET" {
+		t.Errorf("span[1] = %+v", spans[1])
+	}
+	for _, span := range spans {
+		if span.Repo != "https://github.com/acme/ingested" {
+			t.Errorf("repo = %q, want the normalized URL", span.Repo)
+		}
+		if span.Time.IsZero() {
+			t.Error("time must be stamped server-side")
+		}
+	}
+}
+
+func TestIngestCapsBatchAt100(t *testing.T) {
+	_, ts := testServer(t)
+
+	var spans []string
+	for i := 0; i < 150; i++ {
+		spans = append(spans, fmt.Sprintf(`{"kind":"server","method":"GET","path":"/n/%d","status":200}`, i))
+	}
+	body := `{"repo_url":"github.com/acme/capped","spans":[` + strings.Join(spans, ",") + `]}`
+	resp, err := http.Post(ts.URL+"/traces/ingest", "application/json", strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("status = %d, want 204", resp.StatusCode)
+	}
+	history, _, cancel := trace.Subscribe("https://github.com/acme/capped")
+	cancel()
+	if len(history) != 100 {
+		t.Errorf("published %d spans, want the batch capped at 100", len(history))
+	}
+}
+
+func TestIngestRejectsBadBody(t *testing.T) {
+	_, ts := testServer(t)
+	for _, body := range []string{"", "{}", "not json", `{"repo_url":"nope","spans":[]}`} {
+		resp, err := http.Post(ts.URL+"/traces/ingest", "application/json", strings.NewReader(body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("body %q: status = %d, want 400", body, resp.StatusCode)
+		}
+	}
+}
+
 func TestTracesRejectsBadRepoURL(t *testing.T) {
 	_, ts := testServer(t)
 	resp, err := http.Get(ts.URL + "/traces?repo_url=nope")

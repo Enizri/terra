@@ -135,3 +135,50 @@ func TestTailTruncates(t *testing.T) {
 		t.Fatalf("got len %d, want 2000", len(got))
 	}
 }
+
+func TestMergeNodeOptions(t *testing.T) {
+	if got := mergeNodeOptions("", "/tmp/hook.js"); got != "--require /tmp/hook.js" {
+		t.Errorf("empty existing: %q", got)
+	}
+	// An app's own NODE_OPTIONS must survive, hook appended.
+	if got := mergeNodeOptions("--max-old-space-size=4096", "/tmp/hook.js"); got != "--max-old-space-size=4096 --require /tmp/hook.js" {
+		t.Errorf("existing preserved: %q", got)
+	}
+	// NODE_OPTIONS splits on spaces; a spacey path needs quotes.
+	if got := mergeNodeOptions("", "/tmp/my dir/hook.js"); got != `--require "/tmp/my dir/hook.js"` {
+		t.Errorf("spacey path: %q", got)
+	}
+}
+
+func TestTerraPort(t *testing.T) {
+	for env, want := range map[string]string{"": "8080", ":9000": "9000", "localhost:7777": "7777"} {
+		t.Setenv("TERRA_ADDR", env)
+		if got := terraPort(); got != want {
+			t.Errorf("TERRA_ADDR=%q: port = %q, want %q", env, got, want)
+		}
+	}
+}
+
+func TestTraceEnvArmsTheHook(t *testing.T) {
+	t.Setenv("TERRA_ADDR", ":9999")
+	t.Setenv("NODE_OPTIONS", "")
+	env := traceEnv("https://github.com/acme/notes")
+	if len(env) != 3 {
+		t.Fatalf("env = %v", env)
+	}
+	if !strings.HasPrefix(env[0], "NODE_OPTIONS=--require ") {
+		t.Errorf("NODE_OPTIONS = %q", env[0])
+	}
+	// The required path must be absolute: node resolves relative --require
+	// against the previewed app's cwd, not Terra's.
+	hookPath := strings.TrimPrefix(env[0], "NODE_OPTIONS=--require ")
+	if !filepath.IsAbs(strings.Trim(hookPath, `"`)) {
+		t.Errorf("hook path %q is not absolute", hookPath)
+	}
+	if env[1] != "TERRA_TRACE_URL=http://localhost:9999/traces/ingest" {
+		t.Errorf("trace url = %q", env[1])
+	}
+	if env[2] != "TERRA_TRACE_REPO=https://github.com/acme/notes" {
+		t.Errorf("trace repo = %q", env[2])
+	}
+}

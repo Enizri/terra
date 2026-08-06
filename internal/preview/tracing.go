@@ -28,6 +28,7 @@ func traceMiddleware(repo string, next http.Handler) http.Handler {
 			Path:   r.URL.Path,
 			Status: rec.status,
 			DurMS:  time.Since(start).Milliseconds(),
+			Kind:   "edge",
 		})
 	})
 }

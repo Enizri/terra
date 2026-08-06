@@ -7,6 +7,7 @@ import { matchComponents } from "../../../shared/map/search";
 import { matchSpan, topLevelId } from "../../../shared/map/spanMatch";
 import { traces } from "../../../shared/api";
 import { LiveFrame, type LiveSelection } from "../../../shared/live";
+import { emptyQueue, enqueue } from "../pulseQueue";
 
 /**
  * Find a component by name, tech, type, file or purpose and jump to it.
@@ -77,23 +78,36 @@ export function MapStage({
   const view = useMemo(() => toDiagram(map, { all }), [map, all]);
   const primary = selectedIds[selectedIds.length - 1] ?? null;
 
-  // Live trace: while the preview is open, every request its proxy observes
-  // pulses the component that handled it. History replays on connect, so the
-  // last-used card glows the moment the stream opens.
+  // Live trace: while the preview is open, every span the pipeline observes
+  // (edge proxy plus the in-process Node hook) pulses the component that
+  // handled it. A multi-step request arrives as a burst of spans, so they
+  // queue through pulseQueue and light up in order — a path across the map,
+  // not one flickering card. History replays on connect, so the last-used
+  // cards glow the moment the stream opens.
   const [pulseId, setPulseId] = useState<string | null>(null);
-  const pulseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (preview === "off") return;
+    let queue = emptyQueue;
+    const timers = new Set<ReturnType<typeof setTimeout>>();
+    let clearTimer: ReturnType<typeof setTimeout> | null = null;
     const unsubscribe = traces(map.project.repository_url, (span) => {
       const hit = matchSpan(span.path, map.components);
-      if (!hit) return;
-      setPulseId(topLevelId(hit));
-      if (pulseTimer.current) clearTimeout(pulseTimer.current);
-      pulseTimer.current = setTimeout(() => setPulseId(null), 950);
+      const id = hit ? topLevelId(hit) : null;
+      const next = enqueue(queue, id, Date.now());
+      queue = next.state;
+      if (next.showAt == null || id == null) return;
+      const t = setTimeout(() => {
+        timers.delete(t);
+        setPulseId(id);
+        if (clearTimer) clearTimeout(clearTimer);
+        clearTimer = setTimeout(() => setPulseId(null), 950);
+      }, Math.max(0, next.showAt - Date.now()));
+      timers.add(t);
     });
     return () => {
       unsubscribe();
-      if (pulseTimer.current) clearTimeout(pulseTimer.current);
+      timers.forEach(clearTimeout);
+      if (clearTimer) clearTimeout(clearTimer);
       setPulseId(null);
     };
   }, [preview, map]);

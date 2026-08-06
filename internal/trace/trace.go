@@ -17,6 +17,10 @@ type Span struct {
 	Path   string    `json:"path"`
 	Status int       `json:"status"`
 	DurMS  int64     `json:"dur_ms"`
+	// Kind says where the span was observed: "edge" (Terra's proxy),
+	// "server" (inside the app's Node process), "client" (the app calling
+	// out). Empty means edge, from before kinds existed.
+	Kind string `json:"kind,omitempty"`
 }
 
 // keep is the ring size per repo: enough for a demo session's history,

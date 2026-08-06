@@ -123,6 +123,8 @@ export type TraceSpan = {
   path: string;
   status: number;
   dur_ms: number;
+  /** Where it was observed: "edge" (proxy), "server" or "client" (Node hook). */
+  kind?: string;
 };
 
 /**

@@ -43,6 +43,11 @@ func startViaRunfile(key, root string, detectErr error) (string, error) {
 	cmd := exec.Command("/bin/sh", "-c", shell)
 	cmd.Dir = workDir(root, rf)
 	cmd.Env = append(os.Environ(), env...)
+	// Only Node runs get the trace hook; NODE_OPTIONS means nothing to a Go
+	// binary or a uvicorn process.
+	if rf.Source == "package.json" {
+		cmd.Env = append(cmd.Env, traceEnv(key)...)
+	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	logs := &boundedBuf{}
 	cmd.Stdout = logs

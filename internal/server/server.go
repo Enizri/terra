@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/Enizri/terra/internal/graph"
 	"github.com/Enizri/terra/internal/preview"
@@ -43,6 +44,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /ask", s.ask)
 	mux.HandleFunc("GET /files", s.files)
 	mux.HandleFunc("GET /traces", s.traces)
+	mux.HandleFunc("POST /traces/ingest", s.ingest)
 	return mux
 }
 
@@ -364,6 +366,50 @@ func (s *Server) traces(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+}
+
+// ingest accepts span batches from the trace hook running inside a previewed
+// app's Node processes and publishes them on the same hub the edge proxy
+// uses, so the map animates the request's whole path. Repo and Time are
+// stamped server-side — the hook is inside untrusted app code and gets to
+// say what happened, not when or for whom.
+func (s *Server) ingest(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		RepoURL string `json:"repo_url"`
+		Spans   []struct {
+			Kind   string `json:"kind"`
+			Method string `json:"method"`
+			Path   string `json:"path"`
+			Status int    `json:"status"`
+			DurMS  int64  `json:"dur_ms"`
+		} `json:"spans"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.RepoURL == "" {
+		httpError(w, http.StatusBadRequest, `body must be {"repo_url": "...", "spans": [...]}`)
+		return
+	}
+	key, _, err := scan.NormalizeURL(req.RepoURL)
+	if err != nil {
+		httpError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	// Cap, don't reject: a misbehaving hook loses spans, not the stream.
+	if len(req.Spans) > 100 {
+		req.Spans = req.Spans[:100]
+	}
+	now := time.Now()
+	for _, sp := range req.Spans {
+		trace.Publish(trace.Span{
+			Repo:   key,
+			Time:   now,
+			Method: sp.Method,
+			Path:   sp.Path,
+			Status: sp.Status,
+			DurMS:  sp.DurMS,
+			Kind:   sp.Kind,
+		})
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // safeJoin resolves a client-supplied path under base and refuses anything
