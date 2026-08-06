@@ -96,7 +96,10 @@ func Start(repoURL string) (string, error) {
 	}
 	appDir, script, pm, err := detect(root)
 	if err != nil {
-		return "", err
+		// No frontend package.json — fall back to the repo's Runfile, which
+		// can boot plain Go and Python services (a FastAPI app has no dev
+		// script but still has a face once proxied).
+		return startViaRunfile(key, root, err)
 	}
 	if _, err := os.Stat(filepath.Join(appDir, "node_modules")); err != nil {
 		install := exec.Command(pm, "install")

@@ -27,7 +27,7 @@ def test_healthz():
 def test_list_tasks():
     response = client.get("/tasks")
     assert response.status_code == 200
-    assert response.json()["tasks"] == ["architecture", "qa"]
+    assert response.json()["tasks"] == ["architecture", "qa", "runfile"]
 
 
 def test_analyze_happy_path(monkeypatch, scan, good_draft):

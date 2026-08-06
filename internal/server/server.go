@@ -76,6 +76,10 @@ func (s *Server) analyze(w http.ResponseWriter, r *http.Request) {
 		httpError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	if m := s.cached(res); m != nil {
+		writeJSON(w, m)
+		return
+	}
 	m, warnings, err := s.Analyze(res, req.Model)
 	if err != nil {
 		httpError(w, http.StatusBadGateway, err.Error())
@@ -135,6 +139,10 @@ func (s *Server) analyzeStream(w http.ResponseWriter, repoURL, model string) {
 		"label": fmt.Sprintf("Read %d files across %d languages",
 			res.Stats.SourceFiles, len(res.Languages)),
 	})
+	if m := s.cached(res); m != nil {
+		send(map[string]any{"stage": "done", "map": m})
+		return
+	}
 	send(map[string]any{"stage": "analyze", "label": "Terra is reading the architecture"})
 	m, warnings, err := s.Analyze(res, model)
 	if err != nil {
@@ -373,28 +381,31 @@ func snippet(repoURL, file string, line int) string {
 	return ""
 }
 
+// cached returns the stored map when the repo's HEAD commit hasn't moved
+// since the last analysis. Everything is keyed by the commit SHA the scan
+// resolved, so a repeat visitor to an unchanged repo never pays the analyzer.
+func (s *Server) cached(res *scan.Result) *graph.Map {
+	if s.DB == "" || res.Commit == "" {
+		return nil
+	}
+	commit, m, err := store.Find(s.DB, res.RepositoryURL)
+	if err != nil || commit != res.Commit {
+		return nil
+	}
+	return m
+}
+
 // storedMap finds the saved analysis for repoURL, or nil.
 func storedMap(dbPath, repoURL string) *graph.Map {
 	norm, _, err := scan.NormalizeURL(repoURL)
 	if err != nil {
 		return nil
 	}
-	list, err := store.List(dbPath)
+	_, m, err := store.Find(dbPath, norm)
 	if err != nil {
 		return nil
 	}
-	for _, s := range list {
-		got, _, err := scan.NormalizeURL(s.RepoURL)
-		if err != nil || got != norm {
-			continue
-		}
-		m, err := store.Get(dbPath, s.ID)
-		if err != nil {
-			return nil
-		}
-		return m
-	}
-	return nil
+	return m
 }
 
 func (s *Server) list(w http.ResponseWriter, r *http.Request) {

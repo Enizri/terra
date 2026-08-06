@@ -1,18 +1,26 @@
 package scan
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"fmt"
 	"os"
 	"path"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 )
 
 func mustParse(t *testing.T, base string) []string {
 	t.Helper()
-	m := parseManifest(base, filepath.Join("testdata", base), base)
+	data, err := os.ReadFile(filepath.Join("testdata", base))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := parseManifest(base, base, data)
 	if m == nil {
 		t.Fatalf("parseManifest(%s) returned nil", base)
 	}
@@ -78,19 +86,18 @@ func TestNormalizeURL(t *testing.T) {
 	}
 }
 
-func TestWalkRepoCollectsFilesAndDirs(t *testing.T) {
-	root := t.TempDir()
-	for _, p := range []string{"main.go", "web/src/App.tsx", "web/src/index.tsx", "node_modules/dep/x.js", ".git/config"} {
-		full := filepath.Join(root, filepath.FromSlash(p))
-		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(full, []byte("x"), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
+func TestScanTarballCollectsFilesAndDirs(t *testing.T) {
+	tgz := makeTarball(t, "memos-abc1234", map[string]string{
+		"main.go":               "package main\n",
+		"web/src/App.tsx":       "export {}\n",
+		"web/src/index.tsx":     "export {}\n",
+		"node_modules/dep/x.js": "x",
+		".git/config":           "x",
+		"docs/":                 "", // dir entry with no source files
+		"go.mod":                "module x\n\nrequire github.com/lib/pq v1.0.0\n",
+	})
 	var res Result
-	if err := walkRepo(root, &res); err != nil {
+	if err := scanTarball(bytes.NewReader(tgz), &res); err != nil {
 		t.Fatal(err)
 	}
 	if got := strings.Join(res.Files, ","); got != "main.go,web/src/App.tsx,web/src/index.tsx" {
@@ -102,6 +109,54 @@ func TestWalkRepoCollectsFilesAndDirs(t *testing.T) {
 	if res.FilesNote != "" {
 		t.Errorf("small repositories should not be truncated, got note %q", res.FilesNote)
 	}
+	if got := strings.Join(res.Stats.TopLevelDirs, ","); got != "docs,web" {
+		t.Errorf("top-level dirs = %q, want docs,web (hidden and dependency dirs excluded)", got)
+	}
+	if len(res.Dependencies) != 1 || res.Dependencies[0].Manifest != "go.mod" {
+		t.Errorf("dependencies = %+v, want the go.mod manifest", res.Dependencies)
+	}
+	if len(res.Languages) == 0 || res.Languages[0].Name != "TypeScript" {
+		t.Errorf("languages = %+v, want TypeScript first (most bytes)", res.Languages)
+	}
+}
+
+// makeTarball builds a gzipped tarball shaped like codeload's: every entry
+// under a "repo-sha/" root, plus the pax_global_header codeload emits.
+func makeTarball(t *testing.T, root string, entries map[string]string) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(gz)
+	write := func(hdr *tar.Header, body string) {
+		if err := tw.WriteHeader(hdr); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := tw.Write([]byte(body)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write(&tar.Header{Name: "pax_global_header", Typeflag: tar.TypeXGlobalHeader}, "")
+	write(&tar.Header{Name: root + "/", Typeflag: tar.TypeDir, Mode: 0o755}, "")
+	names := make([]string, 0, len(entries))
+	for name := range entries {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		body := entries[name]
+		if strings.HasSuffix(name, "/") {
+			write(&tar.Header{Name: root + "/" + name, Typeflag: tar.TypeDir, Mode: 0o755}, "")
+			continue
+		}
+		write(&tar.Header{Name: root + "/" + name, Typeflag: tar.TypeReg, Mode: 0o644, Size: int64(len(body))}, body)
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
 }
 
 func TestSamplePaths(t *testing.T) {

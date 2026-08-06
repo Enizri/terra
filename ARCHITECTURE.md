@@ -10,7 +10,7 @@ User (CLI / browser)
         |
         v
    Go backend (:8080)  ──────────────► SQLite (terra.db)
-   clone, scan, HTTP API, storage
+   tarball ingest, scan, HTTP API, storage
         |
         | POST /analyze  {scan, model}
         v
@@ -42,7 +42,7 @@ this list:
 | `internal/store` | SQLite persistence keyed by repo URL | graph, scan |
 | `internal/preview` | Clone a repo, boot its dev server, reverse-proxy it with `select.js` injected | scan |
 | `internal/graph` | Wire types + the HTTP client to the analyzer | scan |
-| `internal/scan` | Clone, walk, languages, dependency manifests | nothing |
+| `internal/scan` | Tarball ingest (SHA-keyed, no git), languages, dependency manifests | nothing |
 
 Rules:
 

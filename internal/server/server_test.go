@@ -77,6 +77,77 @@ func TestAnalyzeStoresAndReturnsMap(t *testing.T) {
 	}
 }
 
+func TestAnalyzeReusesStoredMapForUnchangedCommit(t *testing.T) {
+	s, ts := testServer(t)
+	calls := 0
+	scanCommit := "aaa111"
+	s.Scan = func(url string) (*scan.Result, error) {
+		return &scan.Result{RepositoryURL: url, Name: "notes", Commit: scanCommit,
+			ScannedAt: time.Now().UTC()}, nil
+	}
+	realAnalyze := s.Analyze
+	s.Analyze = func(res *scan.Result, model string) (*graph.Map, []string, error) {
+		calls++
+		return realAnalyze(res, model)
+	}
+
+	for i := 0; i < 2; i++ {
+		resp := postAnalyze(t, ts, `{"repo_url":"https://github.com/acme/notes"}`)
+		if resp.StatusCode != 200 {
+			t.Fatalf("request %d: status = %d", i, resp.StatusCode)
+		}
+		var m graph.Map
+		if err := json.NewDecoder(resp.Body).Decode(&m); err != nil {
+			t.Fatal(err)
+		}
+		if m.Project.Name != "Notes" {
+			t.Errorf("request %d: map = %+v", i, m.Project)
+		}
+	}
+	if calls != 1 {
+		t.Errorf("analyzer ran %d times; an unchanged commit must be served from the store", calls)
+	}
+
+	// A new commit invalidates the cache.
+	scanCommit = "bbb222"
+	postAnalyze(t, ts, `{"repo_url":"https://github.com/acme/notes"}`)
+	if calls != 2 {
+		t.Errorf("analyzer ran %d times; a moved HEAD must re-analyze", calls)
+	}
+}
+
+func TestAnalyzeStreamCacheHitEndsWithDone(t *testing.T) {
+	s, ts := testServer(t)
+	s.Scan = func(url string) (*scan.Result, error) {
+		return &scan.Result{RepositoryURL: url, Name: "notes", Commit: "aaa111",
+			ScannedAt: time.Now().UTC()}, nil
+	}
+	postAnalyze(t, ts, `{"repo_url":"https://github.com/acme/notes"}`) // warm the store
+	s.Analyze = func(res *scan.Result, model string) (*graph.Map, []string, error) {
+		t.Error("analyzer must not run on a cache hit")
+		return nil, nil, fmt.Errorf("unreachable")
+	}
+
+	req, _ := http.NewRequest("POST", ts.URL+"/analyze",
+		strings.NewReader(`{"repo_url":"https://github.com/acme/notes"}`))
+	req.Header.Set("Accept", "application/x-ndjson")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var last map[string]any
+	dec := json.NewDecoder(resp.Body)
+	for dec.More() {
+		if err := dec.Decode(&last); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if last["stage"] != "done" || last["map"] == nil {
+		t.Errorf("last event = %v, want done with the stored map", last)
+	}
+}
+
 func TestAnalyzeStreamsStages(t *testing.T) {
 	_, ts := testServer(t)
 

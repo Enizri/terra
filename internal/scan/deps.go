@@ -2,7 +2,6 @@ package scan
 
 import (
 	"encoding/json"
-	"os"
 	"regexp"
 	"sort"
 	"strings"
@@ -28,13 +27,9 @@ var manifestParsers = map[string]struct {
 }
 
 // parseManifest returns nil if base is not a known manifest or parsing fails.
-func parseManifest(base, absPath, relPath string) *Manifest {
+func parseManifest(base, relPath string, data []byte) *Manifest {
 	p, ok := manifestParsers[base]
 	if !ok {
-		return nil
-	}
-	data, err := os.ReadFile(absPath)
-	if err != nil {
 		return nil
 	}
 	names := p.parse(data)

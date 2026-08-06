@@ -171,6 +171,34 @@ func Get(dbPath string, id int64) (*graph.Map, error) {
 	return &m, nil
 }
 
+// Find returns the stored commit and map for one repository URL, or
+// ("", nil, nil) when the repo has never been analyzed. This is the cache
+// lookup that lets a repeat analysis of an unchanged repo skip the analyzer.
+func Find(dbPath, repoURL string) (commit string, m *graph.Map, err error) {
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		return "", nil, err
+	}
+	defer db.Close()
+	if _, err := db.Exec(schema); err != nil {
+		return "", nil, fmt.Errorf("create schema: %w", err)
+	}
+
+	var mapJSON string
+	err = db.QueryRow(`SELECT commit_hash, map_json FROM projects WHERE repo_url = ?`, repoURL).Scan(&commit, &mapJSON)
+	if err == sql.ErrNoRows {
+		return "", nil, nil
+	}
+	if err != nil {
+		return "", nil, err
+	}
+	m = &graph.Map{}
+	if err := json.Unmarshal([]byte(mapJSON), m); err != nil {
+		return "", nil, fmt.Errorf("stored map for %s is corrupt: %w", repoURL, err)
+	}
+	return commit, m, nil
+}
+
 func mustJSON(v []string) string {
 	if v == nil {
 		v = []string{}

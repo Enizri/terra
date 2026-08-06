@@ -10,7 +10,7 @@ User (CLI / HTTP)
         |
         v
    Go backend  ──────────────► SQLite (terra.db)
-   clone, scan, API, storage
+   tarball ingest, scan, API, storage
         |
         | POST /analyze  {scan, model}
         v
