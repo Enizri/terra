@@ -47,8 +47,8 @@ export type DiagramView = {
 };
 
 /** Directory a component lives in, for the group box's subtitle. */
-function dirOf(c: Component): string {
-  const first = c.files[0] ?? "";
+function dirOf(component: Component): string {
+  const first = component.files[0] ?? "";
   const parts = first.replace(/\/$/, "").split("/");
   return parts.length > 1 ? `${parts[0]}/` : first;
 }

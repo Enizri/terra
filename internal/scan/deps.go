@@ -28,16 +28,16 @@ var manifestParsers = map[string]struct {
 
 // parseManifest returns nil if base is not a known manifest or parsing fails.
 func parseManifest(base, relPath string, data []byte) *Manifest {
-	p, ok := manifestParsers[base]
+	parser, ok := manifestParsers[base]
 	if !ok {
 		return nil
 	}
-	names := p.parse(data)
+	names := parser.parse(data)
 	if len(names) == 0 {
 		return nil
 	}
 	sort.Strings(names)
-	return &Manifest{Manifest: relPath, Ecosystem: p.ecosystem, Names: names}
+	return &Manifest{Manifest: relPath, Ecosystem: parser.ecosystem, Names: names}
 }
 
 func parsePackageJSON(data []byte) []string {
@@ -123,8 +123,8 @@ func parsePyproject(data []byte) []string {
 			inDepsArray = true
 			fallthrough
 		case section == "project" && inDepsArray:
-			for _, m := range regexp.MustCompile(`"([^"]+)"`).FindAllStringSubmatch(line, -1) {
-				if name := pipNameRe.FindString(m[1]); name != "" {
+			for _, match := range regexp.MustCompile(`"([^"]+)"`).FindAllStringSubmatch(line, -1) {
+				if name := pipNameRe.FindString(match[1]); name != "" {
 					names = append(names, name)
 				}
 			}

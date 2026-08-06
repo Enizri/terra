@@ -27,9 +27,9 @@ _FENCE = re.compile(r"```(?:json)?\s*(.*?)\s*```", re.DOTALL)
 
 
 def _parse(content: str) -> dict[str, Any]:
-    m = _FENCE.search(content)
-    if m:
-        content = m.group(1)
+    match = _FENCE.search(content)
+    if match:
+        content = match.group(1)
     try:
         raw = json.loads(content)
     except ValueError as e:
@@ -41,7 +41,7 @@ def _parse(content: str) -> dict[str, Any]:
         "install": str(raw.get("install") or ""),
         "run": str(raw.get("run") or ""),
         "dir": str(raw.get("dir") or ""),
-        "ports": [int(p) for p in raw.get("ports") or [] if isinstance(p, (int, float))],
+        "ports": [int(port) for port in raw.get("ports") or [] if isinstance(port, (int, float))],
     }
 
 

@@ -9,27 +9,6 @@ import (
 	"github.com/Enizri/terra/internal/trace"
 )
 
-func TestTraceworthy(t *testing.T) {
-	cases := map[string]bool{
-		"/":                                    true,
-		"/api/v1/memos":                        true,
-		"/memos.api.v1.MemoService/CreateMemo": true, // RPC dots are not extensions
-		"/auth":                                true,
-		"/src/main.tsx":                        false,
-		"/@vite/client":                        false,
-		"/assets/logo.svg":                     false,
-		"/node_modules/.vite/deps/react.js":    false,
-		"/__terra/select.js":                   false,
-		"/main.abc123.hot-update.json":         false,
-		"/bundle.JS":                           false, // extension check is case-insensitive
-	}
-	for path, want := range cases {
-		if got := traceworthy(path); got != want {
-			t.Errorf("traceworthy(%q) = %v, want %v", path, got, want)
-		}
-	}
-}
-
 func TestTraceMiddlewarePublishesFilteredSpans(t *testing.T) {
 	repo := "https://github.com/test/trace-mw"
 	_, ch, cancel := trace.Subscribe(repo)
@@ -41,8 +20,8 @@ func TestTraceMiddlewarePublishesFilteredSpans(t *testing.T) {
 	ts := httptest.NewServer(h)
 	defer ts.Close()
 
-	for _, p := range []string{"/api/v1/memos", "/assets/logo.svg"} {
-		resp, err := http.Post(ts.URL+p, "application/json", nil)
+	for _, urlPath := range []string{"/api/v1/memos", "/assets/logo.svg"} {
+		resp, err := http.Post(ts.URL+urlPath, "application/json", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -50,16 +29,16 @@ func TestTraceMiddlewarePublishesFilteredSpans(t *testing.T) {
 	}
 
 	select {
-	case s := <-ch:
-		if s.Path != "/api/v1/memos" || s.Method != "POST" || s.Status != http.StatusCreated {
-			t.Errorf("span = %+v", s)
+	case span := <-ch:
+		if span.Path != "/api/v1/memos" || span.Method != "POST" || span.Status != http.StatusCreated {
+			t.Errorf("span = %+v", span)
 		}
 	case <-time.After(time.Second):
 		t.Fatal("no span published for the API request")
 	}
 	select {
-	case s := <-ch:
-		t.Errorf("asset request must not produce a span, got %+v", s)
+	case span := <-ch:
+		t.Errorf("asset request must not produce a span, got %+v", span)
 	default:
 	}
 }

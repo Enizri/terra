@@ -129,8 +129,8 @@ func parseArgs(fs *flag.FlagSet, args []string) string {
 
 // write emits JSON to path, or to stdout when path is empty. Everything else
 // the command says goes to stderr, so `terra map <url> | jq` works.
-func write(path string, v any) {
-	data, err := json.MarshalIndent(v, "", "  ")
+func write(path string, payload any) {
+	data, err := json.MarshalIndent(payload, "", "  ")
 	if err != nil {
 		fail(err)
 	}

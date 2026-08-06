@@ -36,11 +36,11 @@ func NormalizeURL(raw string) (url, name string, err error) {
 }
 
 func ownerRepo(raw string) (owner, repo string, err error) {
-	m := githubRe.FindStringSubmatch(strings.TrimSpace(raw))
-	if m == nil {
+	match := githubRe.FindStringSubmatch(strings.TrimSpace(raw))
+	if match == nil {
 		return "", "", fmt.Errorf("not a GitHub repository URL: %q (expected https://github.com/owner/repo)", raw)
 	}
-	return m[1], m[2], nil
+	return match[1], match[2], nil
 }
 
 // ResolveCommit asks the GitHub API for the SHA of the default branch's HEAD.

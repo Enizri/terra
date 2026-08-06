@@ -80,11 +80,11 @@ func (s *Server) analyze(w http.ResponseWriter, r *http.Request) {
 		httpError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if m := s.cached(res); m != nil {
-		writeJSON(w, m)
+	if repoMap := s.cached(res); repoMap != nil {
+		writeJSON(w, repoMap)
 		return
 	}
-	m, warnings, err := s.Analyze(res, req.Model)
+	repoMap, warnings, err := s.Analyze(res, req.Model)
 	if err != nil {
 		httpError(w, http.StatusBadGateway, err.Error())
 		return
@@ -93,12 +93,12 @@ func (s *Server) analyze(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(os.Stderr, "warning:", warn)
 	}
 	if s.DB != "" {
-		if err := store.Save(s.DB, res, m); err != nil {
+		if err := store.Save(s.DB, res, repoMap); err != nil {
 			httpError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 	}
-	writeJSON(w, m)
+	writeJSON(w, repoMap)
 }
 
 // analyzeStream runs the same pipeline as analyze but reports each stage as
@@ -143,12 +143,12 @@ func (s *Server) analyzeStream(w http.ResponseWriter, repoURL, model string) {
 		"label": fmt.Sprintf("Read %d files across %d languages",
 			res.Stats.SourceFiles, len(res.Languages)),
 	})
-	if m := s.cached(res); m != nil {
-		send(map[string]any{"stage": "done", "map": m})
+	if repoMap := s.cached(res); repoMap != nil {
+		send(map[string]any{"stage": "done", "map": repoMap})
 		return
 	}
 	send(map[string]any{"stage": "analyze", "label": "Terra is reading the architecture"})
-	m, warnings, err := s.Analyze(res, model)
+	repoMap, warnings, err := s.Analyze(res, model)
 	if err != nil {
 		fail(err)
 		return
@@ -160,14 +160,14 @@ func (s *Server) analyzeStream(w http.ResponseWriter, repoURL, model string) {
 	if s.DB != "" {
 		send(map[string]any{
 			"stage": "store",
-			"label": fmt.Sprintf("Saving %d components", len(m.Components)),
+			"label": fmt.Sprintf("Saving %d components", len(repoMap.Components)),
 		})
-		if err := store.Save(s.DB, res, m); err != nil {
+		if err := store.Save(s.DB, res, repoMap); err != nil {
 			fail(err)
 			return
 		}
 	}
-	send(map[string]any{"stage": "done", "map": m})
+	send(map[string]any{"stage": "done", "map": repoMap})
 }
 
 // preview starts (or reuses) a live dev-server preview of the repo's
@@ -231,8 +231,8 @@ func (s *Server) ask(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if s.DB != "" {
-		if m := storedMap(s.DB, req.RepoURL); m != nil {
-			payload["map"] = m
+		if repoMap := storedMap(s.DB, req.RepoURL); repoMap != nil {
+			payload["map"] = repoMap
 		}
 	}
 
@@ -300,13 +300,13 @@ func (s *Server) files(w http.ResponseWriter, r *http.Request) {
 		Dir  bool   `json:"dir"`
 	}
 	out := []entry{}
-	for _, e := range entries {
-		name := e.Name()
+	for _, ent := range entries {
+		name := ent.Name()
 		// Noise that makes the tree unusable, not a security boundary.
 		if name == ".git" || name == "node_modules" || strings.HasPrefix(name, ".") {
 			continue
 		}
-		out = append(out, entry{Name: name, Path: path.Join(rel, name), Dir: e.IsDir()})
+		out = append(out, entry{Name: name, Path: path.Join(rel, name), Dir: ent.IsDir()})
 	}
 	slices.SortFunc(out, func(a, b entry) int {
 		if a.Dir != b.Dir {
@@ -399,6 +399,9 @@ func (s *Server) ingest(w http.ResponseWriter, r *http.Request) {
 	}
 	now := time.Now()
 	for _, sp := range req.Spans {
+		if !trace.WorthKeeping(sp.Path) {
+			continue
+		}
 		trace.Publish(trace.Span{
 			Repo:   key,
 			Time:   now,
@@ -427,8 +430,8 @@ func safeJoin(base, rel string) (full, clean string, err error) {
 	// textual join above would not notice. Only resolvable paths are checked;
 	// missing ones are the caller's Stat to reject.
 	if realFull, err := filepath.EvalSymlinks(full); err == nil {
-		r, err := filepath.Rel(realBase, realFull)
-		if err != nil || r == ".." || strings.HasPrefix(r, ".."+string(filepath.Separator)) {
+		relPath, err := filepath.Rel(realBase, realFull)
+		if err != nil || relPath == ".." || strings.HasPrefix(relPath, ".."+string(filepath.Separator)) {
 			return "", "", fmt.Errorf("path escapes the repository")
 		}
 	}
@@ -484,11 +487,11 @@ func (s *Server) cached(res *scan.Result) *graph.Map {
 	if s.DB == "" || res.Commit == "" {
 		return nil
 	}
-	commit, m, err := store.Find(s.DB, res.RepositoryURL)
+	commit, repoMap, err := store.Find(s.DB, res.RepositoryURL)
 	if err != nil || commit != res.Commit {
 		return nil
 	}
-	return m
+	return repoMap
 }
 
 // storedMap finds the saved analysis for repoURL, or nil.
@@ -497,11 +500,11 @@ func storedMap(dbPath, repoURL string) *graph.Map {
 	if err != nil {
 		return nil
 	}
-	_, m, err := store.Find(dbPath, norm)
+	_, repoMap, err := store.Find(dbPath, norm)
 	if err != nil {
 		return nil
 	}
-	return m
+	return repoMap
 }
 
 func (s *Server) list(w http.ResponseWriter, r *http.Request) {
@@ -519,21 +522,21 @@ func (s *Server) get(w http.ResponseWriter, r *http.Request) {
 		httpError(w, http.StatusBadRequest, "id must be a number")
 		return
 	}
-	m, err := store.Get(s.DB, id)
+	repoMap, err := store.Get(s.DB, id)
 	if err != nil {
 		httpError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	if m == nil {
+	if repoMap == nil {
 		httpError(w, http.StatusNotFound, fmt.Sprintf("no analysis with id %d", id))
 		return
 	}
-	writeJSON(w, m)
+	writeJSON(w, repoMap)
 }
 
-func writeJSON(w http.ResponseWriter, v any) {
+func writeJSON(w http.ResponseWriter, payload any) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(v)
+	json.NewEncoder(w).Encode(payload)
 }
 
 func httpError(w http.ResponseWriter, code int, msg string) {

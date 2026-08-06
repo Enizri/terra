@@ -9,19 +9,21 @@ interface Props {
 }
 
 export default function DetailsPanel({ map, selectedId, onSelect }: Props) {
-  const c = map.components.find((x) => x.id === selectedId);
-  const touching = c
-    ? map.relationships.filter((r) => r.from === c.id || r.to === c.id)
+  const component = map.components.find((comp) => comp.id === selectedId);
+  const touching = component
+    ? map.relationships.filter(
+        (rel) => rel.from === component.id || rel.to === component.id,
+      )
     : [];
   const nameOf = (id: string) =>
-    map.components.find((x) => x.id === id)?.name ?? id;
+    map.components.find((comp) => comp.id === id)?.name ?? id;
 
   return (
     <div className={styles.slot}>
       <AnimatePresence mode="wait">
-        {c ? (
+        {component ? (
           <motion.aside
-            key={c.id}
+            key={component.id}
             className={styles.panel}
             initial={{ opacity: 0, x: 24 }}
             animate={{ opacity: 1, x: 0 }}
@@ -36,22 +38,22 @@ export default function DetailsPanel({ map, selectedId, onSelect }: Props) {
               ×
             </button>
             <p className={styles.kicker}>
-              {c.type}
+              {component.type}
               <span
                 className={styles.importance}
-                data-importance={c.importance}
+                data-importance={component.importance}
               >
-                {c.importance}
+                {component.importance}
               </span>
             </p>
-            <h3 className={styles.name}>{c.name}</h3>
-            <p className={styles.purpose}>{c.purpose}</p>
+            <h3 className={styles.name}>{component.name}</h3>
+            <p className={styles.purpose}>{component.purpose}</p>
 
-            {c.tech && c.tech.length > 0 && (
+            {component.tech && component.tech.length > 0 && (
               <div className={styles.chips}>
-                {c.tech.map((t) => (
-                  <span key={t} className={styles.chip}>
-                    {t}
+                {component.tech.map((tech) => (
+                  <span key={tech} className={styles.chip}>
+                    {tech}
                   </span>
                 ))}
               </div>
@@ -59,8 +61,8 @@ export default function DetailsPanel({ map, selectedId, onSelect }: Props) {
 
             <p className={styles.subhead}>Where it lives</p>
             <ul className={styles.files}>
-              {c.files.map((f) => (
-                <li key={f}>{f}</li>
+              {component.files.map((filePath) => (
+                <li key={filePath}>{filePath}</li>
               ))}
             </ul>
 
@@ -68,22 +70,25 @@ export default function DetailsPanel({ map, selectedId, onSelect }: Props) {
               <>
                 <p className={styles.subhead}>Connections — with evidence</p>
                 <ul className={styles.edges}>
-                  {touching.map((r) => (
-                    <li key={`${r.from}-${r.to}`} className={styles.edgeItem}>
+                  {touching.map((rel) => (
+                    <li
+                      key={`${rel.from}-${rel.to}`}
+                      className={styles.edgeItem}
+                    >
                       <p className={styles.edgeHead}>
-                        {r.from === c.id ? (
+                        {rel.from === component.id ? (
                           <>
-                            <em>{r.type}</em> → {nameOf(r.to)}
+                            <em>{rel.type}</em> → {nameOf(rel.to)}
                           </>
                         ) : (
                           <>
-                            {nameOf(r.from)} <em>{r.type}</em> → this
+                            {nameOf(rel.from)} <em>{rel.type}</em> → this
                           </>
                         )}
                       </p>
-                      {r.because.map((b) => (
-                        <p key={b} className={styles.because}>
-                          {b}
+                      {rel.because.map((reason) => (
+                        <p key={reason} className={styles.because}>
+                          {reason}
                         </p>
                       ))}
                     </li>

@@ -46,8 +46,8 @@ var ErrUnknown = errors.New("no runfile evidence found")
 
 // Infer walks the roadmap's inference order against a checkout root.
 func Infer(root string) (*Runfile, error) {
-	for _, f := range []func(string) *Runfile{fromDockerfile, fromCompose, fromPackageJSON, fromGoMod, fromPython} {
-		if rf := f(root); rf != nil {
+	for _, try := range []func(string) *Runfile{fromDockerfile, fromCompose, fromPackageJSON, fromGoMod, fromPython} {
+		if rf := try(root); rf != nil {
 			return rf, nil
 		}
 	}
@@ -65,15 +65,15 @@ func fromDockerfile(root string) *Runfile {
 		return nil
 	}
 	rf := &Runfile{Source: "dockerfile"}
-	for _, m := range exposeRe.FindAllStringSubmatch(string(data), -1) {
-		for _, tok := range strings.Fields(m[1]) {
-			if p, err := strconv.Atoi(strings.SplitN(tok, "/", 2)[0]); err == nil {
-				rf.Ports = append(rf.Ports, p)
+	for _, match := range exposeRe.FindAllStringSubmatch(string(data), -1) {
+		for _, tok := range strings.Fields(match[1]) {
+			if port, err := strconv.Atoi(strings.SplitN(tok, "/", 2)[0]); err == nil {
+				rf.Ports = append(rf.Ports, port)
 			}
 		}
 	}
-	if m := cmdRe.FindStringSubmatch(string(data)); m != nil {
-		rf.Run = parseDockerCmd(m[1])
+	if match := cmdRe.FindStringSubmatch(string(data)); match != nil {
+		rf.Run = parseDockerCmd(match[1])
 	}
 	return rf
 }
@@ -109,13 +109,13 @@ func fromCompose(root string) *Runfile {
 				continue
 			}
 			if inPorts {
-				m := composePortRe.FindStringSubmatch(line)
-				if m == nil {
+				match := composePortRe.FindStringSubmatch(line)
+				if match == nil {
 					inPorts = false
 					continue
 				}
-				if p, err := strconv.Atoi(m[1]); err == nil {
-					rf.Ports = append(rf.Ports, p)
+				if port, err := strconv.Atoi(match[1]); err == nil {
+					rf.Ports = append(rf.Ports, port)
 				}
 			}
 		}
@@ -209,9 +209,9 @@ func pythonDeps(root string) map[string]bool {
 			continue
 		}
 		low := strings.ToLower(string(data))
-		for _, d := range []string{"fastapi", "uvicorn", "flask", "django"} {
-			if strings.Contains(low, d) {
-				deps[d] = true
+		for _, dep := range []string{"fastapi", "uvicorn", "flask", "django"} {
+			if strings.Contains(low, dep) {
+				deps[dep] = true
 			}
 		}
 	}
@@ -220,9 +220,9 @@ func pythonDeps(root string) map[string]bool {
 
 // appModule guesses the uvicorn module: main.py or app.py at root.
 func appModule(root string) string {
-	for _, m := range []string{"main", "app"} {
-		if fileExists(root, m+".py") {
-			return m
+	for _, mod := range []string{"main", "app"} {
+		if fileExists(root, mod+".py") {
+			return mod
 		}
 	}
 	return ""
@@ -248,11 +248,11 @@ func cachePath(sha string) (string, error) {
 
 // Load returns the cached Runfile for a commit, or nil when never inferred.
 func Load(sha string) *Runfile {
-	p, err := cachePath(sha)
+	path, err := cachePath(sha)
 	if err != nil {
 		return nil
 	}
-	data, err := os.ReadFile(p)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil
 	}
@@ -266,15 +266,15 @@ func Load(sha string) *Runfile {
 // Save caches a Runfile under its commit SHA. Best-effort: a failed write
 // only costs a re-inference.
 func Save(sha string, rf *Runfile) {
-	p, err := cachePath(sha)
+	path, err := cachePath(sha)
 	if err != nil {
 		return
 	}
-	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return
 	}
 	data, _ := json.Marshal(rf)
-	os.WriteFile(p, data, 0o644)
+	os.WriteFile(path, data, 0o644)
 }
 
 // For returns the Runfile for a checkout at one commit, from cache or fresh

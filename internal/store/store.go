@@ -45,8 +45,8 @@ CREATE TABLE IF NOT EXISTS relationships (
 
 // Save writes the map to dbPath, replacing whatever was stored for the same
 // repository URL.
-func Save(dbPath string, res *scan.Result, m *graph.Map) error {
-	mapJSON, err := json.Marshal(m)
+func Save(dbPath string, res *scan.Result, repoMap *graph.Map) error {
+	mapJSON, err := json.Marshal(repoMap)
 	if err != nil {
 		return err
 	}
@@ -73,7 +73,7 @@ func Save(dbPath string, res *scan.Result, m *graph.Map) error {
 			name = excluded.name, commit_hash = excluded.commit_hash,
 			scanned_at = excluded.scanned_at, map_json = excluded.map_json
 		RETURNING id`,
-		res.RepositoryURL, m.Project.Name, res.Commit, res.ScannedAt.Format("2006-01-02T15:04:05Z"), string(mapJSON),
+		res.RepositoryURL, repoMap.Project.Name, res.Commit, res.ScannedAt.Format("2006-01-02T15:04:05Z"), string(mapJSON),
 	).Scan(&projectID)
 	if err != nil {
 		return fmt.Errorf("upsert project: %w", err)
@@ -85,24 +85,24 @@ func Save(dbPath string, res *scan.Result, m *graph.Map) error {
 		}
 	}
 
-	for _, c := range m.Components {
+	for _, component := range repoMap.Components {
 		var parent any
-		if c.ParentID != nil {
-			parent = *c.ParentID
+		if component.ParentID != nil {
+			parent = *component.ParentID
 		}
 		if _, err := tx.Exec(`INSERT INTO components
 			(project_id, id, parent_id, name, purpose, importance, type, tech_json, files_json)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			projectID, c.ID, parent, c.Name, c.Purpose, c.Importance, c.Type,
-			mustJSON(c.Tech), mustJSON(c.Files)); err != nil {
-			return fmt.Errorf("insert component %s: %w", c.ID, err)
+			projectID, component.ID, parent, component.Name, component.Purpose, component.Importance, component.Type,
+			mustJSON(component.Tech), mustJSON(component.Files)); err != nil {
+			return fmt.Errorf("insert component %s: %w", component.ID, err)
 		}
 	}
-	for _, r := range m.Relationships {
+	for _, rel := range repoMap.Relationships {
 		if _, err := tx.Exec(`INSERT INTO relationships
 			(project_id, from_id, to_id, type, because_json) VALUES (?, ?, ?, ?, ?)`,
-			projectID, r.From, r.To, r.Type, mustJSON(r.Because)); err != nil {
-			return fmt.Errorf("insert relationship %s->%s: %w", r.From, r.To, err)
+			projectID, rel.From, rel.To, rel.Type, mustJSON(rel.Because)); err != nil {
+			return fmt.Errorf("insert relationship %s->%s: %w", rel.From, rel.To, err)
 		}
 	}
 	return tx.Commit()
@@ -135,11 +135,11 @@ func List(dbPath string) ([]Summary, error) {
 
 	out := []Summary{}
 	for rows.Next() {
-		var s Summary
-		if err := rows.Scan(&s.ID, &s.RepoURL, &s.Name, &s.ScannedAt); err != nil {
+		var row Summary
+		if err := rows.Scan(&row.ID, &row.RepoURL, &row.Name, &row.ScannedAt); err != nil {
 			return nil, err
 		}
-		out = append(out, s)
+		out = append(out, row)
 	}
 	return out, rows.Err()
 }
@@ -164,17 +164,17 @@ func Get(dbPath string, id int64) (*graph.Map, error) {
 	if err != nil {
 		return nil, err
 	}
-	var m graph.Map
-	if err := json.Unmarshal([]byte(mapJSON), &m); err != nil {
+	var repoMap graph.Map
+	if err := json.Unmarshal([]byte(mapJSON), &repoMap); err != nil {
 		return nil, fmt.Errorf("stored map for id %d is corrupt: %w", id, err)
 	}
-	return &m, nil
+	return &repoMap, nil
 }
 
 // Find returns the stored commit and map for one repository URL, or
 // ("", nil, nil) when the repo has never been analyzed. This is the cache
 // lookup that lets a repeat analysis of an unchanged repo skip the analyzer.
-func Find(dbPath, repoURL string) (commit string, m *graph.Map, err error) {
+func Find(dbPath, repoURL string) (commit string, repoMap *graph.Map, err error) {
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return "", nil, err
@@ -192,17 +192,17 @@ func Find(dbPath, repoURL string) (commit string, m *graph.Map, err error) {
 	if err != nil {
 		return "", nil, err
 	}
-	m = &graph.Map{}
-	if err := json.Unmarshal([]byte(mapJSON), m); err != nil {
+	repoMap = &graph.Map{}
+	if err := json.Unmarshal([]byte(mapJSON), repoMap); err != nil {
 		return "", nil, fmt.Errorf("stored map for %s is corrupt: %w", repoURL, err)
 	}
-	return commit, m, nil
+	return commit, repoMap, nil
 }
 
-func mustJSON(v []string) string {
-	if v == nil {
-		v = []string{}
+func mustJSON(items []string) string {
+	if items == nil {
+		items = []string{}
 	}
-	b, _ := json.Marshal(v)
+	b, _ := json.Marshal(items)
 	return string(b)
 }

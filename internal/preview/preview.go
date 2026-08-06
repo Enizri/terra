@@ -47,8 +47,8 @@ func loadSelectJS() []byte {
 			filepath.Join(filepath.Dir(exe), "..", "internal", "preview", "select.js"),
 		)
 	}
-	for _, p := range candidates {
-		b, err := os.ReadFile(p)
+	for _, cand := range candidates {
+		b, err := os.ReadFile(cand)
 		if err == nil && len(b) > 0 {
 			return b
 		}
@@ -70,16 +70,16 @@ func hookJSPath() (string, error) {
 			filepath.Join(filepath.Dir(exe), "..", "internal", "preview", "hook.js"),
 		)
 	}
-	for _, p := range candidates {
-		if b, err := os.ReadFile(p); err == nil && len(b) > 0 {
-			return filepath.Abs(p)
+	for _, cand := range candidates {
+		if b, err := os.ReadFile(cand); err == nil && len(b) > 0 {
+			return filepath.Abs(cand)
 		}
 	}
-	p := filepath.Join(os.TempDir(), "terra-hook.js")
-	if err := os.WriteFile(p, hookJS, 0o644); err != nil {
+	hookPath := filepath.Join(os.TempDir(), "terra-hook.js")
+	if err := os.WriteFile(hookPath, hookJS, 0o644); err != nil {
 		return "", err
 	}
-	return p, nil
+	return hookPath, nil
 }
 
 // mergeNodeOptions extends an existing NODE_OPTIONS value with the hook's
@@ -187,12 +187,12 @@ func Start(repoURL string) (string, error) {
 	var apiEnv []string
 	apiPort := 0
 	if pkg, ok := detectGoBackend(root); ok {
-		p, c, err := startBackend(root, pkg)
+		port, backend, err := startBackend(root, pkg)
 		if err != nil {
 			// Hard fail: a frontend whose API calls all 502 is a broken demo.
 			return "", err
 		}
-		apiPort, apiCmd = p, c
+		apiPort, apiCmd = port, backend
 		apiEnv = append(apiEnv, "DEV_PROXY_SERVER=http://localhost:"+strconv.Itoa(apiPort))
 	}
 
@@ -319,17 +319,17 @@ func detect(root string) (appDir, script, pm string, err error) {
 		if json.Unmarshal(data, &pkg) != nil {
 			return nil
 		}
-		s := ""
+		script := ""
 		if pkg.Scripts["dev"] != "" {
-			s = "dev"
+			script = "dev"
 		} else if pkg.Scripts["start"] != "" {
-			s = "start"
+			script = "start"
 		}
-		if s == "" {
+		if script == "" {
 			return nil
 		}
 		score := 0
-		if s == "dev" {
+		if script == "dev" {
 			score++
 		}
 		for _, dep := range []string{"react", "vite"} {
@@ -338,7 +338,7 @@ func detect(root string) (appDir, script, pm string, err error) {
 			}
 		}
 		if best == nil || score > best.score {
-			best = &candidate{dir: filepath.Dir(path), script: s, score: score}
+			best = &candidate{dir: filepath.Dir(path), script: script, score: score}
 		}
 		return nil
 	})
@@ -357,11 +357,11 @@ func depth(root, path string) int {
 }
 
 func packageManager(dir, root string) string {
-	for _, d := range []string{dir, root} {
-		if _, err := os.Stat(filepath.Join(d, "pnpm-lock.yaml")); err == nil {
+	for _, base := range []string{dir, root} {
+		if _, err := os.Stat(filepath.Join(base, "pnpm-lock.yaml")); err == nil {
 			return "pnpm"
 		}
-		if _, err := os.Stat(filepath.Join(d, "yarn.lock")); err == nil {
+		if _, err := os.Stat(filepath.Join(base, "yarn.lock")); err == nil {
 			return "yarn"
 		}
 	}
@@ -448,12 +448,12 @@ func waitReady(want int, logs *boundedBuf, exited <-chan struct{}, budget time.D
 			return 0, fmt.Errorf("process exited")
 		default:
 		}
-		for _, p := range candidatePorts(want, logs, skip) {
+		for _, port := range candidatePorts(want, logs, skip) {
 			// "localhost", not 127.0.0.1: modern Vite/Node may bind ::1 only.
-			resp, err := probe.Get("http://localhost:" + strconv.Itoa(p) + "/")
+			resp, err := probe.Get("http://localhost:" + strconv.Itoa(port) + "/")
 			if err == nil {
 				resp.Body.Close()
-				return p, nil
+				return port, nil
 			}
 		}
 		time.Sleep(500 * time.Millisecond)
@@ -463,12 +463,12 @@ func waitReady(want int, logs *boundedBuf, exited <-chan struct{}, budget time.D
 
 func candidatePorts(want int, logs *boundedBuf, skip []int) []int {
 	ports := []int{want}
-	for _, m := range portRe.FindAllStringSubmatch(logs.String(), -1) {
-		p, err := strconv.Atoi(m[1])
-		if err != nil || p == want || slices.Contains(skip, p) || slices.Contains(ports, p) {
+	for _, match := range portRe.FindAllStringSubmatch(logs.String(), -1) {
+		port, err := strconv.Atoi(match[1])
+		if err != nil || port == want || slices.Contains(skip, port) || slices.Contains(ports, port) {
 			continue
 		}
-		ports = append(ports, p)
+		ports = append(ports, port)
 	}
 	return ports
 }
@@ -478,8 +478,8 @@ func alive(port int) bool {
 	if port == 0 {
 		return false
 	}
-	c := &http.Client{Timeout: 2 * time.Second}
-	resp, err := c.Get("http://localhost:" + strconv.Itoa(port) + "/")
+	client := &http.Client{Timeout: 2 * time.Second}
+	resp, err := client.Get("http://localhost:" + strconv.Itoa(port) + "/")
 	if err != nil {
 		return false
 	}
@@ -514,9 +514,9 @@ func signinDemo(client *http.Client, base string) (*http.Response, error) {
 // Set-Cookie header — accept either.
 func refreshCookie(resp *http.Response) string {
 	for _, header := range []string{"Set-Cookie", "Grpc-Metadata-Set-Cookie"} {
-		for _, v := range resp.Header.Values(header) {
-			if strings.HasPrefix(v, "memos_refresh=") {
-				return strings.SplitN(v, ";", 2)[0]
+		for _, value := range resp.Header.Values(header) {
+			if strings.HasPrefix(value, "memos_refresh=") {
+				return strings.SplitN(value, ";", 2)[0]
 			}
 		}
 	}
@@ -575,13 +575,13 @@ func seedMemos(client *http.Client, base string, signinResp *http.Response) {
 		"Everything here is real — the screens come from `web/src`, requests go through `internal/api`, and notes land in `store/memo.go`.",
 		"Try it: write a note, then ask Terra which file just saved it.",
 	}
-	for _, n := range notes {
-		body, _ := json.Marshal(map[string]string{"content": n, "visibility": "PUBLIC"})
+	for _, note := range notes {
+		body, _ := json.Marshal(map[string]string{"content": note, "visibility": "PUBLIC"})
 		req, _ := http.NewRequest("POST", base+"/api/v1/memos", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", "Bearer "+out.AccessToken)
-		if r, err := client.Do(req); err == nil {
-			r.Body.Close()
+		if resp, err := client.Do(req); err == nil {
+			resp.Body.Close()
 		}
 	}
 }
@@ -614,11 +614,11 @@ func serveProxy(repoKey string, devPort int, hasAuth bool) (string, error) {
 				strings.Contains(r.URL.Path, "AuthService/RefreshToken")) &&
 			!strings.Contains(r.Header.Get("Cookie"), "memos_refresh=") {
 			if resp, err := signinDemo(authClient, base); err == nil {
-				if c := refreshCookie(resp); c != "" {
+				if cookie := refreshCookie(resp); cookie != "" {
 					if prev := r.Header.Get("Cookie"); prev != "" {
-						r.Header.Set("Cookie", prev+"; "+c)
+						r.Header.Set("Cookie", prev+"; "+cookie)
 					} else {
-						r.Header.Set("Cookie", c)
+						r.Header.Set("Cookie", cookie)
 					}
 				}
 				resp.Body.Close()
@@ -689,9 +689,9 @@ func (b *boundedBuf) String() string {
 }
 
 func tail(out []byte) string {
-	s := strings.TrimSpace(string(out))
-	if len(s) > 2000 {
-		s = s[len(s)-2000:]
+	text := strings.TrimSpace(string(out))
+	if len(text) > 2000 {
+		text = text[len(text)-2000:]
 	}
-	return s
+	return text
 }

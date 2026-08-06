@@ -58,11 +58,11 @@ func Analyze(res *scan.Result, model string) (*Map, []string, error) {
 	}
 	if resp.StatusCode != http.StatusOK {
 		// The analyzer puts its legible error message in .detail.
-		var e struct {
+		var errBody struct {
 			Detail any `json:"detail"`
 		}
-		if json.Unmarshal(data, &e) == nil && e.Detail != nil {
-			return nil, nil, fmt.Errorf("analyzer: %v", e.Detail)
+		if json.Unmarshal(data, &errBody) == nil && errBody.Detail != nil {
+			return nil, nil, fmt.Errorf("analyzer: %v", errBody.Detail)
 		}
 		return nil, nil, fmt.Errorf("analyzer: %s: %s", resp.Status, strings.TrimSpace(string(data)))
 	}
@@ -104,11 +104,11 @@ func RunTask(name string, payload any) (json.RawMessage, error) {
 		return nil, fmt.Errorf("analyzer: %w", err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		var e struct {
+		var errBody struct {
 			Detail any `json:"detail"`
 		}
-		if json.Unmarshal(data, &e) == nil && e.Detail != nil {
-			return nil, fmt.Errorf("analyzer: %v", e.Detail)
+		if json.Unmarshal(data, &errBody) == nil && errBody.Detail != nil {
+			return nil, fmt.Errorf("analyzer: %v", errBody.Detail)
 		}
 		return nil, fmt.Errorf("analyzer: %s: %s", resp.Status, strings.TrimSpace(string(data)))
 	}
@@ -128,30 +128,30 @@ func preflight(base string) error {
 
 // assemble combines what the analyzer judged with what the scan already
 // knows. Nothing the scan can state as fact is left for the model to invent.
-func assemble(res *scan.Result, d *draft) *Map {
+func assemble(res *scan.Result, draft *draft) *Map {
 	return &Map{
 		Project: Project{
 			Name:             titleCase(res.Name),
 			RepositoryURL:    res.RepositoryURL,
-			Description:      strings.TrimSpace(d.Description),
-			Kind:             strings.TrimSpace(d.Kind),
+			Description:      strings.TrimSpace(draft.Description),
+			Kind:             strings.TrimSpace(draft.Kind),
 			PrimaryLanguages: res.PrimaryLanguages,
 			Stats: ProjectStats{
 				ApproxSourceFiles: res.Stats.SourceFiles,
 				TopLevelDirs:      res.Stats.TopLevelDirs,
 			},
 		},
-		Components:         d.Components,
-		Relationships:      d.Relationships,
-		SuggestedQuestions: d.SuggestedQuestions,
+		Components:         draft.Components,
+		Relationships:      draft.Relationships,
+		SuggestedQuestions: draft.SuggestedQuestions,
 	}
 }
 
-func titleCase(s string) string {
-	r := []rune(s)
-	if len(r) == 0 {
-		return s
+func titleCase(name string) string {
+	runes := []rune(name)
+	if len(runes) == 0 {
+		return name
 	}
-	r[0] = unicode.ToUpper(r[0])
-	return string(r)
+	runes[0] = unicode.ToUpper(runes[0])
+	return string(runes)
 }

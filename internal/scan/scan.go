@@ -110,7 +110,7 @@ func scanTarball(r io.Reader, res *Result) error {
 	}
 	defer gz.Close()
 	tr := tar.NewReader(gz)
-	c := newCollector(res)
+	col := newCollector(res)
 	for {
 		hdr, err := tr.Next()
 		if err == io.EOF {
@@ -125,12 +125,12 @@ func scanTarball(r io.Reader, res *Result) error {
 		}
 		switch hdr.Typeflag {
 		case tar.TypeDir:
-			c.dir(rel)
+			col.dir(rel)
 		case tar.TypeReg:
-			c.file(rel, hdr.Size, func() ([]byte, error) { return io.ReadAll(tr) })
+			col.file(rel, hdr.Size, func() ([]byte, error) { return io.ReadAll(tr) })
 		}
 	}
-	c.finish()
+	col.finish()
 	return nil
 }
 
@@ -169,8 +169,8 @@ func (c *collector) file(rel string, size int64, read func() ([]byte, error)) {
 	base := path.Base(rel)
 	if _, ok := manifestParsers[base]; ok {
 		if data, err := read(); err == nil {
-			if m := parseManifest(base, rel, data); m != nil {
-				c.res.Dependencies = append(c.res.Dependencies, *m)
+			if manifest := parseManifest(base, rel, data); manifest != nil {
+				c.res.Dependencies = append(c.res.Dependencies, *manifest)
 			}
 		}
 	}
@@ -200,37 +200,37 @@ func (c *collector) file(rel string, size int64, read func() ([]byte, error)) {
 
 func (c *collector) finish() {
 	res := c.res
-	for d := range c.topDirs {
-		res.Stats.TopLevelDirs = append(res.Stats.TopLevelDirs, d)
+	for dir := range c.topDirs {
+		res.Stats.TopLevelDirs = append(res.Stats.TopLevelDirs, dir)
 	}
 	sort.Strings(res.Stats.TopLevelDirs)
 
-	for lang, n := range c.langFiles {
-		res.Languages = append(res.Languages, LanguageStat{Name: lang, Files: n, Bytes: c.langBytes[lang]})
+	for lang, nFiles := range c.langFiles {
+		res.Languages = append(res.Languages, LanguageStat{Name: lang, Files: nFiles, Bytes: c.langBytes[lang]})
 	}
 	sort.Slice(res.Languages, func(i, j int) bool { return res.Languages[i].Bytes > res.Languages[j].Bytes })
 
 	// Primary = every language holding at least 10% of source bytes.
-	for _, l := range res.Languages {
-		if res.Stats.TotalBytes > 0 && l.Bytes*10 >= res.Stats.TotalBytes {
-			res.PrimaryLanguages = append(res.PrimaryLanguages, l.Name)
+	for _, lang := range res.Languages {
+		if res.Stats.TotalBytes > 0 && lang.Bytes*10 >= res.Stats.TotalBytes {
+			res.PrimaryLanguages = append(res.PrimaryLanguages, lang.Name)
 		}
 	}
 
-	for dir, n := range c.dirFiles {
-		res.Tree = append(res.Tree, DirSummary{Path: dir, Files: n, Languages: sortedByBytes(c.dirLangBytes[dir])})
+	for dir, nFiles := range c.dirFiles {
+		res.Tree = append(res.Tree, DirSummary{Path: dir, Files: nFiles, Languages: sortedByBytes(c.dirLangBytes[dir])})
 	}
 	sort.Slice(res.Tree, func(i, j int) bool { return res.Tree[i].Files > res.Tree[j].Files })
 	sort.Slice(res.Dependencies, func(i, j int) bool { return res.Dependencies[i].Manifest < res.Dependencies[j].Manifest })
 
 	dirSet := map[string]bool{}
-	for _, f := range c.allFiles {
-		for d := path.Dir(f); d != "." && d != "/"; d = path.Dir(d) {
-			dirSet[d] = true
+	for _, filePath := range c.allFiles {
+		for dir := path.Dir(filePath); dir != "." && dir != "/"; dir = path.Dir(dir) {
+			dirSet[dir] = true
 		}
 	}
-	for d := range dirSet {
-		res.Dirs = append(res.Dirs, d)
+	for dir := range dirSet {
+		res.Dirs = append(res.Dirs, dir)
 	}
 	sort.Strings(res.Dirs)
 	sort.Strings(c.allFiles)
@@ -245,9 +245,9 @@ func SamplePaths(all []string, maxFiles int) (files []string, note string) {
 		return all, ""
 	}
 	byDir := map[string][]string{}
-	for _, p := range all {
-		d := path.Dir(p)
-		byDir[d] = append(byDir[d], p)
+	for _, filePath := range all {
+		dir := path.Dir(filePath)
+		byDir[dir] = append(byDir[dir], filePath)
 	}
 	per := maxFiles / len(byDir)
 	if per < 1 {
@@ -268,8 +268,8 @@ func SamplePaths(all []string, maxFiles int) (files []string, note string) {
 
 func sortedByBytes(byLang map[string]int64) []string {
 	langs := make([]string, 0, len(byLang))
-	for l := range byLang {
-		langs = append(langs, l)
+	for lang := range byLang {
+		langs = append(langs, lang)
 	}
 	sort.Slice(langs, func(i, j int) bool { return byLang[langs[i]] > byLang[langs[j]] })
 	return langs
