@@ -445,6 +445,52 @@
     filter 0.25s ease;
 }
 
+/* ---- focus / dim states ---- */
+
+/* RepoDiagram toggles these classes; the rules live here (not in a route
+   sheet) so every route that renders the shared diagram gets them. */
+
+.sh-diagram__node.is-focus {
+  /* Railway's clean violet ring — border plus a 1px shadow so it reads as 2px
+     without shifting layout. */
+  border-color: var(--dg-select);
+  box-shadow: 0 0 0 1px var(--dg-select);
+}
+
+/* Never the `opacity` property — Motion writes that inline on every card. */
+
+.sh-diagram__node.is-dim {
+  filter: opacity(0.25) saturate(0.4);
+}
+
+.sh-diagram__edge.is-lit {
+  stroke: var(--dg-accent);
+  stroke-width: 1.6;
+}
+
+.sh-diagram__edge.is-dim {
+  filter: opacity(0.25) saturate(0.4);
+}
+
+/* Back-routed edges are drawn end-to-start, so the light runs the other way. */
+
+.sh-diagram__edge-flow.is-back {
+  animation-direction: reverse;
+}
+
+.sh-diagram__arrow.is-lit {
+  fill: var(--dg-accent);
+}
+
+.sh-diagram__edge-label.is-lit {
+  color: var(--dg-text);
+  border-color: var(--dg-accent);
+}
+
+.sh-diagram__edge-label.is-dim {
+  filter: opacity(0.25) saturate(0.4);
+}
+
 .sh-diagram__legend {
   flex: none;
   display: flex;

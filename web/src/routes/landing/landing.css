@@ -2134,19 +2134,6 @@
 
 /* ---- node ---- */
 
-.sh-diagram__node.is-focus {
-  /* Railway's clean violet ring — border plus a 1px shadow so it reads as 2px
-     without shifting layout. */
-  border-color: var(--dg-select);
-  box-shadow: 0 0 0 1px var(--dg-select);
-}
-
-/* Never the `opacity` property — Motion writes that inline on every card. */
-
-.sh-diagram__node.is-dim {
-  filter: opacity(0.25) saturate(0.4);
-}
-
 /* The tech tile: brand colours arrive inline from TechIcon. */
 
 /* Railway's attached-volume row: the card's evidence path lives in a footer
@@ -2155,36 +2142,11 @@
 
 /* ---- connections ---- */
 
-.sh-diagram__edge.is-lit {
-  stroke: var(--dg-accent);
-  stroke-width: 1.6;
-}
-
-.sh-diagram__edge.is-dim {
-  filter: opacity(0.25) saturate(0.4);
-}
-
 /* Streak of light running along a lit wire, source → target. Dash lengths are
    user units, so on a short route it reads as one pulse rather than a train. */
 
-/* Back-routed edges are drawn end-to-start, so the light runs the other way. */
-
-.sh-diagram__edge-flow.is-back {
-  animation-direction: reverse;
-}
-
-.sh-diagram__arrow.is-lit {
-  fill: var(--dg-accent);
-}
-
-.sh-diagram__edge-label.is-lit {
-  color: var(--dg-text);
-  border-color: var(--dg-accent);
-}
-
-.sh-diagram__edge-label.is-dim {
-  filter: opacity(0.25) saturate(0.4);
-}
+/* Focus / dim / lit state rules moved to shared/styles/ui.css — RepoDiagram is
+   shared, so its interaction states must not live in a route sheet. */
 
 /* ---- legend ---- */
 
@@ -3091,7 +3053,7 @@
 
 /* Title bar — Cursor h-7 traffic lights + title */
 
-.sh-terra-chat__head:active,
+.sh-theater__dock .sh-terra-chat__head:active,
 .sh-theater__dock.is-dragging .sh-terra-chat__head {
   cursor: grabbing;
 }

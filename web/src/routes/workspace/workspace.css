@@ -65,7 +65,7 @@
 }
 
 /* Placeholder chips: visibly present, not yet wired. */
-.sh-chip.is-disabled {
+.sh-ws .sh-chip.is-disabled {
   opacity: 0.55;
   cursor: default;
 }

@@ -102,9 +102,14 @@ Rules:
   `shared/`.
 - CSS follows the same shape: `shared/styles/tokens.css` (the `.sh-root` shell
   and custom properties, loaded by every route), `shared/styles/ui.css`
-  (components more than one route renders), then the route's own stylesheet,
-  which loads last and may override. `shared/styles/global.css` sits below all
-  of that — `app/main.tsx` loads it first for the document reset and the warm
+  (components more than one route renders), then the route's own stylesheet.
+  A route sheet must not rely on load order to win: every selector in it that
+  also appears in another sheet is scoped under a route-only ancestor class
+  (`.sh-section--hero`, `.sh-ws__dock`, …), so the sheets stay order-independent
+  and a route can be lazy-loaded without restyling the other. Styling for
+  shared components' own behavior (e.g. `RepoDiagram`'s `is-focus`/`is-dim`
+  states) lives in `ui.css`, never in a route sheet.
+  `shared/styles/global.css` sits below all of that — `app/main.tsx` loads it first for the document reset and the warm
   editorial `:root` tokens (`--ink`, `--ivory`, `--yellow`, the display font)
   that `landing.css` still reads.
 - No path aliases. `npm test` runs `node --test` directly over `.ts` files with
