@@ -10,6 +10,9 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
+      // Vite matches proxy keys by prefix, so '/analyze' would already catch
+      // '/analyses' — the explicit entry keeps that from being an accident.
+      '/analyses': api,
       '/analyze': api,
       '/preview': api,
       '/ask': api,

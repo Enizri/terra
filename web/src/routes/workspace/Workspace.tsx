@@ -3,10 +3,12 @@ import { useLocation, useParams } from "react-router-dom";
 import type { Component, TerraMap } from "../../shared/map/types";
 import type { LiveSelection } from "../../shared/live";
 import memosFixture from "../../data/memos.map.json";
+import { analyses, analysis } from "../../shared/api";
 import { useAnalyze } from "./useAnalyze";
 import { nextSelection } from "./selection";
+import { toHistory, type HistoryEntry } from "./history";
 import { WorkspaceHeader } from "./sections/WorkspaceHeader";
-import { Sidebar, type HistoryEntry } from "./sections/Sidebar";
+import { Sidebar } from "./sections/Sidebar";
 import { DropStage } from "./sections/Stage";
 import { AgentDock } from "./sections/AgentDock";
 // Owns its skin import: today terra.css only loads because App statically
@@ -28,8 +30,10 @@ export default function Workspace() {
   /** Up to three cards, oldest first — the theater's cap, for the same reason. */
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [elements, setElements] = useState<LiveSelection[]>([]);
-  /** Session-only: every repo mapped in this tab, newest first. */
+  /** The store's analyses, newest first — history is the SQLite store now. */
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+  /** A stored map opened from the rail — shown without re-running the pipeline. */
+  const [storedMap, setStoredMap] = useState<TerraMap | null>(null);
 
   // ponytail: dev-only render harness — `?fixture` draws the golden memos map
   // with no Go server. Upgrade path: a real fixture picker if a second map lands.
@@ -37,24 +41,38 @@ export default function Workspace() {
     import.meta.env.DEV && new URLSearchParams(search).has("fixture")
       ? (memosFixture as TerraMap)
       : null;
-  // A live run always wins, so the URL form still works with the harness on.
-  const map = analyze.running ? analyze.map : (analyze.map ?? fixture);
+  // A live run always wins; a stored map opened from the rail beats the last
+  // finished run (a fresh run clears it again below).
+  const map = analyze.running ? analyze.map : (storedMap ?? analyze.map ?? fixture);
 
   useEffect(() => {
     setSelectedIds([]);
     setElements([]);
   }, [map]);
 
-  // Re-mapping a repo moves it back to the top rather than listing it twice.
+  // History is the store's list: fetched on mount, re-fetched after a run
+  // lands (the run just wrote a row). Server down or empty DB → empty rail.
   useEffect(() => {
-    if (!map) return;
-    const entry = {
-      repoUrl: map.project.repository_url,
-      name: map.project.name,
-      components: map.components.length,
-    };
-    setHistory((prev) => [entry, ...prev.filter((h) => h.repoUrl !== entry.repoUrl)].slice(0, 8));
-  }, [map]);
+    if (analyze.map) setStoredMap(null); // the fresh run is what's on stage now
+    const ac = new AbortController();
+    analyses(ac.signal)
+      .then((rows) => setHistory(toHistory(rows)))
+      .catch((e: Error) => {
+        if (e.name !== "AbortError") setHistory([]);
+      });
+    return () => ac.abort();
+  }, [analyze.map]);
+
+  // Open a stored analysis's saved map — no pipeline re-run. A failure just
+  // leaves the stage as it was; the row itself is the error surface.
+  const open = async (entry: HistoryEntry) => {
+    try {
+      setStoredMap(await analysis(entry.id));
+    } catch {
+      // ponytail: swallowed — no toast layer exists yet. Upgrade path: surface
+      // it in the rail row once the app grows an error affordance.
+    }
+  };
 
   const select = (id: string | null, additive?: boolean) => {
     if (!id) return setSelectedIds([]);
@@ -76,7 +94,7 @@ export default function Workspace() {
         map={map}
         history={history}
         onSelect={select}
-        onReplay={analyze.start}
+        onOpen={open}
         busy={analyze.running}
       />
       <DropStage

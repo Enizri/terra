@@ -1,10 +1,8 @@
 import { useMemo, useState, type ReactNode } from "react";
 import type { TerraMap } from "../../../shared/map/types";
 import { buildFileTree, countLeaves, type FileNode } from "../../../shared/fileTree";
+import type { HistoryEntry } from "../history";
 import { ChevronIcon } from "../icons";
-
-/** A repo mapped in this session — clicking one maps it again. */
-export type HistoryEntry = { repoUrl: string; name: string; components: number };
 
 /** One rail section: the header is the toggle, the body is what it hides. */
 function RailSection({
@@ -80,18 +78,19 @@ function FileRow({ node, onSelect }: { node: FileNode; onSelect: (id: string) =>
   );
 }
 
-/** The left rail: the mapped repo's files, and what else this tab has mapped. */
+/** The left rail: the mapped repo's files, and every analysis the store holds. */
 export function Sidebar({
   map,
   history,
   onSelect,
-  onReplay,
+  onOpen,
   busy,
 }: {
   map: TerraMap | null;
   history: HistoryEntry[];
   onSelect: (id: string) => void;
-  onReplay: (repoUrl: string) => void;
+  /** Load a stored analysis's saved map — no pipeline re-run. */
+  onOpen: (entry: HistoryEntry) => void;
   busy: boolean;
 }) {
   const tree = useMemo(() => (map ? buildFileTree(map.components) : []), [map]);
@@ -113,20 +112,20 @@ export function Sidebar({
       </RailSection>
       <RailSection title="History" count={history.length || undefined}>
         {history.length === 0 ? (
-          <p className="sh-ws__rail-empty">No maps in this session.</p>
+          <p className="sh-ws__rail-empty">No stored maps yet.</p>
         ) : (
           <ul className="sh-ws__history">
             {history.map((h) => (
-              <li key={h.repoUrl}>
+              <li key={h.id}>
                 <button
                   type="button"
                   className={`sh-ws__history-row${h.repoUrl === current ? " is-current" : ""}`}
                   title={h.repoUrl}
                   disabled={busy || h.repoUrl === current}
-                  onClick={() => onReplay(h.repoUrl)}
+                  onClick={() => onOpen(h)}
                 >
                   <b>{h.name}</b>
-                  <em>{h.components} components</em>
+                  <em>{new Date(h.scannedAt).toLocaleDateString()}</em>
                 </button>
               </li>
             ))}

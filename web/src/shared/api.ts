@@ -145,6 +145,26 @@ export function traces(repoUrl: string, onSpan: (span: TraceSpan) => void): () =
   return () => es.close();
 }
 
+/** One stored analysis, as GET /analyses lists them (internal/store.Summary). */
+export type AnalysisSummary = {
+  id: number;
+  repo_url: string;
+  name: string;
+  scanned_at: string;
+};
+
+/** List every stored analysis, newest first. */
+export async function analyses(signal?: AbortSignal): Promise<AnalysisSummary[]> {
+  const res = await fetch("/analyses", { signal });
+  return json<AnalysisSummary[]>(res, "analyses");
+}
+
+/** Fetch one stored analysis's map without re-running the pipeline. */
+export async function analysis(id: number, signal?: AbortSignal): Promise<TerraMap> {
+  const res = await fetch(`/analyses/${id}`, { signal });
+  return json<TerraMap>(res, "analysis");
+}
+
 /** List a directory, or read a file, inside the preview's checkout. */
 export async function files(repoUrl: string, path: string, signal?: AbortSignal): Promise<FilesResponse> {
   const query = `repo_url=${encodeURIComponent(repoUrl)}&path=${encodeURIComponent(path)}`;
