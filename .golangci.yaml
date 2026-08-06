@@ -9,9 +9,22 @@ linters:
     - misspell
     - gocritic
     - godot
+    - depguard
   disable:
     - errcheck
   settings:
+    # Mechanical guard for the layering in ARCHITECTURE.md: `server` is the
+    # top of internal/ — nothing below it may import it. The rest of the
+    # import direction falls out of package structure on its own.
+    depguard:
+      rules:
+        no-server-from-internal:
+          files:
+            - "**/internal/**"
+            - "!**/internal/server/**"
+          deny:
+            - pkg: github.com/Enizri/terra/internal/server
+              desc: only cmd/ may import internal/server (see ARCHITECTURE.md)
     staticcheck:
       checks:
         - all

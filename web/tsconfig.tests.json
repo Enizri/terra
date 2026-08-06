@@ -1,0 +1,31 @@
+{
+  // Tests run on node (`npm test`), not in the browser bundle. This project
+  // exists so `tsc -b` still type-checks them — without it a test could rot
+  // into a type error while `npm run build` stays green.
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.tests.tsbuildinfo",
+    "target": "es2023",
+    // DOM + jsx only because tested modules may import types from .tsx files
+    // (e.g. toDiagram.ts → RepoDiagram.tsx).
+    "lib": ["ES2023", "DOM"],
+    "jsx": "react-jsx",
+    "types": ["node"],
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "module": "esnext",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+
+    /* Linting */
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["src/**/*.test.ts"]
+}
