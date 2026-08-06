@@ -92,6 +92,11 @@ func runServe(args []string) {
 	db := fs.String("db", "terra.db", "SQLite file to store maps in")
 	fs.Parse(args)
 
+	// The trace hook inside previewed apps posts back to this server;
+	// preview.terraPort reads TERRA_ADDR to build that URL. Without this a
+	// non-default --addr silently loses all in-process spans.
+	os.Setenv("TERRA_ADDR", *addr)
+
 	// Preview dev servers are child process groups; reap them on Ctrl-C.
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)

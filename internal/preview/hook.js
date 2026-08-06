@@ -97,8 +97,10 @@ try {
         };
       }
       if (!opts) return null;
-      const host =
-        (opts.host || opts.hostname || "localhost") + (opts.port ? ":" + opts.port : "");
+      // opts.host may already carry a port (vite's proxy passes "host:port"
+      // plus a separate opts.port) — don't append it twice.
+      let host = String(opts.host || opts.hostname || "localhost");
+      if (opts.port && !host.includes(":")) host += ":" + opts.port;
       const path = String(opts.path || "/").split("?")[0];
       return {
         method: (opts.method || "GET").toUpperCase(),

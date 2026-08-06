@@ -97,8 +97,8 @@ func mergeNodeOptions(existing, hookPath string) string {
 }
 
 // terraPort is the port the previewed app reports spans back to.
-// ponytail: TERRA_ADDR env or "8080" — the serve --addr flag isn't plumbed
-// through to here. Upgrade: cmd/terra exports TERRA_ADDR from its flag.
+// TERRA_ADDR is exported by cmd/terra's serve from its --addr flag; "8080"
+// covers embedders that skip the CLI.
 func terraPort() string {
 	addr := os.Getenv("TERRA_ADDR")
 	if addr == "" {
