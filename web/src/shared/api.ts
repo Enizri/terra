@@ -17,9 +17,10 @@ import { ndjsonSplitter } from "./ndjson";
 export type Selection = Record<string, unknown>;
 
 export type AnalyzeEvent = {
-  stage: "clone" | "scan" | "analyze" | "store" | "done" | "error";
+  stage: "clone" | "scan" | "analyze" | "store" | "ask" | "done" | "error";
   label?: string;
   map?: TerraMap;
+  answer?: string;
 };
 
 export type FilesResponse = {
@@ -50,42 +51,63 @@ async function json<T>(res: Response, what: string): Promise<T> {
   return data as T;
 }
 
-/**
- * POST /analyze in NDJSON mode, yielding one stage event at a time so the
- * caller can render progress while the clone/scan/analyze pipeline runs.
- */
-export async function* analyze(repoUrl: string, signal?: AbortSignal): AsyncGenerator<AnalyzeEvent> {
-  const res = await fetch("/analyze", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/x-ndjson" },
-    body: JSON.stringify({ repo_url: repoUrl }),
-    signal,
-  });
+/** Ask the server to stop a job. Best-effort — never throws. */
+export function cancelJob(jobId: string): void {
+  void fetch(`/jobs/${jobId}/cancel`, { method: "POST" }).catch(() => {});
+}
 
-  // A rejected URL never reaches the stream — it comes back as {"error"}.
-  if (!res.ok || !res.body) {
-    const detail = await res.json().catch(() => null);
-    throw new Error(detail?.error ?? `analyze failed (${res.status})`);
-  }
-
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  const feed = ndjsonSplitter<AnalyzeEvent>();
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) return;
-    for (const ev of feed(decoder.decode(value, { stream: true }))) {
-      if (ev.stage === "error") throw new Error(ev.label ?? "analysis failed");
-      yield ev;
+async function* jobEvents(jobId: string, signal?: AbortSignal): AsyncGenerator<AnalyzeEvent> {
+  const onAbort = () => cancelJob(jobId);
+  signal?.addEventListener("abort", onAbort, { once: true });
+  try {
+    const res = await fetch(`/jobs/${jobId}/events`, {
+      headers: { Accept: "application/x-ndjson" },
+      signal,
+    });
+    if (!res.ok || !res.body) {
+      const detail = await res.json().catch(() => null);
+      throw new Error(detail?.error ?? `job events failed (${res.status})`);
     }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    const feed = ndjsonSplitter<AnalyzeEvent>();
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) return;
+      for (const ev of feed(decoder.decode(value, { stream: true }))) {
+        if (ev.stage === "error") {
+          // Cancel-on-abort must look like a fetch abort so UI hooks stay quiet.
+          if (ev.label === "cancelled" || signal?.aborted) {
+            const err = new Error("cancelled");
+            err.name = "AbortError";
+            throw err;
+          }
+          throw new Error(ev.label ?? "job failed");
+        }
+        yield ev;
+      }
+    }
+  } finally {
+    signal?.removeEventListener("abort", onAbort);
   }
 }
 
 /**
- * Ask about a selection. `selections` is always sent; the server keeps the
- * last one as the primary and only forwards the list when it holds more than
- * one entry (internal/server.ask), so callers do not special-case the single
- * selection.
+ * Enqueue an analyze job, then stream its stage events. The POST returns as
+ * soon as the job is queued — the LLM runs off the request path. Aborting
+ * the signal also cancels the job.
+ */
+export async function* analyze(repoUrl: string, signal?: AbortSignal): AsyncGenerator<AnalyzeEvent> {
+  const created = await post("/jobs/analyze", { repo_url: repoUrl }, signal);
+  const { job_id } = await json<{ job_id: string }>(created, "analyze");
+  yield* jobEvents(job_id, signal);
+}
+
+/**
+ * Ask about a selection via a background job. `selections` is always sent;
+ * the server keeps the last one as the primary and only forwards the list
+ * when it holds more than one entry.
  */
 export async function ask(
   repoUrl: string,
@@ -93,8 +115,8 @@ export async function ask(
   selections: Selection[],
   signal?: AbortSignal,
 ): Promise<string> {
-  const res = await post(
-    "/ask",
+  const created = await post(
+    "/jobs/ask",
     {
       repo_url: repoUrl,
       question,
@@ -103,8 +125,11 @@ export async function ask(
     },
     signal,
   );
-  const data = await json<{ answer?: string }>(res, "ask");
-  return data.answer ?? "No answer.";
+  const { job_id } = await json<{ job_id: string }>(created, "ask");
+  for await (const ev of jobEvents(job_id, signal)) {
+    if (ev.stage === "done") return ev.answer ?? "No answer.";
+  }
+  throw new Error("ask ended without an answer");
 }
 
 /** Boot (or reuse) the repo's dev server behind the Go preview proxy. */

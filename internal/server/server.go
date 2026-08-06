@@ -1,9 +1,10 @@
 // Package server exposes Terra over HTTP: analyze a repository, list past
-// analyses, fetch one. Analysis is synchronous — the response is the full
-// map, minutes later. Good enough until there is more than one user.
+// analyses, fetch one. Long analyze work runs as a process-local job so the
+// browser can detach; sync POST /analyze remains for the CLI.
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -15,6 +16,7 @@ import (
 	"time"
 
 	"github.com/Enizri/terra/internal/graph"
+	"github.com/Enizri/terra/internal/job"
 	"github.com/Enizri/terra/internal/preview"
 	"github.com/Enizri/terra/internal/scan"
 	"github.com/Enizri/terra/internal/store"
@@ -23,10 +25,13 @@ import (
 
 type Server struct {
 	DB string
-	// Scan and Analyze exist so tests can stub the clone and the analyzer;
-	// zero values mean the real thing.
+	// Jobs holds in-flight analyze work. Nil means a fresh hub on first use.
+	Jobs *job.Hub
+	// Scan, Analyze, and RunTask exist so tests can stub I/O; zero values
+	// mean the real thing.
 	Scan    func(url string) (*scan.Result, error)
 	Analyze func(res *scan.Result, model string) (*graph.Map, []string, error)
+	RunTask func(name string, payload any) (json.RawMessage, error)
 }
 
 func (s *Server) Handler() http.Handler {
@@ -36,8 +41,18 @@ func (s *Server) Handler() http.Handler {
 	if s.Analyze == nil {
 		s.Analyze = graph.Analyze
 	}
+	if s.RunTask == nil {
+		s.RunTask = graph.RunTask
+	}
+	if s.Jobs == nil {
+		s.Jobs = job.NewHub()
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /analyze", s.analyze)
+	mux.HandleFunc("POST /jobs/analyze", s.enqueueAnalyze)
+	mux.HandleFunc("POST /jobs/ask", s.enqueueAsk)
+	mux.HandleFunc("GET /jobs/{id}/events", s.jobEvents)
+	mux.HandleFunc("POST /jobs/{id}/cancel", s.cancelJob)
 	mux.HandleFunc("GET /analyses", s.list)
 	mux.HandleFunc("GET /analyses/{id}", s.get)
 	mux.HandleFunc("POST /preview", s.preview)
@@ -48,8 +63,8 @@ func (s *Server) Handler() http.Handler {
 	return mux
 }
 
-// ListenAndServe blocks. Timeouts stay off: a synchronous analysis holds the
-// response open for minutes.
+// ListenAndServe blocks. Sync analyze/ask may still hold a connection for
+// minutes; the job endpoints do not.
 func (s *Server) ListenAndServe(addr string) error {
 	fmt.Fprintf(os.Stderr, "terra API listening on %s\n", addr)
 	return (&http.Server{Addr: addr, Handler: s.Handler()}).ListenAndServe()
@@ -71,7 +86,7 @@ func (s *Server) analyze(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if strings.Contains(r.Header.Get("Accept"), "application/x-ndjson") {
-		s.analyzeStream(w, req.RepoURL, req.Model)
+		s.analyzeStream(w, r.Context(), req.RepoURL, req.Model)
 		return
 	}
 
@@ -101,73 +116,140 @@ func (s *Server) analyze(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, repoMap)
 }
 
-// analyzeStream runs the same pipeline as analyze but reports each stage as
-// it starts, one JSON object per line, flushed immediately. The UI shows the
-// latest line; the response ends with a "done" event carrying the full map.
-//
-// ponytail: four stages, because they wrap the existing Scan/Analyze calls
-// rather than reaching inside them. The analyze stage is the multi-minute one
-// and reports nothing while it runs — the UI covers it with an elapsed timer.
-// Per-phase callbacks in scan/ and the analyzer are the upgrade.
-func (s *Server) analyzeStream(w http.ResponseWriter, repoURL, model string) {
+// analyzeStream starts the pipeline as a job and streams its events on this
+// response — same NDJSON shape as before, but Analyze runs off the handler
+// goroutine.
+func (s *Server) analyzeStream(w http.ResponseWriter, ctx context.Context, repoURL, model string) {
+	j := s.startAnalyzeJob(repoURL, model)
+	s.streamJobEvents(w, ctx, j)
+}
+
+// enqueueAnalyze starts an analyze job and returns its id immediately so the
+// client can subscribe on GET /jobs/{id}/events without holding this request
+// open for the LLM.
+func (s *Server) enqueueAnalyze(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		RepoURL string `json:"repo_url"`
+		Model   string `json:"model"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.RepoURL == "" {
+		httpError(w, http.StatusBadRequest, `body must be {"repo_url": "github.com/user/project"}`)
+		return
+	}
+	if _, _, err := scan.NormalizeURL(req.RepoURL); err != nil {
+		httpError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	j := s.startAnalyzeJob(req.RepoURL, req.Model)
+	writeJSON(w, map[string]string{"job_id": j.ID})
+}
+
+func (s *Server) jobEvents(w http.ResponseWriter, r *http.Request) {
+	j := s.Jobs.Get(r.PathValue("id"))
+	if j == nil {
+		httpError(w, http.StatusNotFound, "unknown job")
+		return
+	}
+	s.streamJobEvents(w, r.Context(), j)
+}
+
+func (s *Server) cancelJob(w http.ResponseWriter, r *http.Request) {
+	j := s.Jobs.Get(r.PathValue("id"))
+	if j == nil {
+		httpError(w, http.StatusNotFound, "unknown job")
+		return
+	}
+	j.Cancel()
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) startAnalyzeJob(repoURL, model string) *job.Job {
+	return s.Jobs.Start(func(ctx context.Context, emit func(job.Event)) {
+		emit(job.Event{Stage: "clone", Label: "Cloning " + repoURL})
+		if err := ctx.Err(); err != nil {
+			emit(job.Event{Stage: "error", Label: "cancelled"})
+			return
+		}
+		res, err := s.Scan(repoURL)
+		if err != nil {
+			emit(job.Event{Stage: "error", Label: err.Error()})
+			return
+		}
+		emit(job.Event{
+			Stage: "scan",
+			Label: fmt.Sprintf("Read %d files across %d languages",
+				res.Stats.SourceFiles, len(res.Languages)),
+		})
+		if repoMap := s.cached(res); repoMap != nil {
+			emit(job.Event{Stage: "done", Map: repoMap})
+			return
+		}
+		if err := ctx.Err(); err != nil {
+			emit(job.Event{Stage: "error", Label: "cancelled"})
+			return
+		}
+		emit(job.Event{Stage: "analyze", Label: "Terra is reading the architecture"})
+		repoMap, warnings, err := s.Analyze(res, model)
+		if err != nil {
+			emit(job.Event{Stage: "error", Label: err.Error()})
+			return
+		}
+		for _, warn := range warnings {
+			fmt.Fprintln(os.Stderr, "warning:", warn)
+		}
+		if err := ctx.Err(); err != nil {
+			emit(job.Event{Stage: "error", Label: "cancelled"})
+			return
+		}
+		if s.DB != "" {
+			emit(job.Event{
+				Stage: "store",
+				Label: fmt.Sprintf("Saving %d components", len(repoMap.Components)),
+			})
+			if err := store.Save(s.DB, res, repoMap); err != nil {
+				emit(job.Event{Stage: "error", Label: err.Error()})
+				return
+			}
+		}
+		emit(job.Event{Stage: "done", Map: repoMap})
+	})
+}
+
+// streamJobEvents writes job events as NDJSON until the job finishes or the
+// client goes away. History replays first so a late subscriber is complete.
+func (s *Server) streamJobEvents(w http.ResponseWriter, ctx context.Context, j *job.Job) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		httpError(w, http.StatusInternalServerError, "streaming unsupported")
 		return
 	}
 	w.Header().Set("Content-Type", "application/x-ndjson")
-	// Proxies that buffer would defeat the point of flushing.
 	w.Header().Set("Cache-Control", "no-cache, no-transform")
 	w.Header().Set("X-Accel-Buffering", "no")
 	w.WriteHeader(http.StatusOK)
 
 	enc := json.NewEncoder(w)
-	send := func(ev map[string]any) {
+	send := func(ev job.Event) {
 		enc.Encode(ev)
 		flusher.Flush()
 	}
-	// Past this point the status code is spent, so failures ride the stream.
-	fail := func(err error) {
-		send(map[string]any{"stage": "error", "label": err.Error()})
-	}
 
-	send(map[string]any{"stage": "clone", "label": "Cloning " + repoURL})
-	res, err := s.Scan(repoURL)
-	if err != nil {
-		fail(err)
-		return
+	history, ch, unsub := j.Subscribe()
+	defer unsub()
+	for _, ev := range history {
+		send(ev)
 	}
-
-	send(map[string]any{
-		"stage": "scan",
-		"label": fmt.Sprintf("Read %d files across %d languages",
-			res.Stats.SourceFiles, len(res.Languages)),
-	})
-	if repoMap := s.cached(res); repoMap != nil {
-		send(map[string]any{"stage": "done", "map": repoMap})
-		return
-	}
-	send(map[string]any{"stage": "analyze", "label": "Terra is reading the architecture"})
-	repoMap, warnings, err := s.Analyze(res, model)
-	if err != nil {
-		fail(err)
-		return
-	}
-	for _, warn := range warnings {
-		fmt.Fprintln(os.Stderr, "warning:", warn)
-	}
-
-	if s.DB != "" {
-		send(map[string]any{
-			"stage": "store",
-			"label": fmt.Sprintf("Saving %d components", len(repoMap.Components)),
-		})
-		if err := store.Save(s.DB, res, repoMap); err != nil {
-			fail(err)
+	for {
+		select {
+		case ev, ok := <-ch:
+			if !ok {
+				return
+			}
+			send(ev)
+		case <-ctx.Done():
 			return
 		}
 	}
-	send(map[string]any{"stage": "done", "map": repoMap})
 }
 
 // preview starts (or reuses) a live dev-server preview of the repo's
@@ -190,21 +272,72 @@ func (s *Server) preview(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]string{"url": url})
 }
 
-// ask answers a question about a selected component in the live preview:
-// it enriches the selection with the source snippet and the stored map,
-// then forwards to the analyzer's qa task.
+type askRequest struct {
+	RepoURL    string           `json:"repo_url"`
+	Question   string           `json:"question"`
+	Selection  map[string]any   `json:"selection"`
+	Selections []map[string]any `json:"selections"`
+}
+
+// ask answers synchronously (CLI / older clients). Prefer POST /jobs/ask.
 func (s *Server) ask(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		RepoURL    string           `json:"repo_url"`
-		Question   string           `json:"question"`
-		Selection  map[string]any   `json:"selection"`
-		Selections []map[string]any `json:"selections"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.RepoURL == "" || req.Question == "" {
-		httpError(w, http.StatusBadRequest, `body must be {"repo_url": "...", "question": "...", "selection": {...}}`)
+	req, ok := decodeAsk(w, r)
+	if !ok {
 		return
 	}
+	data, err := s.RunTask("qa", s.askPayload(req))
+	if err != nil {
+		httpError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(data)
+}
 
+// enqueueAsk starts a qa job and returns its id immediately.
+func (s *Server) enqueueAsk(w http.ResponseWriter, r *http.Request) {
+	req, ok := decodeAsk(w, r)
+	if !ok {
+		return
+	}
+	payload := s.askPayload(req)
+	j := s.Jobs.Start(func(ctx context.Context, emit func(job.Event)) {
+		emit(job.Event{Stage: "ask", Label: "Terra is reading the selection"})
+		if err := ctx.Err(); err != nil {
+			emit(job.Event{Stage: "error", Label: "cancelled"})
+			return
+		}
+		data, err := s.RunTask("qa", payload)
+		if err != nil {
+			emit(job.Event{Stage: "error", Label: err.Error()})
+			return
+		}
+		if err := ctx.Err(); err != nil {
+			emit(job.Event{Stage: "error", Label: "cancelled"})
+			return
+		}
+		var out struct {
+			Answer string `json:"answer"`
+		}
+		answer := string(data)
+		if json.Unmarshal(data, &out) == nil && out.Answer != "" {
+			answer = out.Answer
+		}
+		emit(job.Event{Stage: "done", Answer: answer})
+	})
+	writeJSON(w, map[string]string{"job_id": j.ID})
+}
+
+func decodeAsk(w http.ResponseWriter, r *http.Request) (askRequest, bool) {
+	var req askRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.RepoURL == "" || req.Question == "" {
+		httpError(w, http.StatusBadRequest, `body must be {"repo_url": "...", "question": "...", "selection": {...}}`)
+		return req, false
+	}
+	return req, true
+}
+
+func (s *Server) askPayload(req askRequest) map[string]any {
 	sels := req.Selections
 	if len(sels) == 0 && req.Selection != nil {
 		sels = []map[string]any{req.Selection}
@@ -235,14 +368,7 @@ func (s *Server) ask(w http.ResponseWriter, r *http.Request) {
 			payload["map"] = repoMap
 		}
 	}
-
-	data, err := graph.RunTask("qa", payload)
-	if err != nil {
-		httpError(w, http.StatusBadGateway, err.Error())
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(data)
+	return payload
 }
 
 // files browses the running preview's checkout: a directory listing, or the

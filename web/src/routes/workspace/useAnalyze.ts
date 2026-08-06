@@ -3,8 +3,8 @@ import type { TerraMap } from "../../shared/map/types";
 import { analyze, type AnalyzeEvent } from "../../shared/api";
 
 /**
- * Drives POST /analyze in its NDJSON mode. Only the latest stage is kept —
- * the UI shows one evolving line, not a growing log.
+ * Drives an analyze job (enqueue + event stream). Only the latest stage is
+ * kept — the UI shows one evolving line, not a growing log.
  */
 export function useAnalyze() {
   const [status, setStatus] = useState<AnalyzeEvent | null>(null);

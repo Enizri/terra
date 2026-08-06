@@ -14,6 +14,7 @@ export default defineConfig({
       // '/analyses' — the explicit entry keeps that from being an accident.
       '/analyses': api,
       '/analyze': api,
+      '/jobs': api,
       '/preview': api,
       '/ask': api,
       '/files': api,

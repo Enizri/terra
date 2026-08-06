@@ -15,9 +15,8 @@ export type { AskMessage, AskPart, ProcessStep, ProcessStepStatus } from "./askP
 const THINKING_COPY = "Considering the map and what you selected…";
 
 /**
- * Drives POST /ask for one repo. Plain JSON, not NDJSON — /ask answers in one
- * object. Client stages thinking + process parts so the dock can look Claude-like
- * until a real stream lands later.
+ * Drives an ask job for one repo. Client stages thinking + process parts so
+ * the dock can look Claude-like while the job runs; abort cancels the job.
  */
 export function useAsk(repoUrl: string | null) {
   const [messages, setMessages] = useState<AskMessage[]>([]);

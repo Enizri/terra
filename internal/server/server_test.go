@@ -483,3 +483,178 @@ func TestTracesRejectsBadRepoURL(t *testing.T) {
 		t.Errorf("status = %d", resp.StatusCode)
 	}
 }
+
+func TestEnqueueAnalyzeReturnsBeforeWorkFinishes(t *testing.T) {
+	s, ts := testServer(t)
+	started := make(chan struct{})
+	release := make(chan struct{})
+	s.Analyze = func(res *scan.Result, model string) (*graph.Map, []string, error) {
+		close(started)
+		<-release
+		return &graph.Map{
+			Project:    graph.Project{Name: "Notes", RepositoryURL: res.RepositoryURL},
+			Components: []graph.Component{{ID: "web", Name: "Web", Purpose: "p", Importance: "critical", Type: "frontend"}},
+		}, nil, nil
+	}
+
+	resp, err := http.Post(ts.URL+"/jobs/analyze", "application/json",
+		strings.NewReader(`{"repo_url":"https://github.com/acme/notes"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+	var out struct {
+		JobID string `json:"job_id"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil || out.JobID == "" {
+		t.Fatalf("body = %+v err=%v", out, err)
+	}
+
+	select {
+	case <-started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("worker never started")
+	}
+	// POST already returned with job_id while Analyze is still blocked.
+	close(release)
+
+	evResp, err := http.Get(ts.URL + "/jobs/" + out.JobID + "/events")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer evResp.Body.Close()
+	var last struct {
+		Stage string     `json:"stage"`
+		Map   *graph.Map `json:"map"`
+	}
+	dec := json.NewDecoder(evResp.Body)
+	for dec.More() {
+		if err := dec.Decode(&last); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if last.Stage != "done" || last.Map == nil || last.Map.Project.Name != "Notes" {
+		t.Fatalf("last = %+v", last)
+	}
+}
+
+func TestJobEventsUnknownID(t *testing.T) {
+	_, ts := testServer(t)
+	resp, err := http.Get(ts.URL + "/jobs/does-not-exist/events")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 404 {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+}
+
+func TestCancelAnalyzeJob(t *testing.T) {
+	s, ts := testServer(t)
+	enteredScan := make(chan struct{})
+	s.Scan = func(url string) (*scan.Result, error) {
+		close(enteredScan)
+		time.Sleep(100 * time.Millisecond) // window for cancel to land
+		return &scan.Result{RepositoryURL: url, Name: "notes", ScannedAt: time.Now().UTC()}, nil
+	}
+	s.Analyze = func(res *scan.Result, model string) (*graph.Map, []string, error) {
+		t.Error("Analyze must not run after cancel")
+		return nil, nil, fmt.Errorf("unreachable")
+	}
+	resp, err := http.Post(ts.URL+"/jobs/analyze", "application/json",
+		strings.NewReader(`{"repo_url":"https://github.com/acme/notes"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out struct {
+		JobID string `json:"job_id"`
+	}
+	json.NewDecoder(resp.Body).Decode(&out)
+	resp.Body.Close()
+	<-enteredScan
+
+	cancelResp, err := http.Post(ts.URL+"/jobs/"+out.JobID+"/cancel", "application/json", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cancelResp.Body.Close()
+	if cancelResp.StatusCode != http.StatusNoContent {
+		t.Fatalf("cancel status = %d", cancelResp.StatusCode)
+	}
+
+	evResp, err := http.Get(ts.URL + "/jobs/" + out.JobID + "/events")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer evResp.Body.Close()
+	var last struct{ Stage, Label string }
+	dec := json.NewDecoder(evResp.Body)
+	for dec.More() {
+		if err := dec.Decode(&last); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if last.Stage != "error" || last.Label != "cancelled" {
+		t.Fatalf("last = %+v, want cancelled error", last)
+	}
+}
+
+func TestEnqueueAskReturnsBeforeWorkFinishes(t *testing.T) {
+	s, ts := testServer(t)
+	started := make(chan struct{})
+	release := make(chan struct{})
+	s.RunTask = func(name string, payload any) (json.RawMessage, error) {
+		if name != "qa" {
+			t.Fatalf("task = %q", name)
+		}
+		close(started)
+		<-release
+		return json.RawMessage(`{"answer":"hello from qa"}`), nil
+	}
+
+	resp, err := http.Post(ts.URL+"/jobs/ask", "application/json",
+		strings.NewReader(`{"repo_url":"https://github.com/acme/notes","question":"where?"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+	var out struct {
+		JobID string `json:"job_id"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil || out.JobID == "" {
+		t.Fatalf("body = %+v err=%v", out, err)
+	}
+
+	select {
+	case <-started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("qa worker never started")
+	}
+	close(release)
+
+	evResp, err := http.Get(ts.URL + "/jobs/" + out.JobID + "/events")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer evResp.Body.Close()
+	var last struct {
+		Stage  string `json:"stage"`
+		Answer string `json:"answer"`
+	}
+	dec := json.NewDecoder(evResp.Body)
+	for dec.More() {
+		if err := dec.Decode(&last); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if last.Stage != "done" || last.Answer != "hello from qa" {
+		t.Fatalf("last = %+v", last)
+	}
+}
