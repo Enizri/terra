@@ -175,6 +175,7 @@ export default function RepoDiagram({
   overlay,
   hoverOnly = false,
   selectedId = null,
+  pulseId = null,
   onSelect,
   legendNote,
   labelsOnHover = false,
@@ -189,6 +190,8 @@ export default function RepoDiagram({
   overlay?: ReactNode;
   hoverOnly?: boolean;
   selectedId?: string | null;
+  /** Component a live request just crossed — its card glows briefly. */
+  pulseId?: string | null;
   /** `additive` is a shift/⌘-click — the owner decides whether it stacks. */
   onSelect?: (id: string | null, additive?: boolean) => void;
   legendNote?: string;
@@ -418,7 +421,7 @@ export default function RepoDiagram({
         }}
         className={`sh-diagram__node sh-diagram__node--${n.kind}${lit ? " is-focus" : ""}${
           dim ? " is-dim" : ""
-        }`}
+        }${pulseId === n.id ? " is-pulse" : ""}`}
         aria-pressed={focus === n.id}
         onMouseEnter={() => setHover(n.id)}
         onMouseLeave={() => setHover((h) => (h === n.id ? null : h))}

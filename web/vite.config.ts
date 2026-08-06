@@ -14,6 +14,7 @@ export default defineConfig({
       '/preview': api,
       '/ask': api,
       '/files': api,
+      '/traces': api,
     },
   },
 })

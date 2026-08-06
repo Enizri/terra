@@ -463,6 +463,31 @@
   filter: opacity(0.25) saturate(0.4);
 }
 
+/* A live request just crossed this component (see spanMatch + /traces). */
+.sh-diagram__node.is-pulse {
+  border-color: var(--dg-accent);
+  animation: sh-node-pulse 0.9s ease-out;
+}
+
+@keyframes sh-node-pulse {
+  0% {
+    box-shadow: 0 0 0 0 var(--dg-accent);
+  }
+  70% {
+    box-shadow: 0 0 18px 2px var(--dg-accent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sh-diagram__node.is-pulse {
+    animation: none;
+    box-shadow: 0 0 0 1px var(--dg-accent);
+  }
+}
+
 .sh-diagram__edge.is-lit {
   stroke: var(--dg-accent);
   stroke-width: 1.6;

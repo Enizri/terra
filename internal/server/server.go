@@ -17,6 +17,7 @@ import (
 	"github.com/Enizri/terra/internal/preview"
 	"github.com/Enizri/terra/internal/scan"
 	"github.com/Enizri/terra/internal/store"
+	"github.com/Enizri/terra/internal/trace"
 )
 
 type Server struct {
@@ -41,6 +42,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /preview", s.preview)
 	mux.HandleFunc("POST /ask", s.ask)
 	mux.HandleFunc("GET /files", s.files)
+	mux.HandleFunc("GET /traces", s.traces)
 	return mux
 }
 
@@ -314,6 +316,54 @@ func (s *Server) files(w http.ResponseWriter, r *http.Request) {
 		return strings.Compare(a.Name, b.Name)
 	})
 	writeJSON(w, map[string]any{"path": rel, "entries": out})
+}
+
+// traces streams the live preview's request spans for one repo as
+// Server-Sent Events: ring-buffer history first, then live spans until the
+// client goes away. SSE over WebSocket on purpose — fan-out is one-way and
+// the stdlib does it in a handler.
+func (s *Server) traces(w http.ResponseWriter, r *http.Request) {
+	repoURL := r.URL.Query().Get("repo_url")
+	key, _, err := scan.NormalizeURL(repoURL)
+	if err != nil {
+		httpError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		httpError(w, http.StatusInternalServerError, "streaming unsupported")
+		return
+	}
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache, no-transform")
+	w.Header().Set("X-Accel-Buffering", "no")
+	w.WriteHeader(http.StatusOK)
+	// SSE comment as an immediate hello: without a first flush the headers sit
+	// in the buffer and EventSource never fires `open` on a quiet stream.
+	fmt.Fprint(w, ": connected\n\n")
+	flusher.Flush()
+
+	send := func(span trace.Span) {
+		data, _ := json.Marshal(span)
+		fmt.Fprintf(w, "data: %s\n\n", data)
+		flusher.Flush()
+	}
+	history, ch, cancel := trace.Subscribe(key)
+	defer cancel()
+	for _, span := range history {
+		send(span)
+	}
+	for {
+		select {
+		case span, ok := <-ch:
+			if !ok {
+				return
+			}
+			send(span)
+		case <-r.Context().Done():
+			return
+		}
+	}
 }
 
 // safeJoin resolves a client-supplied path under base and refuses anything

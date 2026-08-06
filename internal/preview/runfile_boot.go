@@ -56,7 +56,7 @@ func startViaRunfile(key, root string, detectErr error) (string, error) {
 		stop(cmd)
 		return "", fmt.Errorf("runfile service never came up: %v\n--- output ---\n%s", err, logs.String())
 	}
-	proxyURL, err := serveProxy(bound, false)
+	proxyURL, err := serveProxy(key, bound, false)
 	if err != nil {
 		stop(cmd)
 		return "", err

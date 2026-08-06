@@ -115,6 +115,34 @@ export async function preview(repoUrl: string, signal?: AbortSignal): Promise<st
   return data.url;
 }
 
+/** One request the live preview's proxy observed — see internal/trace. */
+export type TraceSpan = {
+  repo: string;
+  time: string;
+  method: string;
+  path: string;
+  status: number;
+  dur_ms: number;
+};
+
+/**
+ * Subscribe to the preview's request spans (GET /traces, Server-Sent
+ * Events). Ring-buffer history replays first, then live spans. Returns an
+ * unsubscribe function; transport errors just end the stream — the map
+ * simply stops pulsing.
+ */
+export function traces(repoUrl: string, onSpan: (span: TraceSpan) => void): () => void {
+  const es = new EventSource(`/traces?repo_url=${encodeURIComponent(repoUrl)}`);
+  es.onmessage = (e) => {
+    try {
+      onSpan(JSON.parse(e.data) as TraceSpan);
+    } catch {
+      // A malformed event is dropped, not fatal.
+    }
+  };
+  return () => es.close();
+}
+
 /** List a directory, or read a file, inside the preview's checkout. */
 export async function files(repoUrl: string, path: string, signal?: AbortSignal): Promise<FilesResponse> {
   const query = `repo_url=${encodeURIComponent(repoUrl)}&path=${encodeURIComponent(path)}`;

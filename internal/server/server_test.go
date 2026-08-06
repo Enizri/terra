@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/Enizri/terra/internal/graph"
 	"github.com/Enizri/terra/internal/scan"
+	"github.com/Enizri/terra/internal/trace"
 )
 
 func testServer(t *testing.T) (*Server, *httptest.Server) {
@@ -349,5 +351,53 @@ func TestSafeJoinContainsEveryPath(t *testing.T) {
 	}
 	if _, _, err := safeJoin(base, "escape"); err == nil {
 		t.Error("safeJoin followed a symlink out of the checkout")
+	}
+}
+
+func TestTracesStreamsSpansAsSSE(t *testing.T) {
+	_, ts := testServer(t)
+
+	// History before connecting, then a live span after.
+	trace.Publish(trace.Span{Repo: "https://github.com/acme/traced", Path: "/api/old", Method: "GET", Status: 200})
+
+	req, _ := http.NewRequest("GET", ts.URL+"/traces?repo_url=github.com/acme/traced", nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if ct := resp.Header.Get("Content-Type"); ct != "text/event-stream" {
+		t.Fatalf("content-type = %q", ct)
+	}
+
+	go trace.Publish(trace.Span{Repo: "https://github.com/acme/traced", Path: "/api/live", Method: "POST", Status: 201})
+
+	sc := bufio.NewScanner(resp.Body)
+	var paths []string
+	for sc.Scan() && len(paths) < 2 {
+		line := sc.Text()
+		if !strings.HasPrefix(line, "data: ") {
+			continue
+		}
+		var span trace.Span
+		if err := json.Unmarshal([]byte(strings.TrimPrefix(line, "data: ")), &span); err != nil {
+			t.Fatal(err)
+		}
+		paths = append(paths, span.Path)
+	}
+	if len(paths) != 2 || paths[0] != "/api/old" || paths[1] != "/api/live" {
+		t.Errorf("paths = %v, want history then live", paths)
+	}
+}
+
+func TestTracesRejectsBadRepoURL(t *testing.T) {
+	_, ts := testServer(t)
+	resp, err := http.Get(ts.URL + "/traces?repo_url=nope")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("status = %d", resp.StatusCode)
 	}
 }

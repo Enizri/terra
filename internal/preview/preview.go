@@ -162,7 +162,7 @@ func Start(repoURL string) (string, error) {
 	// login wall. No-op for repos without a memos-style auth API.
 	hasAuth := seedAuth(port)
 
-	proxyURL, err := serveProxy(port, hasAuth)
+	proxyURL, err := serveProxy(key, port, hasAuth)
 	if err != nil {
 		stop(cmd)
 		stop(apiCmd)
@@ -519,8 +519,9 @@ const injectTag = `<script src="/__terra/select.js"></script>`
 
 // serveProxy proxies the dev server root-of-origin on its own port so the
 // app's absolute asset paths (/src/main.tsx, /@vite/client) keep working,
-// and injects the selection script into HTML responses.
-func serveProxy(devPort int, hasAuth bool) (string, error) {
+// injects the selection script into HTML responses, and publishes a trace
+// span per app-level request so the map can light up the path.
+func serveProxy(repoKey string, devPort int, hasAuth bool) (string, error) {
 	base := "http://localhost:" + strconv.Itoa(devPort)
 	target, _ := url.Parse(base)
 	authClient := &http.Client{Timeout: 5 * time.Second}
@@ -585,7 +586,7 @@ func serveProxy(devPort int, hasAuth bool) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	go http.Serve(ln, mux)
+	go http.Serve(ln, traceMiddleware(repoKey, mux))
 	return "http://" + ln.Addr().String() + "/", nil
 }
 

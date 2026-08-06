@@ -4,6 +4,8 @@ import RepoDiagram from "../../../shared/map/RepoDiagram";
 import DetailsPanel from "../../../shared/map/DetailsPanel";
 import { toDiagram } from "../../../shared/map/toDiagram";
 import { matchComponents } from "../../../shared/map/search";
+import { matchSpan, topLevelId } from "../../../shared/map/spanMatch";
+import { traces } from "../../../shared/api";
 import { LiveFrame, type LiveSelection } from "../../../shared/live";
 
 /**
@@ -75,6 +77,27 @@ export function MapStage({
   const view = useMemo(() => toDiagram(map, { all }), [map, all]);
   const primary = selectedIds[selectedIds.length - 1] ?? null;
 
+  // Live trace: while the preview is open, every request its proxy observes
+  // pulses the component that handled it. History replays on connect, so the
+  // last-used card glows the moment the stream opens.
+  const [pulseId, setPulseId] = useState<string | null>(null);
+  const pulseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (preview === "off") return;
+    const unsubscribe = traces(map.project.repository_url, (span) => {
+      const hit = matchSpan(span.path, map.components);
+      if (!hit) return;
+      setPulseId(topLevelId(hit));
+      if (pulseTimer.current) clearTimeout(pulseTimer.current);
+      pulseTimer.current = setTimeout(() => setPulseId(null), 950);
+    });
+    return () => {
+      unsubscribe();
+      if (pulseTimer.current) clearTimeout(pulseTimer.current);
+      setPulseId(null);
+    };
+  }, [preview, map]);
+
   // Element picks come from select.js, injected into the preview by the Go proxy.
   useEffect(() => {
     if (preview === "off") return;
@@ -126,6 +149,7 @@ export function MapStage({
           edges={view.edges}
           groups={view.groups}
           selectedId={primary}
+          pulseId={pulseId}
           onSelect={select}
           labelsOnHover
           remeasureKey={preview}
