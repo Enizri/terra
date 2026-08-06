@@ -56,22 +56,28 @@ def build_prompt(res: ScanResult) -> str:
     ]
 
     if res.languages:
-        langs = ", ".join(f"{l.name} ({l.files} files)" for l in res.languages)
+        langs = ", ".join(
+            f"{language.name} ({language.files} files)" for language in res.languages
+        )
         parts.append(f"languages: {langs}\n")
 
     if res.tree:
         parts.append("\nDIRECTORIES (files, languages)\n")
-        for d in res.tree:
-            parts.append(f"{d.path}  {d.files}  {', '.join(d.languages)}\n")
+        for directory in res.tree:
+            parts.append(
+                f"{directory.path}  {directory.files}  {', '.join(directory.languages)}\n"
+            )
 
     if res.dependencies:
         parts.append("\nDEPENDENCIES\n")
-        for m in res.dependencies:
-            names, extra = m.names, ""
+        for manifest in res.dependencies:
+            names, extra = manifest.names, ""
             if len(names) > MAX_DEPS_PER_MANIFEST:
                 extra = f" (+{len(names) - MAX_DEPS_PER_MANIFEST} more)"
                 names = names[:MAX_DEPS_PER_MANIFEST]
-            parts.append(f"{m.manifest} [{m.ecosystem}]: {', '.join(names)}{extra}\n")
+            parts.append(
+                f"{manifest.manifest} [{manifest.ecosystem}]: {', '.join(names)}{extra}\n"
+            )
 
     parts.append("\nFILES (real paths, grouped by directory — quote these exactly)\n")
     parts.append(file_section(res.files))
@@ -84,20 +90,20 @@ def file_section(all_paths: list[str]) -> str:
     paths, note = sample_paths(all_paths, MAX_PROMPT_PATHS)
 
     by_dir: dict[str, list[str]] = {}
-    for p in paths:
-        d = posixpath.dirname(p) or "."
-        by_dir.setdefault(d, []).append(posixpath.basename(p))
+    for path in paths:
+        directory = posixpath.dirname(path) or "."
+        by_dir.setdefault(directory, []).append(posixpath.basename(path))
 
     out = []
     length = 0
     omitted = 0
-    for d in sorted(by_dir):
+    for directory in sorted(by_dir):
         # Root-level files are listed bare: their path is just the filename.
-        line = f"{d}/: {', '.join(by_dir[d])}\n"
-        if d == ".":
-            line = ", ".join(by_dir[d]) + "\n"
+        line = f"{directory}/: {', '.join(by_dir[directory])}\n"
+        if directory == ".":
+            line = ", ".join(by_dir[directory]) + "\n"
         if length + len(line) > MAX_FILES_CHARS:
-            omitted += len(by_dir[d])
+            omitted += len(by_dir[directory])
             continue
         out.append(line)
         length += len(line)
@@ -116,8 +122,8 @@ def sample_paths(all_paths: list[str], max_files: int) -> tuple[list[str], str]:
     if len(all_paths) <= max_files:
         return all_paths, ""
     by_dir: dict[str, list[str]] = {}
-    for p in all_paths:
-        by_dir.setdefault(posixpath.dirname(p) or ".", []).append(p)
+    for path in all_paths:
+        by_dir.setdefault(posixpath.dirname(path) or ".", []).append(path)
     per = max(1, max_files // len(by_dir))
     files: list[str] = []
     for group in by_dir.values():

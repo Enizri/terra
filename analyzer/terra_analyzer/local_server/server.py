@@ -119,7 +119,7 @@ def _ensure_loaded() -> None:
 
 
 def _messages_for_generate(req: ChatCompletionRequest) -> list[dict[str, str]]:
-    msgs = [{"role": m.role, "content": m.content} for m in req.messages]
+    msgs = [{"role": message.role, "content": message.content} for message in req.messages]
     rf = req.response_format
     if rf and rf.type == "json_schema" and rf.json_schema and rf.json_schema.schema_:
         schema_text = json.dumps(rf.json_schema.schema_)

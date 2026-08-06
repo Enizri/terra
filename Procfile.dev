@@ -1,0 +1,7 @@
+# Local full-stack processes for `make dev` / `make dev-api`.
+# Format: name: command  (command runs via bash from the repo root)
+
+llm: cd analyzer && .venv/bin/uvicorn terra_analyzer.local_server.server:app --port 8020
+analyzer: cd analyzer && TERRA_LLM_URL="${TERRA_LLM_URL:-http://localhost:8020/v1}" .venv/bin/uvicorn terra_analyzer.app:app --port 8010
+api: go run ./cmd/terra serve
+web: cd web && { test -d node_modules || npm install; } && npm run dev

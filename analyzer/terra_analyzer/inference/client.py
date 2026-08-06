@@ -32,7 +32,7 @@ def preflight(cfg: Config) -> None:
     except ValueError as e:
         raise LLMError(f"unexpected reply from the model server at {cfg.base_url}: {e}") from e
 
-    have = [m.get("id", "") for m in listing.get("data") or []]
+    have = [entry.get("id", "") for entry in listing.get("data") or []]
     for name in have:
         if name == cfg.model or name.removesuffix(":latest") == cfg.model:
             return

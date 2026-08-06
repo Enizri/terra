@@ -13,19 +13,19 @@ from .conftest import DEFAULT_MODEL, draft_json, mock_client, openai_handler
 
 def test_generate_against_openai_compatible(scan, good_draft_dict):
     client = mock_client(openai_handler(draft_json(good_draft_dict)))
-    d, warnings = generate(scan, base_url="http://llm/v1", client=client)
-    assert [c.id for c in d.components] == ["web", "server", "data"]
+    draft, warnings = generate(scan, base_url="http://llm/v1", client=client)
+    assert [component.id for component in draft.components] == ["web", "server", "data"]
     assert warnings == []
     # file_count comes from the scan, not the model.
-    assert d.components[0].file_count == 1  # web/ -> web/src/app.tsx
+    assert draft.components[0].file_count == 1  # web/ -> web/src/app.tsx
     # "" parent_id normalized to None so it serializes as JSON null.
-    assert all(c.parent_id is None for c in d.components)
-    assert len(d.relationships) == 2
-    assert d.relationships[0].from_ == "web"
+    assert all(component.parent_id is None for component in draft.components)
+    assert len(draft.relationships) == 2
+    assert draft.relationships[0].from_ == "web"
 
 
 def test_config_normalizes_bare_url_to_v1():
-    cfg = Config(base_url="http://llm:8020", model="m", client=mock_client(lambda r: httpx.Response(404)))
+    cfg = Config(base_url="http://llm:8020", model="m", client=mock_client(lambda request: httpx.Response(404)))
     assert cfg.base_url == "http://llm:8020/v1"
 
 
@@ -44,7 +44,7 @@ def test_retry_once_on_validation_errors(scan, good_draft_dict):
                          "finish_reason": "stop"}],
         })
 
-    d, _ = generate(scan, base_url="http://llm/v1", client=mock_client(handle))
+    draft, _ = generate(scan, base_url="http://llm/v1", client=mock_client(handle))
     assert len(chats) == 2
     # Schema-constrained request on every chat call.
     assert chats[0]["response_format"]["type"] == "json_schema"
@@ -52,20 +52,20 @@ def test_retry_once_on_validation_errors(scan, good_draft_dict):
     retry_msgs = chats[1]["messages"]
     assert retry_msgs[-2]["role"] == "assistant"
     assert "made/up.go" in retry_msgs[-1]["content"]
-    assert d.components[0].files == ["web/"]
+    assert draft.components[0].files == ["web/"]
 
 
 def test_second_attempt_is_lenient(scan, good_draft_dict):
     bad = json.loads(json.dumps(good_draft_dict))
     bad["components"][0]["files"] = ["made/up.go", "web/"]
 
-    d, warnings = generate(
+    draft, warnings = generate(
         scan,
         base_url="http://llm/v1",
         client=mock_client(openai_handler(draft_json(bad))),
     )
-    assert d.components[0].files == ["web/"]
-    assert any("made/up.go" in w for w in warnings)
+    assert draft.components[0].files == ["web/"]
+    assert any("made/up.go" in warning for warning in warnings)
 
 
 def test_unparseable_json_retries_then_fails(scan):
@@ -105,8 +105,8 @@ def test_preflight_accepts_empty_model_list(scan, good_draft_dict):
             "choices": [{"message": {"content": answers}, "finish_reason": "stop"}],
         })
 
-    d, _ = generate(scan, base_url="http://llm/v1", client=mock_client(handle))
-    assert d.components
+    draft, _ = generate(scan, base_url="http://llm/v1", client=mock_client(handle))
+    assert draft.components
 
 
 def test_schema_covers_draft_fields():

@@ -51,9 +51,9 @@ def good_draft_dict() -> dict:
 def good_draft(good_draft_dict, scan) -> Draft:
     """The draft as generate() would return it: already validated, so the ""
     parent_id the model emits has been normalized to None."""
-    d = Draft.model_validate(good_draft_dict)
-    validate(d, known_paths(scan), strict=True)
-    return d
+    draft = Draft.model_validate(good_draft_dict)
+    validate(draft, known_paths(scan), strict=True)
+    return draft
 
 
 def mock_client(handler) -> httpx.Client:
@@ -77,5 +77,5 @@ def openai_handler(draft_json: str, model: str = DEFAULT_MODEL):
     return handle
 
 
-def draft_json(d: dict) -> str:
-    return json.dumps(d)
+def draft_json(payload: dict) -> str:
+    return json.dumps(payload)

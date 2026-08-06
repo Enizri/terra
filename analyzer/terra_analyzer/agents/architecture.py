@@ -58,7 +58,7 @@ class ArchitectureMapper:
             content = chat(cfg, msgs)
 
             try:
-                d = Draft.model_validate_json(content)
+                draft = Draft.model_validate_json(content)
             except ValidationError as e:
                 if not strict:
                     raise LLMError(
@@ -76,7 +76,7 @@ class ArchitectureMapper:
                 ]
                 continue
 
-            warnings, errs = validate(d, known, strict)
+            warnings, errs = validate(draft, known, strict)
             if errs:
                 if not strict:
                     raise LLMError(
@@ -87,7 +87,7 @@ class ArchitectureMapper:
                     {"role": "user", "content": retry_message(errs)},
                 ]
                 continue
-            count_files(d, res.files)
-            return d, warnings
+            count_files(draft, res.files)
+            return draft, warnings
 
         raise LLMError(f"model {cfg.model} produced no usable map after two attempts")

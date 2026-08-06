@@ -1,9 +1,10 @@
-.PHONY: run-analyzer run-server run-llm run-web build-web test test-fixtures test-go test-py lint fmt-go venv venv-local
+.PHONY: run-analyzer run-server run-llm run-web build-web dev dev-api test test-fixtures test-go test-py lint fmt-go venv venv-local
 
-# Three-terminal quickstart:
-#   terminal 1: make run-llm         (loads HF model behind OpenAI-compatible /v1)
-#   terminal 2: make run-analyzer
-#   terminal 3: make run-server      (or: go run ./cmd/terra map <github-url>)
+# One-command local stack:
+#   make venv-local   # once
+#   make dev          # llm + analyzer + api + web
+#   make dev-api      # same without web
+# Individual targets (run-llm, run-analyzer, …) still work for single-service work.
 
 VENV := analyzer/.venv
 GOIMPORTS := $(shell go env GOPATH)/bin/goimports
@@ -27,6 +28,12 @@ run-server:
 
 run-web:
 	cd web && npm install && npm run dev
+
+dev:
+	./scripts/dev.sh
+
+dev-api:
+	./scripts/dev.sh llm analyzer api
 
 build-web:
 	cd web && npm install && npm run build

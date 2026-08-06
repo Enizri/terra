@@ -39,20 +39,20 @@ to add for a new product under this repo.
 # once (adds torch + transformers for local serving)
 make venv-local
 
-# terminal 1: local HF model behind /v1
-make run-llm
+# one terminal: llm (:8020) + analyzer (:8010) + api (:8080) + web (vite)
+make dev
+# backend only (no web): make dev-api
 
-# terminal 2: the analyzer
-make run-analyzer
-
-# terminal 3: use it
+# then, in another terminal:
 go run ./cmd/terra map https://github.com/usememos/memos -o memos.map.json
-# or run the HTTP API:
-make run-server
+# or hit the HTTP API:
 curl -X POST localhost:8080/analyze -d '{"repo_url":"https://github.com/usememos/memos"}'
 curl localhost:8080/analyses
 curl localhost:8080/analyses/1
 ```
+
+`make run-llm`, `make run-analyzer`, `make run-server`, and `make run-web` still
+exist if you want to run one service alone.
 
 Point `TERRA_LLM_URL` at any other OpenAI-compatible `/v1` endpoint (cloud, vLLM,
 Ollama’s OpenAI mode) without changing analyzer code.
@@ -61,6 +61,8 @@ Ollama’s OpenAI mode) without changing analyzer code.
 
 | Command | What it does |
 |---|---|
+| `make dev` | Local full stack: LLM + analyzer + Go API + web |
+| `make dev-api` | Same as `make dev` without the web UI |
 | `terra scan <url>` | Clone + deterministic scan, JSON to stdout |
 | `terra map <url>` | Scan, ask the analyzer for a map, store in `terra.db` |
 | `terra serve` | HTTP API: `POST /analyze`, `GET /analyses`, `GET /analyses/{id}`, `POST /preview`, `POST /ask`, `GET /files` |
