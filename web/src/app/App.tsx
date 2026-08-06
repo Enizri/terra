@@ -1,6 +1,8 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import TerraLanding from "../routes/landing/TerraLanding";
-import Workspace, { randomSlug } from "../routes/workspace/Workspace";
+import Workspace from "../routes/workspace/Workspace";
+// Not from Workspace itself: minting a slug must not pull the whole route in.
+import { randomSlug } from "../routes/workspace/slug";
 
 /** /new mints a session slug once, then hands off to the workspace route. */
 function NewSession() {

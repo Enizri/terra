@@ -83,7 +83,11 @@ routes/
   landing/    the marketing page: TerraLanding.tsx composes sections/*,
               primitives.tsx holds what several sections share, data.ts holds
               copy and fixtures, theater.tsx holds the demo replicas
-  workspace/  /new/s/:slug — the real product surface
+  workspace/  /new/s/:slug — the real product surface. Workspace.tsx owns the
+              shared state (the run, the selection, this tab's history) and
+              nothing else; sections/* are the four panes, selection.ts is the
+              pick maths, slug.ts is imported by the router alone so minting a
+              session id never pulls the route in
 shared/       api.ts, live.tsx, motion.ts, map/, markdown, fileTree, ndjson,
               styles/{tokens,ui}.css
 data/         committed fixtures
