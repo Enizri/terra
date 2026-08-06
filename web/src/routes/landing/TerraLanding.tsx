@@ -15,8 +15,7 @@ const SMOOTH_SCROLL_GAIN = 0.24;
 /** A "line" of wheel delta (deltaMode 1) in px. */
 const WHEEL_LINE_PX = 16;
 
-/** Can `el` (or an ancestor) still scroll `dy` itself? Then leave it alone —
-    modals and code panes must keep their own native scrolling. */
+/** True if `el` or an ancestor can still scroll `dy`. */
 function scrollableUnder(el: EventTarget | null, dy: number) {
   let node = el instanceof Element ? el : null;
   while (node && node !== document.body) {
@@ -33,11 +32,7 @@ function scrollableUnder(el: EventTarget | null, dy: number) {
   return false;
 }
 
-/**
- * Wheel scrolling eased frame by frame, so the pinned hero scrubs like video
- * instead of snapping. Only wheel is intercepted — touch, keyboard, anchors and
- * the scrollbar keep their native behaviour (and resync the target).
- */
+/** Eased wheel scrolling for the pinned hero scrub. */
 function useSmoothWheelScroll() {
   const reduced = useReducedMotion();
   useEffect(() => {

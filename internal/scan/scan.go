@@ -22,16 +22,11 @@ type Result struct {
 	PrimaryLanguages []string       `json:"primary_languages"`
 	Tree             []DirSummary   `json:"tree"`
 	Dependencies     []Manifest     `json:"dependencies"`
-	// Files are repo-relative source paths, capped at maxFiles; FilesNote is
-	// set when that cap kicked in. Dirs is every directory containing source,
-	// uncapped — it stays small and is what path claims get checked against.
-	Files     []string `json:"files"`
+	Files     []string `json:"files"` // capped at maxFiles
 	FilesNote string   `json:"files_note,omitempty"`
-	Dirs      []string `json:"dirs"`
+	Dirs      []string `json:"dirs"` // uncapped dirs with source
 }
 
-// maxFiles caps the path list; past it we keep a per-directory sample so the
-// shape of the tree survives even when the file count doesn't.
 const maxFiles = 4000
 
 type Stats struct {
@@ -60,8 +55,7 @@ var skipDirs = map[string]bool{
 	"target":       true,
 }
 
-// Scan resolves the repo's HEAD commit, streams its tarball from codeload,
-// and analyzes it in memory. No git, no clone, no working tree on disk.
+// Scan analyzes a GitHub repo from its codeload tarball (no local clone).
 func Scan(rawURL string) (*Result, error) {
 	url, name, err := NormalizeURL(rawURL)
 	if err != nil {
@@ -91,8 +85,7 @@ func Scan(rawURL string) (*Result, error) {
 	return res, nil
 }
 
-// skipPath reports whether any segment of a repo-relative path is hidden or a
-// dependency/build directory — the same entries the old disk walk skipped.
+// skipPath is true for hidden segments or dependency/build dirs.
 func skipPath(rel string) bool {
 	for _, seg := range strings.Split(rel, "/") {
 		if strings.HasPrefix(seg, ".") || skipDirs[seg] {
@@ -134,8 +127,7 @@ func scanTarball(r io.Reader, res *Result) error {
 	return nil
 }
 
-// collector accumulates per-file facts and turns them into a Result. It is
-// fed by scanTarball but has no opinion about where the entries come from.
+// collector accumulates per-file facts into a Result.
 type collector struct {
 	res          *Result
 	langFiles    map[string]int
@@ -163,8 +155,7 @@ func (c *collector) dir(rel string) {
 	}
 }
 
-// file records one regular file. read is only called for dependency
-// manifests, so a tar scan doesn't buffer file bodies it never looks at.
+// file records one regular file; read is only used for manifests.
 func (c *collector) file(rel string, size int64, read func() ([]byte, error)) {
 	base := path.Base(rel)
 	if _, ok := manifestParsers[base]; ok {
@@ -237,9 +228,7 @@ func (c *collector) finish() {
 	res.Files, res.FilesNote = SamplePaths(c.allFiles, maxFiles)
 }
 
-// SamplePaths returns all paths when there are few enough, otherwise an even
-// per-directory sample so every part of the tree stays represented, plus a
-// note describing what was left out.
+// SamplePaths returns all paths, or a per-directory sample when over maxFiles.
 func SamplePaths(all []string, maxFiles int) (files []string, note string) {
 	if len(all) <= maxFiles {
 		return all, ""

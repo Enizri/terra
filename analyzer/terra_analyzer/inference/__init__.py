@@ -1,4 +1,4 @@
-"""OpenAI-compatible inference client for Terra agents."""
+"""OpenAI-compatible inference client."""
 
 from .client import LLMError, chat, preflight
 from .config import Config

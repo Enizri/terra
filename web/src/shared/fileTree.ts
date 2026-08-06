@@ -1,10 +1,6 @@
 import type { Component } from "./map/types";
 
-/**
- * A node in the rail's Files tree. `owners` are the component ids that listed
- * this path — clicking a row selects the first one, which is what puts the
- * card and its details on screen.
- */
+/** Files-tree node; `owners` are component ids that listed this path. */
 export type FileNode = {
   name: string;
   /** Full path, no trailing slash — also the React key. */
@@ -17,8 +13,7 @@ export type FileNode = {
 type Draft = { node: FileNode; children: Map<string, Draft> };
 
 function insert(level: Map<string, Draft>, rawPath: string, owner: string) {
-  // The analyzer lists whole folders too ("internal/markdown/"), so a trailing
-  // slash is the only signal that a leaf is a directory rather than a file.
+  // Trailing slash marks a directory leaf (analyzer lists whole folders).
   const isDir = rawPath.endsWith("/");
   const parts = rawPath.split("/").filter(Boolean);
   let cursor = level;
@@ -53,7 +48,7 @@ function finalize(level: Map<string, Draft>): FileNode[] {
     });
 }
 
-/** Every file the map mentions, folded into one tree. */
+/** Fold every map-mentioned file into one tree. */
 export function buildFileTree(components: Component[]): FileNode[] {
   const root = new Map<string, Draft>();
   for (const c of components) {
@@ -64,7 +59,7 @@ export function buildFileTree(components: Component[]): FileNode[] {
   return finalize(root);
 }
 
-/** Leaves only: a listed file, or a folder the analyzer listed whole. */
+/** Count leaves (files or whole folders listed by the analyzer). */
 export function countLeaves(nodes: FileNode[]): number {
   return nodes.reduce(
     (sum, n) => sum + (n.children.length === 0 ? 1 : countLeaves(n.children)),

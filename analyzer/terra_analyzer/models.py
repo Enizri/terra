@@ -1,5 +1,4 @@
-"""Pydantic mirrors of Terra's Go wire types (internal/scan.Result and the
-draft half of internal/graph). Field names match the Go JSON tags exactly."""
+"""Pydantic mirrors of Go wire types (scan.Result + graph draft)."""
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -46,9 +45,7 @@ class ScanResult(BaseModel):
 class Component(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = ""
-    # The model is asked for "" instead of null (nullable types survive
-    # Ollama's schema-to-grammar step unreliably); validate() normalizes ""
-    # back to None so it serializes as JSON null for Go's *string.
+    # Model emits ""; validate() → None for Go's *string (nullable schema is unreliable).
     parent_id: str | None = None
     name: str = ""
     purpose: str = ""
@@ -68,8 +65,7 @@ class Relationship(BaseModel):
 
 
 class Draft(BaseModel):
-    """What the model is asked for: everything that requires judgement, and
-    nothing the scan already knows for certain."""
+    """Judgement fields only — scan already knows the rest."""
     model_config = ConfigDict(extra="ignore")
     description: str = ""
     kind: str = ""

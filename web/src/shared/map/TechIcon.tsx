@@ -1,7 +1,4 @@
-// Railway-style tech tile for a diagram card: a small rounded square carrying
-// the stack's mark. Letterform logos are drawn as text (TS/JS/Go really are
-// their logos); React gets its atom. Anything unknown falls back to the
-// component's initial tinted with its kind colour.
+/** Tech tile for a diagram card; unknown tech falls back to kind-tinted initial. */
 
 import type { DiagramKind } from "./RepoDiagram";
 

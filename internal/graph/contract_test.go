@@ -9,10 +9,7 @@ import (
 	"testing"
 )
 
-// The wire contract between Go, the Python analyzer and the frontend is
-// mirrored by hand in each language, with no codegen. This is the cheap guard:
-// the golden map must still parse into the Go types with nothing important
-// coming back empty. It fails when one language's copy drifts.
+// TestGoldenMapParses guards the hand-mirrored map wire contract across languages.
 func TestGoldenMapParses(t *testing.T) {
 	path := filepath.Join("..", "..", "case-studies", "memos.map.json")
 	raw, err := os.ReadFile(path)
@@ -20,8 +17,7 @@ func TestGoldenMapParses(t *testing.T) {
 		t.Fatalf("read golden map: %v", err)
 	}
 
-	// "$"-prefixed keys are documentation the fixture carries for humans
-	// ($schema_note); drop them so the rest can be decoded strictly.
+	// Drop $-prefixed documentation keys before strict decode.
 	var top map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &top); err != nil {
 		t.Fatalf("golden map is not an object: %v", err)
@@ -37,8 +33,6 @@ func TestGoldenMapParses(t *testing.T) {
 	}
 
 	var m Map
-	// DisallowUnknownFields: a field the analyzer emits but Go has not learned
-	// about is exactly the drift this test exists to catch.
 	dec := json.NewDecoder(bytes.NewReader(stripped))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&m); err != nil {

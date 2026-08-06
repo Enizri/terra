@@ -1,13 +1,8 @@
-/**
- * Motion presets, measured once and reused everywhere. Kept out of any route
- * so shared components (the map diagram) can animate without importing a page.
- */
+/** Shared motion presets (route-free). */
 
 export const spring = { type: "spring", damping: 60, stiffness: 400 } as const;
 
-// Section reveal trigger: fires when ~40% of the section is visible
-// (headings reveal around mid-viewport on tall sections, near the bottom
-// edge on short ones like the footer).
+/** Reveal when ~40% of the section is visible. */
 export const inView = { once: true, amount: 0.4 } as const;
 
 export const stagger = {

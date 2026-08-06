@@ -14,16 +14,12 @@ import (
 	"github.com/Enizri/terra/internal/scan"
 )
 
-// DefaultAnalyzerURL is where the Python analyzer service listens; override
-// with TERRA_ANALYZER_URL.
+// DefaultAnalyzerURL is the analyzer base URL (override with TERRA_ANALYZER_URL).
 const DefaultAnalyzerURL = "http://localhost:8010"
 
-// ponytail: analysis on a laptop model takes minutes; swap for a
-// context-based deadline if callers ever need cancelling.
 var client = &http.Client{Timeout: 20 * time.Minute}
 
-// draft is what the analyzer returns: everything that required judgement,
-// and nothing the scan already knows for certain.
+// draft is the analyzer response (judgement fields only).
 type draft struct {
 	Description        string         `json:"description"`
 	Kind               string         `json:"kind"`
@@ -32,8 +28,7 @@ type draft struct {
 	SuggestedQuestions []string       `json:"suggested_questions"`
 }
 
-// Analyze sends the scan to the Python analyzer service and assembles its
-// draft with the facts the scan already knows.
+// Analyze sends the scan to the analyzer and returns an assembled Map.
 func Analyze(res *scan.Result, model string) (*Map, []string, error) {
 	base := strings.TrimSuffix(os.Getenv("TERRA_ANALYZER_URL"), "/")
 	if base == "" {
@@ -57,7 +52,6 @@ func Analyze(res *scan.Result, model string) (*Map, []string, error) {
 		return nil, nil, fmt.Errorf("analyzer: %w", err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		// The analyzer puts its legible error message in .detail.
 		var errBody struct {
 			Detail any `json:"detail"`
 		}
@@ -80,8 +74,7 @@ func Analyze(res *scan.Result, model string) (*Map, []string, error) {
 	return assemble(res, &out.Draft), out.Warnings, nil
 }
 
-// RunTask posts payload to the analyzer's generic /tasks/{name} endpoint and
-// returns the raw JSON result.
+// RunTask posts payload to /tasks/{name} and returns the JSON result.
 func RunTask(name string, payload any) (json.RawMessage, error) {
 	base := strings.TrimSuffix(os.Getenv("TERRA_ANALYZER_URL"), "/")
 	if base == "" {
@@ -115,8 +108,7 @@ func RunTask(name string, payload any) (json.RawMessage, error) {
 	return data, nil
 }
 
-// preflight fails early and legibly rather than letting a missing service
-// turn into a confusing HTTP error after minutes of scanning.
+// preflight checks analyzer /healthz before a long request.
 func preflight(base string) error {
 	resp, err := client.Get(base + "/healthz")
 	if err != nil {
@@ -126,8 +118,7 @@ func preflight(base string) error {
 	return nil
 }
 
-// assemble combines what the analyzer judged with what the scan already
-// knows. Nothing the scan can state as fact is left for the model to invent.
+// assemble merges scan facts with the analyzer draft.
 func assemble(res *scan.Result, draft *draft) *Map {
 	return &Map{
 		Project: Project{

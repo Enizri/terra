@@ -1,4 +1,4 @@
-"""QA task: answer questions about a component or the whole project. No code edits."""
+"""QA task — answers only, no code edits."""
 
 import json
 from typing import Any

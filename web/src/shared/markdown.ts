@@ -1,7 +1,4 @@
-/**
- * Tiny markdown → safe HTML for Terra chat answers.
- * Escapes first, then applies a limited subset (no raw HTML passthrough).
- */
+/** Markdown → safe HTML for chat answers (escape first; limited subset). */
 
 function escapeHtml(s: string): string {
   return s

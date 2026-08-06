@@ -2,10 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { TerraMap } from "../../shared/map/types";
 import { analyze, type AnalyzeEvent } from "../../shared/api";
 
-/**
- * Drives an analyze job (enqueue + event stream). Only the latest stage is
- * kept — the UI shows one evolving line, not a growing log.
- */
+/** Analyze job: enqueue + event stream; keep only the latest stage. */
 export function useAnalyze() {
   const [status, setStatus] = useState<AnalyzeEvent | null>(null);
   const [map, setMap] = useState<TerraMap | null>(null);

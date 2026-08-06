@@ -1,7 +1,4 @@
-"""Terra analyzer service: the AI layer, spoken to by the Go backend over HTTP.
-
-Run with: uvicorn terra_analyzer.app:app --port 8010
-"""
+"""Terra analyzer HTTP service (Go backend client)."""
 
 from fastapi import FastAPI, HTTPException
 
@@ -57,10 +54,10 @@ def run_task(name: str, payload: dict) -> dict:
 
 @app.post("/analyze", response_model=AnalyzeResponse)
 def analyze(req: AnalyzeRequest) -> AnalyzeResponse:
-    """Backward-compatible facade for the architecture task (Go wire contract)."""
+    """Go wire contract: architecture task facade."""
     try:
         draft, warnings = llm.generate(req.scan, model=req.model)
     except llm.LLMError as e:
-        # The Go side prints detail verbatim, so keep these messages legible.
+        # Go prints detail verbatim.
         raise HTTPException(status_code=502, detail=str(e)) from e
     return AnalyzeResponse(draft=draft, warnings=warnings)

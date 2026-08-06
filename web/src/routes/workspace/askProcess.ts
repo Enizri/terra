@@ -1,10 +1,6 @@
 import type { Selection } from "../../shared/api.ts";
 
-/**
- * Pure message/process transitions behind useAsk. Deliberately React-free and
- * dependency-free (the Selection import is type-only) so `npm test` can run
- * them directly — the hook keeps only wiring: timers, abort, state.
- */
+/** Pure ask message/process transitions (React-free for tests). */
 
 export type ProcessStepStatus = "pending" | "active" | "done" | "skipped";
 

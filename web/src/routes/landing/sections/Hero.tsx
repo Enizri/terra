@@ -17,12 +17,7 @@ import { rise, stagger } from "../../../shared/motion";
 import { copy, users } from "../data";
 import { ComponentTile, DropIcons, MacPointer, PENCIL_INK, RepoMapDiagram, WindowChrome } from "../primitives";
 
-/**
- * Lerp follower matching He(value, 0.1, filesDropped): eases toward
- * the scroll value while dragging. Unlike useTime()-driven lerps, this only
- * schedules RAF while catching up — freezing/idle stops the frame loop so
- * scroll GPU spikes don't keep burning after the cards land.
- */
+/** Lerp follower for scroll-driven flight; RAF only while catching up. */
 function useLerp(source: MotionValue<number>, factor = 0.1, frozen = false) {
   const out = useMotionValue(source.get());
   const current = useRef(source.get());
@@ -76,16 +71,12 @@ function useLerp(source: MotionValue<number>, factor = 0.1, frozen = false) {
   return out;
 }
 
-/** Flight ease — light trail so scroll feels continuous, not stepped.
-    Kept relatively snappy near the end so the card doesn't rubber-band into
-    the stage center while the shared-layout morph is about to take over. */
 const HERO_FLIGHT_LERP = 0.15;
 
 /** Hero flight tile edge length — keep in sync with `.sh-tile--flight`. */
 const FLIGHT_TILE_PX = 148;
 
-/** One graphite texture for everything drawn by hand — the hero trail and the
-    pencilled "humans" must read as the same tool on the same paper. */
+/** Shared graphite filter for trail and headline pencil marks. */
 function PencilDefs() {
   return (
     <svg className="sh-pencil-defs" aria-hidden>
@@ -115,11 +106,7 @@ const ARROW_D =
   ` L ${TRAIL_END_X} ${TRAIL_END_Y}` +
   ` L ${TRAIL_END_X + 12} ${TRAIL_END_Y - 19}`;
 
-/**
- * Pencil-sketched curl from the parked GitHub card down into the repo window,
- * so the drag reads as "scroll and this lands in there" before anything moves.
- * Coordinates share the stage-centered origin used by `.sh-flight`.
- */
+/** Pencil trail from parked GitHub card into the repo window. */
 function DragTrail({
   start,
   progress,
@@ -267,11 +254,7 @@ function PencilSprite() {
   );
 }
 
-/**
- * The headline states the problem, then rewrites itself into the promise:
- * "…only engineers can understand" becomes "…only humans can understand".
- * An eraser rubs "engineers" off the line, then a pencil writes "humans" in.
- */
+/** Headline rewrite: erase "engineers", write "humans". */
 function HeroTitle() {
   const t = copy.heroTitle;
   const reduced = useReducedMotion();
@@ -431,12 +414,9 @@ const HERO_DRAG_TAIL_PX = 380;
 /** Extra scroll while sticky after drop so the repo map can fully assemble. */
 const HERO_HOLD_PX = 720;
 
-/** Progress past which drag geometry (start vector + pin) is frozen.
-    Remeasuring after the title scrolls away warps the path and jitters the
-    card right as it reaches the stage. */
+/** Freeze drag geometry after this progress. */
 const FLIGHT_LOCK_PROGRESS = 0.04;
-/** Drop engages at 1; only undrop below this so the map↔drop swap doesn't
-    chatter when scroll sits on the threshold. */
+/** Hysteresis for map↔drop swap at the threshold. */
 const FLIGHT_UNDROP_PROGRESS = 0.9;
 
 export function Hero() {
@@ -625,5 +605,3 @@ export function Hero() {
 
 /* ---------- sections ---------- */
 
-// Evidence panel moved into the theater's Files tab — the old always-on
-// PreviewCard overlay sat on top of the diagram and swallowed card clicks.

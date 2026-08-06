@@ -1,4 +1,4 @@
-/** The workspace's inline glyphs — small enough that a sprite would cost more. */
+/** Workspace inline glyphs. */
 
 export function ChevronIcon() {
   return (

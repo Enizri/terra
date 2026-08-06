@@ -121,8 +121,7 @@ func Checkout(rawURL string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// ponytail: no refresh; a stale checkout is fine for an MVP preview.
-	// (.git is the marker of a checkout made before the tarball era.)
+	// Reuse an existing checkout (.git marks pre-tarball clones).
 	for _, marker := range []string{checkoutMarker, ".git"} {
 		if _, err := os.Stat(filepath.Join(dir, marker)); err == nil {
 			return dir, nil

@@ -1,18 +1,14 @@
-"""Single source of truth for the draft enums and the JSON schema sent to the
-model. validate.py checks against the same lists, so they cannot drift apart.
-"""
+"""Draft enums and JSON schema shared with validate.py."""
 
 IMPORTANCE_VALUES = ["critical", "high", "medium", "low"]
 TYPE_VALUES = ["frontend", "backend", "database", "infrastructure"]
-# Relationship verbs are free-form in the wire contract, but an unconstrained
-# field makes a small model produce mush, so the schema pins these.
+# Wire contract allows free-form verbs; schema pins these for small-model reliability.
 RELATION_VERBS = [
     "calls", "exposes", "uses", "reads", "reads_writes",
     "guarded_by", "notifies", "hosts", "initializes", "upgraded_by",
 ]
 
-# Constrains generation to the shape of Draft. A JSON schema makes the server
-# constrain decoding, which is what makes a 3B model reliable enough to use.
+# Constrains generation to the Draft shape (server-side decoding).
 DRAFT_SCHEMA = {
     "type": "object",
     "properties": {

@@ -11,11 +11,7 @@ import {
 import { useAsk } from "../useAsk";
 import { MessageParts } from "./messages";
 
-/**
- * One-shot follow-ups offered once something is selected. Real questions
- * answered by /ask — the landing's Implement hints are scripted CSS tweaks and
- * would fabricate an answer here.
- */
+/** One-shot /ask follow-ups after a selection. */
 const SELECTION_HINTS = [
   "Explain this selection",
   "Where would I make a change here?",
@@ -24,11 +20,7 @@ const SELECTION_HINTS = [
   "Show the evidence",
 ];
 
-/**
- * Terra's chat for the mapped repo. Wears theater.tsx's TerraChatDock classes
- * but is its own component: that one is unexported and welded to
- * selectionKey / onAsk / live-preview state. Workspace skins it light.
- */
+/** Workspace chat dock for the mapped repo. */
 export function AgentDock({
   map,
   selected,
@@ -37,9 +29,8 @@ export function AgentDock({
   onDropElement,
 }: {
   map: TerraMap | null;
-  /** Cards clicked on the map, oldest first — the last one is the subject. */
+  /** Selected cards, oldest first; last is the subject. */
   selected: Component[];
-  /** Elements picked inside the live preview, if it is open. */
   elements: LiveSelection[];
   onDropComponent: (id: string) => void;
   onDropElement: (el: LiveSelection) => void;

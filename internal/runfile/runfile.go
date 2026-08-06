@@ -1,9 +1,4 @@
-// Package runfile infers how to install and run a repository — the small
-// per-repo spec the roadmap calls a Runfile. Inference is deterministic and
-// file-based (Dockerfile → compose → language manifests); results are cached
-// by commit SHA so a repo is inferred once, ever. When nothing matches, the
-// caller may ask the analyzer's runfile task to write one — that path is
-// recorded but never auto-executed on the host.
+// Package runfile infers a boot spec from Dockerfile, compose, or language manifests.
 package runfile
 
 import (
@@ -18,21 +13,14 @@ import (
 )
 
 type Runfile struct {
-	// Source names the evidence: dockerfile, compose, package.json, go.mod,
-	// python, or agent.
-	Source  string `json:"source"`
+	Source  string `json:"source"` // dockerfile, compose, package.json, go.mod, python, agent
 	Install string `json:"install,omitempty"`
-	// Run is the boot command; "{port}" is substituted at boot time.
-	Run string `json:"run,omitempty"`
-	// Dir is the repo-relative working directory ("" = root).
-	Dir   string `json:"dir,omitempty"`
-	Ports []int  `json:"ports,omitempty"`
+	Run     string `json:"run,omitempty"` // may contain "{port}"
+	Dir     string `json:"dir,omitempty"` // repo-relative; empty = root
+	Ports   []int  `json:"ports,omitempty"`
 }
 
-// HostRunnable reports whether Run is safe-ish to execute directly on the
-// host: only commands assembled by Terra's own deterministic inference.
-// Dockerfile CMDs assume a container, and agent-written commands are LLM
-// output — neither runs outside a sandbox.
+// HostRunnable is true for deterministic host-safe sources (not docker/agent).
 func (r *Runfile) HostRunnable() bool {
 	switch r.Source {
 	case "package.json", "go.mod", "python":
@@ -41,10 +29,10 @@ func (r *Runfile) HostRunnable() bool {
 	return false
 }
 
-// ErrUnknown means no manifest matched; the analyzer agent is the fallback.
+// ErrUnknown means no manifest matched.
 var ErrUnknown = errors.New("no runfile evidence found")
 
-// Infer walks the roadmap's inference order against a checkout root.
+// Infer tries Dockerfile → compose → package.json → go.mod → python.
 func Infer(root string) (*Runfile, error) {
 	for _, try := range []func(string) *Runfile{fromDockerfile, fromCompose, fromPackageJSON, fromGoMod, fromPython} {
 		if rf := try(root); rf != nil {
@@ -78,7 +66,7 @@ func fromDockerfile(root string) *Runfile {
 	return rf
 }
 
-// parseDockerCmd flattens both CMD forms to one display string.
+// parseDockerCmd flattens JSON-array or shell CMD forms.
 func parseDockerCmd(raw string) string {
 	raw = strings.TrimSpace(raw)
 	var parts []string
@@ -90,8 +78,6 @@ func parseDockerCmd(raw string) string {
 
 /* ---------- docker-compose ---------- */
 
-// ponytail: line-based YAML scan for ports only; bring in a YAML parser when
-// a real compose file breaks it.
 var composePortRe = regexp.MustCompile(`^\s*-\s*"?(?:\d+:)?(\d+)"?\s*$`)
 
 func fromCompose(root string) *Runfile {
@@ -218,7 +204,7 @@ func pythonDeps(root string) map[string]bool {
 	return deps
 }
 
-// appModule guesses the uvicorn module: main.py or app.py at root.
+// appModule returns main:app or app:app when those files exist.
 func appModule(root string) string {
 	for _, mod := range []string{"main", "app"} {
 		if fileExists(root, mod+".py") {
@@ -246,7 +232,7 @@ func cachePath(sha string) (string, error) {
 	return filepath.Join(cache, "terra", "runfiles", sha+".json"), nil
 }
 
-// Load returns the cached Runfile for a commit, or nil when never inferred.
+// Load returns the cached Runfile for a commit, or nil.
 func Load(sha string) *Runfile {
 	path, err := cachePath(sha)
 	if err != nil {
@@ -263,8 +249,7 @@ func Load(sha string) *Runfile {
 	return &rf
 }
 
-// Save caches a Runfile under its commit SHA. Best-effort: a failed write
-// only costs a re-inference.
+// Save caches a Runfile under its commit SHA.
 func Save(sha string, rf *Runfile) {
 	path, err := cachePath(sha)
 	if err != nil {
@@ -277,8 +262,7 @@ func Save(sha string, rf *Runfile) {
 	os.WriteFile(path, data, 0o644)
 }
 
-// For returns the Runfile for a checkout at one commit, from cache or fresh
-// inference. sha may be "" (no caching then).
+// For returns a cached or freshly inferred Runfile. Empty sha skips cache.
 func For(root, sha string) (*Runfile, error) {
 	if rf := Load(sha); rf != nil {
 		return rf, nil

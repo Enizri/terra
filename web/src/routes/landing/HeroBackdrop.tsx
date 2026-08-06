@@ -1,12 +1,6 @@
 import { useEffect, useRef } from "react";
 
-/**
- * Grainy gradient wash behind the hero —
- * (three soft circles blended subtractively, one tracking the pointer,
- * plus per-pixel grain), clipped into the Terra star by the CSS
- * --sh-star-mask on .sh-backdrop (see terra.css).
- * Exact color values (data-color-1/2/3 + data-bg-color).
- */
+/** Grainy star-masked gradient wash behind the hero. */
 const COL_1 = [232, 64, 13];
 const COL_2 = [255, 238, 216];
 const COL_3 = [208, 178, 255];
@@ -126,8 +120,7 @@ function compile(gl: WebGLRenderingContext, type: number, source: string) {
   return shader;
 }
 
-/** Cap ambient drift to ~15fps when the pointer is idle — the wash drifts so
-    slowly the lower rate is invisible, and it quarters the idle GPU fill. */
+/** Idle ambient drift ~15fps. */
 const IDLE_FRAME_MS = 66;
 /** Full-rate while the pointer is actively moving / catching up. */
 const ACTIVE_FRAME_MS = 0;

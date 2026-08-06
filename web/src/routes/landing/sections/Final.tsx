@@ -46,8 +46,7 @@ export function Final() {
   );
 }
 
-/** True while the star is docked in the Final glyph — the section observer
-    stops steering it for as long as it is. */
+/** True while the star is docked in the Final glyph. */
 let starDocked = false;
 /** Ease-in-out on 0..1 — used to soften the scroll-driven section handoff. */
 function smoothstep(t: number) {
@@ -59,11 +58,7 @@ function starDockEase(t: number) {
   return 1 - Math.pow(1 - t, 3.2);
 }
 
-/**
- * Last section: the travelling star shrinks onto the Final glyph and takes its
- * place. JS eases toward the live glyph for STAR_DOCK_MS (per-frame CSS
- * retargeting would lag then snap); after settle it sticks frame-exactly.
- */
+/** Dock the travelling star onto the Final glyph. */
 export function useStarFinalDock() {
   useEffect(() => {
     const star = document.querySelector<HTMLElement>(".sh-backdrop");
@@ -154,12 +149,7 @@ export function useStarFinalDock() {
   }, []);
 }
 
-/**
- * The star stays off the page through the body sections: it only shows up for
- * the last stretch, gliding down from above into the final section, where the
- * dock below shrinks it onto the glyph. The whole approach is scrubbed by how
- * far the final section has climbed, so it reverses cleanly on scroll-up.
- */
+/** Scroll-scrubbed star approach into the final section. */
 export function useStarFinalApproach() {
   useEffect(() => {
     const star = document.querySelector<HTMLElement>(".sh-backdrop");
@@ -209,7 +199,3 @@ export function useStarFinalApproach() {
     return () => cancelAnimationFrame(raf);
   }, []);
 }
-
-/** Per-frame catch-up toward the wheel target — lower is smoother/slower, but
-    every frame of catch-up repaints the page, so it also sets how long one
-    flick keeps the GPU busy (0.04 ≈ 3s of repaints, 0.12 ≈ 0.6s). */

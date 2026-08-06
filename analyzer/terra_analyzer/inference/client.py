@@ -1,4 +1,4 @@
-"""OpenAI-compatible Chat Completions client (sole LLM wire protocol)."""
+"""OpenAI-compatible Chat Completions client."""
 
 import httpx
 
@@ -7,11 +7,11 @@ from .config import MAX_OUTPUT_TOKENS, Config
 
 
 class LLMError(Exception):
-    """Anything that should surface to the Go side as a legible 502 detail."""
+    """Surfaces to Go as a 502 detail."""
 
 
 def preflight(cfg: Config) -> None:
-    """Fails early if the model server is unreachable or missing TERRA_MODEL."""
+    """Fail if the model server is unreachable or missing TERRA_MODEL."""
     hint = (
         f"start the local HF server with `make run-llm`, or set TERRA_LLM_URL "
         f"to an OpenAI-compatible /v1 endpoint"

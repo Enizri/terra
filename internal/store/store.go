@@ -12,8 +12,6 @@ import (
 	"github.com/Enizri/terra/internal/scan"
 )
 
-// ponytail: created on open, no versioning. When the shape changes, delete
-// terra.db — bring in a migration tool once maps are worth keeping.
 const schema = `
 CREATE TABLE IF NOT EXISTS projects (
 	id          INTEGER PRIMARY KEY,

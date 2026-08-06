@@ -82,13 +82,7 @@ export type FileItem = {
   subLabel: string;
 };
 
-// Components of the mapped repo, each with the evidence path it was derived
-// from. Order/count/ids are load-bearing: the hero flight card shares a
-// layoutId with the diagram hub.
-// ponytail: card art still uses photo thumbs; swap file-*.png for
-// filename/node cards when the demo visuals pass happens.
-// Labels track `diagramNodes` — the later sections must not rename what the
-// landing map just taught the visitor.
+// Order/ids are load-bearing: hero flight card shares layoutId with diagram hub.
 export const files: FileItem[] = [
   { id: "file-1", label: "Web App", subLabel: "web/src · 84 files" },
   { id: "file-2", label: "Request Handler", subLabel: "internal/api · 31 files" },
@@ -101,27 +95,19 @@ export const files: FileItem[] = [
   { id: "file-9", label: "Storage", subLabel: "terra.db · schema v4" },
 ];
 
-/** Hero/map architecture diagram — same components as `files`, human-readable. */
 export type DiagramKind = "frontend" | "backend" | "data" | "service";
 
-/** Same shape as `evidence` below, so the Evidence panel renders either one. */
 export type DiagramFile = { path: string; why: string };
 
 export type DiagramNode = {
   id: string;
   label: string;
-  /** Plain-English sentence — the card's primary text, no jargon. */
   purpose: string;
-  /** Short evidence path, revealed only when the node is focused. */
   hint: string;
   kind: DiagramKind;
-  /** Column in the left→right flow: 0 = entry, 1 = the work, 2 = storage. */
   col: 0 | 1 | 2;
-  /** Order within the column (and within its group box, if grouped). */
   row: number;
-  /** Group box this node is stacked inside (see `diagramGroups`). */
   group?: string;
-  /** Detected technologies — picks the card's tech tile (first match wins). */
   tech?: string[];
   files: DiagramFile[];
 };
@@ -132,7 +118,6 @@ export type DiagramEdge = {
   label?: string;
 };
 
-/** Boxed groups in the flow — a labelled container the stacked nodes sit inside. */
 export const diagramGroups = [
   { id: "backend", title: "Backend", hint: "internal/ · store/", col: 1 },
 ] as const;
@@ -232,15 +217,12 @@ export const diagramEdges: DiagramEdge[] = [
   { from: "web", to: "api", label: "asks for" },
   { from: "api", to: "auth", label: "checks who you are" },
   { from: "api", to: "memos", label: "hands off notes" },
-  // Deliberately unlabelled: this is the one edge routed as a detour around a
-  // node it must not touch, so its caption would sit on the detour's elbow —
-  // and "hands off notes" already makes the pattern obvious.
+  // Unlabelled detour edge — caption would sit on the elbow.
   { from: "api", to: "files" },
   { from: "memos", to: "db", label: "saves & reads" },
   { from: "files", to: "db" },
 ];
 
-/** Citations shown in the Map section's Evidence panel. */
 export const evidence = [
   { path: "app.py", why: "FastAPI service on :8010" },
   { path: "tasks/architecture.py", why: "agent task that builds the map" },
@@ -248,7 +230,6 @@ export const evidence = [
   { path: "models.py", why: "Go wire contract" },
 ];
 
-/** Where inference runs — anything OpenAI-compatible (see TERRA_LLM_URL). */
 export const storage = [
   { id: "local", title: "Local", subtitle: "Qwen2.5-0.5B on this machine" },
   { id: "vllm", title: "vLLM", subtitle: "your own GPU box" },
@@ -257,11 +238,6 @@ export const storage = [
 ];
 
 export const copy = {
-  /**
-   * Lands as "Software that only engineers can understand", then `from` swaps
-   * to `to` — the promise made by the headline rewriting itself rather than by
-   * another sentence of copy.
-   */
   heroTitle: {
     lead: "Software that only",
     from: "engineers",
@@ -294,11 +270,7 @@ export const copy = {
   ] as const,
   trust:
     "Every claim links to the file that proves it. Inference runs against any OpenAI-compatible endpoint — including a model on your own laptop — so your code never has to leave.",
-  /**
-   * Bridge before Trust — same shape as `final` (two short lines, .sh-final width).
-   * Closes the product pitch: the map exists so the whole team can ship too.
-   */
   bridge: ["Work with coworkers", "who aren't engineers."],
-  // Two lines, each ≤ ~18 chars: .sh-final is capped at 36rem (terra.css).
+  // ≤ ~18 chars/line; .sh-final capped at 36rem.
   final: ["The map your team", "can actually read."],
 };

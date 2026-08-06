@@ -1,4 +1,4 @@
-"""Architecture map task: scan facts → OpenAI-compatible LLM → validated draft."""
+"""Architecture map task."""
 
 from typing import Any
 
@@ -13,8 +13,6 @@ from ..validate import count_files, known_paths, retry_message, validate
 
 
 class ArchitectureMapper:
-    """Turns a repository scan into an architecture map draft."""
-
     name = "architecture"
 
     def __init__(self, client: httpx.Client | None = None):
@@ -42,8 +40,7 @@ class ArchitectureMapper:
         base_url: str = "",
         client: httpx.Client | None = None,
     ) -> tuple[Draft, list[str]]:
-        """Asks the model for a map draft. One call, and a second only if the
-        first answer fails validation."""
+        """One chat call; second only if validation fails."""
         cfg = Config(model=model, base_url=base_url, client=client or self._client)
         preflight(cfg)
 

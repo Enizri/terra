@@ -1,4 +1,4 @@
-"""Prompt modules for analyzer tasks."""
+"""Analyzer prompt modules."""
 
 from .architecture import (MAX_DEPS_PER_MANIFEST, MAX_FILES_CHARS,
                            MAX_PROMPT_PATHS, SYSTEM_PROMPT, build_prompt,

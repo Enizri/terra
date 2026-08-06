@@ -9,10 +9,6 @@ import { traces } from "../../../shared/api";
 import { LiveFrame, type LiveSelection } from "../../../shared/live";
 import { emptyQueue, enqueue } from "../pulseQueue";
 
-/**
- * Find a component by name, tech, type, file or purpose and jump to it.
- * Selecting is the whole feature — the map already dims everything else.
- */
 function MapSearch({ map, onSelect }: { map: TerraMap; onSelect: (id: string) => void }) {
   const [query, setQuery] = useState("");
   const results = matchComponents(map.components, query);
@@ -56,7 +52,7 @@ function MapSearch({ map, onSelect }: { map: TerraMap; onSelect: (id: string) =>
   );
 }
 
-/** Everything the old ResultCard said, compressed into one strip above the map. */
+/** Map stage with search, details, and live preview pulses. */
 export function MapStage({
   map,
   selectedIds,
@@ -65,25 +61,16 @@ export function MapStage({
 }: {
   map: TerraMap;
   selectedIds: string[];
-  /** `additive` (shift/⌘-click) stacks a second card onto the selection. */
   onSelect: (id: string | null, additive?: boolean) => void;
   onElements: (picked: LiveSelection[]) => void;
 }) {
-  /** Caps lifted — every component gets a card, however small. */
   const [all, setAll] = useState(false);
   const [preview, setPreview] = useState<"off" | "on">("off");
   const frameRef = useRef<HTMLIFrameElement | null>(null);
-  // Memoised: the view is a dependency of the diagram's measure effect, and a
-  // fresh object every render would rebuild its observers on every keystroke.
+  // Stable view — diagram measure effect depends on it.
   const view = useMemo(() => toDiagram(map, { all }), [map, all]);
   const primary = selectedIds[selectedIds.length - 1] ?? null;
 
-  // Live trace: while the preview is open, every span the pipeline observes
-  // (edge proxy plus the in-process Node hook) pulses the component that
-  // handled it. A multi-step request arrives as a burst of spans, so they
-  // queue through pulseQueue and light up in order — a path across the map,
-  // not one flickering card. History replays on connect, so the last-used
-  // cards glow the moment the stream opens.
   const [pulseId, setPulseId] = useState<string | null>(null);
   useEffect(() => {
     if (preview === "off") return;

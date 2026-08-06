@@ -104,9 +104,7 @@ func parseRequirements(data []byte) []string {
 	return names
 }
 
-// parsePyproject handles [project] dependencies arrays and
-// [tool.poetry.dependencies] tables without a TOML dependency.
-// ponytail: line-based scan, add a TOML parser if real repos break it.
+// parsePyproject reads [project] / [tool.poetry.dependencies] without a TOML parser.
 func parsePyproject(data []byte) []string {
 	var names []string
 	section := ""

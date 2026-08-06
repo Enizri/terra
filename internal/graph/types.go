@@ -1,10 +1,7 @@
-// Package graph turns a scan of a repository into a knowledge map: the
-// handful of components a non-engineer needs to hold in their head, and how
-// those components depend on each other.
+// Package graph defines the architecture map types and analyzer client.
 package graph
 
-// Map mirrors case-studies/memos.map.json, which is the schema contract
-// between this pipeline and the frontend.
+// Map is the architecture map wire type shared with the frontend.
 type Map struct {
 	Project            Project        `json:"project"`
 	Components         []Component    `json:"components"`
@@ -28,10 +25,7 @@ type ProjectStats struct {
 
 type Component struct {
 	ID string `json:"id"`
-	// ParentID is null for a top-level component. The model is asked for an
-	// empty string instead of null, which normalize turns back into null.
-	// ponytail: nullable types survive Ollama's schema-to-grammar step
-	// unreliably; revisit if the model ever gets bigger than 3B.
+	// ParentID is nil for top-level; empty string from the model normalizes to nil.
 	ParentID   *string  `json:"parent_id"`
 	Name       string   `json:"name"`
 	Purpose    string   `json:"purpose"`
@@ -49,7 +43,4 @@ type Relationship struct {
 	Because []string `json:"because"`
 }
 
-// The enums (importance, component type, relationship verbs) and the JSON
-// schema built from them live in the Python analyzer (analyzer/terra_analyzer/
-// schema.py), which is their single source of truth. Go stores and displays
-// these fields as plain strings.
+// Enums and JSON schema live in analyzer/terra_analyzer/schema.py.

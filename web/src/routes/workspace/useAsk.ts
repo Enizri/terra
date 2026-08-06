@@ -14,16 +14,12 @@ export type { AskMessage, AskPart, ProcessStep, ProcessStepStatus } from "./askP
 
 const THINKING_COPY = "Considering the map and what you selected…";
 
-/**
- * Drives an ask job for one repo. Client stages thinking + process parts so
- * the dock can look Claude-like while the job runs; abort cancels the job.
- */
+/** Ask job for one repo; client-stages thinking/process; abort cancels. */
 export function useAsk(repoUrl: string | null) {
   const [messages, setMessages] = useState<AskMessage[]>([]);
   const [thinking, setThinking] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
-  // A ref, not `thinking`: the callback is stable, so its closure would hold a
-  // stale value and let a fast second click double-send.
+  // Ref avoids stale `thinking` in a stable callback (double-send).
   const busyRef = useRef(false);
   const stageTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -39,8 +35,7 @@ export function useAsk(repoUrl: string | null) {
     clearStageTimer();
   }, []);
 
-  // A second repo in the same workspace starts a new conversation — and the
-  // previous repo's answer must not land in it.
+  // New repo → new conversation; drop in-flight answers from the previous.
   useEffect(() => {
     abortRef.current?.abort();
     clearStageTimer();

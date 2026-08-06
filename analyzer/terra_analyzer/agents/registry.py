@@ -1,4 +1,4 @@
-"""Named task registry for multi-task agent growth."""
+"""Named task registry."""
 
 from typing import Any
 

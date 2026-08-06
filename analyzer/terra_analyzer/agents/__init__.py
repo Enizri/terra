@@ -1,4 +1,4 @@
-"""Multi-task agent surface for the Terra analyzer."""
+"""Analyzer task agents."""
 
 from .architecture import ArchitectureMapper
 from .registry import TaskRegistry, default_registry

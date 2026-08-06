@@ -1,14 +1,10 @@
-/**
- * Live-preview plumbing shared by the landing theater and the workspace:
- * the preview iframe, the selection shape select.js posts back, the floating
- * dock drag, and the idle prompt typewriter. Nothing here may import a route.
- */
+/** Live-preview helpers shared by landing and workspace (no route imports). */
 import { useEffect, useRef, useState, type RefObject, type PointerEvent as ReactPointerEvent } from "react";
 import { preview } from "./api";
 
 /* ---------- live preview ---------- */
 
-/** What select.js (injected by the Go preview proxy) posts on click. */
+/** Shape select.js posts on click. */
 export type LiveSelection = {
   name?: string;
   ownerChain?: string[];
@@ -33,7 +29,6 @@ export function LiveFrame({
 }: {
   picking: boolean;
   frameRef: RefObject<HTMLIFrameElement | null>;
-  /** Which checkout to boot — the landing demo's, or the mapped repo. */
   repoUrl: string;
 }) {
   const [url, setUrl] = useState("");
@@ -60,33 +55,24 @@ export function LiveFrame({
   return <iframe ref={frameRef} className="sh-live" src={url} onLoad={sendMode} title="Live preview" />;
 }
 
-/* ---------- floating drag (Cursor-style: transform + clamp, no layout thrash) ---------- */
+/* ---------- floating drag ---------- */
 
-/** Keep a sliver of the dock inside the drag arena so it can't be lost. */
 const DRAG_PAD = 8;
 
 function clamp(n: number, min: number, max: number) {
   return Math.min(max, Math.max(min, n));
 }
 
-/**
- * Prefer the Power theater (wallpaper stage) as the drag arena so the chat
- * can roam freely onto the background; fall back to the preview panel.
- */
 function resolveDragBounds(fallback: HTMLElement | null, shell: HTMLElement) {
   return (
     shell.closest<HTMLElement>(".sh-power-theater") ??
     shell.closest<HTMLElement>(".sh-stage") ??
-    // Workspace: the whole shell, so the dock can roam over the map.
     shell.closest<HTMLElement>(".sh-ws") ??
     fallback
   );
 }
 
-/**
- * Pointer-drag a shell inside the theater/wallpaper arena. Writes
- * `translate3d` directly during the gesture (no React re-renders).
- */
+/** Pointer-drag with translate3d; no React re-renders during the gesture. */
 export function useFloatingDrag(boundsRef: RefObject<HTMLElement | null>) {
   const shellRef = useRef<HTMLDivElement | null>(null);
   const offset = useRef({ x: 0, y: 0 });
@@ -170,7 +156,7 @@ export function useFloatingDrag(boundsRef: RefObject<HTMLElement | null>) {
 
 /* ---------- streaming ask hint ---------- */
 
-/** Typewriter cycle through suggestion options while the prompt is idle. */
+/** Idle typewriter through suggestion options. */
 export function useStreamingAskHint(paused: boolean, hints: readonly string[]) {
   const [hint, setHint] = useState("");
   const [full, setFull] = useState("");

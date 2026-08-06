@@ -1,6 +1,4 @@
-"""Runfile task: write a boot spec for a repo when Go's deterministic
-inference (Dockerfile → compose → manifests) found nothing. The result is
-recorded, never auto-executed on a host — sandboxes only."""
+"""Runfile task — boot spec when Go inference finds nothing (record only)."""
 
 import json
 import re

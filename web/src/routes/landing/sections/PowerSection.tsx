@@ -36,8 +36,7 @@ const OPS_TABS: { id: OpsTabId; label: string }[] = [
   { id: "map", label: "Map" },
 ];
 
-/** Tabbed ops screen for Power of Terra. Controlled from the theater so the
-    Railway-style tab bar can sit on the wallpaper strip below the screen. */
+/** Tabbed ops screen for Power of Terra. */
 function OpsStage({
   active,
   mounted,
@@ -93,8 +92,7 @@ function OpsStage({
   );
 }
 
-/** Pencil curl off the Power title, same graphite as the hero trail, with
-    "Try it" written beside it — points down at the ops tabs below. */
+/** Pencil curl from the Power title toward the ops tabs. */
 function TryItNote() {
   const reduced = useReducedMotion();
   const d =
@@ -211,8 +209,4 @@ export function PowerSection() {
   );
 }
 
-/* ---------- Terra playground (last screen) ----------
-   A looping "film" of the team editing the Memos UI together: named cursors
-   take turns pointing at a piece of the interface, asking for a change, and
-   the UI restyles itself live. Pure state machine — one interval steps a
-   scripted timeline, CSS transitions do the actual restyling. */
+/* ---------- Terra playground (last screen) ---------- */

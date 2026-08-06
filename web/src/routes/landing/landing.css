@@ -50,8 +50,7 @@
   rotate: 62.5deg;
 }
 
-/* Star spins with the nav collapse/expand — same overshoot as the hover spin.
-   ponytail: rides the existing rotate transition, no extra motion values. */
+/* Star spins with the nav collapse/expand — same overshoot as the hover spin. */
 
 .sh-nav__logo .sh-terra-mark--collapsed,
 .sh-nav__logo:hover .sh-terra-mark--collapsed {
@@ -204,10 +203,7 @@
   mask-size: 100% 100%;
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
-  /* The mask rasterizes once, then the layer rotates — resampling stair-steps
-     the spokes. A sub-pixel blur feathers the cut so the edges stay smooth at
-     every angle. ponytail: cheapest fix; only a pre-rendered rotation sprite
-     sheet would beat it, and nothing here needs that. */
+  /* Sub-pixel blur softens mask spokes under rotation. */
   filter: blur(0.6px);
   transform-origin: 50% 50%;
   /* 42 deg/s ambient spin. */
@@ -1287,9 +1283,6 @@
   pointer-events: none;
   color: #3c3733;
 }
-
-/* ponytail: hidden narrow — the anchor jumps under the title and the curl
-   would cross the copy. Draw a mobile variant only if it's asked for. */
 
 @media (max-width: 900px) {
 .sh-trail {

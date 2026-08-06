@@ -1,14 +1,9 @@
-// A real /analyze result, shaped for the hero's three-column flow renderer.
-//
-// The renderer is deliberately not general: three columns, one group box, and
-// a router with three cases. So the map is truncated to fit rather than the
-// renderer generalised — the cost is that low-importance components are hidden
-// until the caller asks for `all`.
+// Shape /analyze results for the three-column flow renderer (truncate to fit).
 
 import type { DiagramEdgeView, DiagramGroupView, DiagramKind, DiagramNodeView } from "./RepoDiagram";
 import type { Component, TerraMap } from "./types";
 
-/** frontend on the left, the work in the middle, storage on the right. */
+/** Column: frontend | work | storage. */
 const COL: Record<Component["type"], 0 | 1 | 2> = {
   frontend: 0,
   backend: 1,
@@ -16,7 +11,6 @@ const COL: Record<Component["type"], 0 | 1 | 2> = {
   database: 2,
 };
 
-/** Reuses the four card colours the landing already teaches. */
 const KIND: Record<Component["type"], DiagramKind> = {
   frontend: "frontend",
   backend: "backend",
@@ -24,16 +18,13 @@ const KIND: Record<Component["type"], DiagramKind> = {
   database: "data",
 };
 
-/** Past this the cards shrink below readable and the stack outgrows the window. */
 export const MAX_NODES = 9;
 export const MAX_PER_COL = 4;
-/** `all` lifts the total, but a column taller than this leaves the canvas. */
+/** Per-column cap when `all` is set. */
 export const MAX_PER_COL_ALL = 6;
-/** The middle column only earns its box once there is a stack to box. */
 const MIN_GROUP = 2;
 const GROUP_ID = "work";
 
-/** Most important / biggest first — the card order in every column. */
 const RANK: Record<Component["importance"], number> = { critical: 0, high: 1, medium: 2 };
 const byImportance = (a: Component, b: Component) =>
   RANK[a.importance] - RANK[b.importance] || (b.file_count ?? 0) - (a.file_count ?? 0);
@@ -42,11 +33,10 @@ export type DiagramView = {
   nodes: DiagramNodeView[];
   edges: DiagramEdgeView[];
   groups: DiagramGroupView[];
-  /** Top-level components the caps left out — the map bar's "+N more". */
+  /** Components omitted by caps ("+N more"). */
   hidden: Component[];
 };
 
-/** Directory a component lives in, for the group box's subtitle. */
 function dirOf(component: Component): string {
   const first = component.files[0] ?? "";
   const parts = first.replace(/\/$/, "").split("/");
@@ -55,7 +45,7 @@ function dirOf(component: Component): string {
 
 export function toDiagram(map: TerraMap, opts: { all?: boolean } = {}): DiagramView {
   const ids = new Set(map.components.map((c) => c.id));
-  // Same rule as layoutMap: a parent_id nothing resolves to is drawn top-level.
+  // Unresolved parent_id → top-level (same as layoutMap).
   const top = map.components.filter((c) => !c.parent_id || !ids.has(c.parent_id));
 
   const perCol = opts.all ? MAX_PER_COL_ALL : MAX_PER_COL;
@@ -71,7 +61,6 @@ export function toDiagram(map: TerraMap, opts: { all?: boolean } = {}): DiagramV
     return col.slice(0, perCol);
   });
 
-  // Still over budget: give up the least important cards, wherever they sit.
   let shown = kept.flat();
   if (shown.length > total) {
     const dropped = [...shown].sort(byImportance).slice(total);

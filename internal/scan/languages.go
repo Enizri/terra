@@ -1,8 +1,6 @@
 package scan
 
-// ponytail: extension map, swap for enry/linguist if accuracy matters.
-// Markup/config formats (md, json, yaml) are deliberately absent so they
-// don't drown out real source in the language stats.
+// extToLanguage maps source extensions; markup/config formats are omitted.
 var extToLanguage = map[string]string{
 	".go":     "Go",
 	".ts":     "TypeScript",

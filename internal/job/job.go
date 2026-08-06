@@ -1,6 +1,4 @@
-// Package job is a process-local work queue for long-running Terra tasks
-// (analyze today, ask next). A job runs in a goroutine, emits stage events,
-// and clients subscribe — so the browser HTTP request is not the worker.
+// Package job is a process-local queue for long-running Terra tasks.
 package job
 
 import (
@@ -12,8 +10,7 @@ import (
 	"github.com/Enizri/terra/internal/graph"
 )
 
-// Event is one progress line. Shape matches the NDJSON the web already
-// consumes from /analyze (stage/label/map); ask jobs put the reply in Answer.
+// Event is one progress update (NDJSON / SSE wire shape).
 type Event struct {
 	Stage  string     `json:"stage"`
 	Label  string     `json:"label,omitempty"`
@@ -21,11 +18,10 @@ type Event struct {
 	Answer string     `json:"answer,omitempty"`
 }
 
-// RunFunc does the work. emit is safe for concurrent use; ctx cancels when
-// the job is cancelled or finishes.
+// RunFunc runs job work. emit is concurrency-safe; ctx cancels on Cancel or finish.
 type RunFunc func(ctx context.Context, emit func(Event))
 
-// Hub holds in-flight and recently finished jobs for one server process.
+// Hub holds in-flight and recently finished jobs for one process.
 type Hub struct {
 	mu   sync.Mutex
 	jobs map[string]*Job
@@ -36,7 +32,7 @@ func NewHub() *Hub {
 	return &Hub{jobs: map[string]*Job{}}
 }
 
-// Start enqueues run and returns immediately with a live Job.
+// Start enqueues run and returns a live Job.
 func (h *Hub) Start(run RunFunc) *Job {
 	id := newID()
 	ctx, cancel := context.WithCancel(context.Background())
@@ -63,7 +59,7 @@ func (h *Hub) Get(id string) *Job {
 	return h.jobs[id]
 }
 
-// Job is one unit of background work with a replayable event log.
+// Job is one background unit of work with a replayable event log.
 type Job struct {
 	ID string
 
@@ -75,13 +71,13 @@ type Job struct {
 	cancel  context.CancelFunc
 }
 
-// Cancel asks the worker to stop. Already-finished jobs are a no-op.
+// Cancel asks the worker to stop. Finished jobs are a no-op.
 func (j *Job) Cancel() {
 	j.cancel()
 }
 
 // Subscribe replays history then yields live events until the job finishes.
-// cancel unsubscribes; it does not cancel the job itself.
+// The returned cancel unsubscribes only; it does not cancel the job.
 func (j *Job) Subscribe() (history []Event, ch <-chan Event, cancel func()) {
 	out := make(chan Event, 16)
 	j.mu.Lock()
@@ -115,7 +111,7 @@ func (j *Job) emit(ev Event) {
 		select {
 		case sub <- ev:
 		default:
-			// Slow subscriber drops; history still has the event on reconnect.
+			// Drop on backpressure; history covers reconnect.
 		}
 	}
 }
@@ -136,7 +132,6 @@ func (j *Job) finish() {
 func newID() string {
 	var b [8]byte
 	if _, err := rand.Read(b[:]); err != nil {
-		// Process-local uniqueness is enough; panic is worse than a weak id.
 		return hex.EncodeToString([]byte("fallback"))
 	}
 	return hex.EncodeToString(b[:])

@@ -10,7 +10,7 @@ function clock(seconds: number) {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
-/** One evolving line — the previous stage is replaced, never stacked. */
+/** Single evolving status line. */
 function StatusLine({ label, elapsed }: { label: string; elapsed: number }) {
   return (
     <div className="sh-ws__status" aria-live="polite">
@@ -32,10 +32,7 @@ function StatusLine({ label, elapsed }: { label: string; elapsed: number }) {
   );
 }
 
-/**
- * The centre column across its three states: waiting for a repo, mapping one,
- * and showing the map. The URL form sits below all three.
- */
+/** Centre column: drop / mapping / map. */
 export function DropStage({
   analyze,
   map,
@@ -56,13 +53,10 @@ export function DropStage({
   const submit = (e: FormEvent) => {
     e.preventDefault();
     const repo = url.trim();
-    // Shape check only — the Go side owns the real rule and returns a 400
-    // with a legible message, which lands in `error`.
     if (!repo || running) return;
     start(repo);
   };
 
-  // ponytail: dropping a repo folder isn't wired — the input is the path in.
   const onDrop = (e: DragEvent) => {
     e.preventDefault();
     setOver(false);

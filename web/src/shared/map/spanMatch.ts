@@ -1,20 +1,12 @@
-// Maps a traced request path onto the component that most plausibly handled
-// it — the wire between the live preview and the map. Pure heuristics over
-// the map's own ids, names and files; no server round-trip.
+// Match a traced request path to a map component (client-side heuristics).
 
 import type { Component } from "./types";
 
-/** Path segments that name plumbing, not a component. */
 const NOISE = new Set(["api", "v1", "v2", "rpc", "rest", "graphql"]);
 
 const stem = (s: string) => (s.endsWith("s") && s.length > 3 ? s.slice(0, -1) : s);
 
-/**
- * "/api/v1/memos" → ["memos"]; "/memos.api.v1.MemoService/CreateMemo" →
- * ["memo", "creatememo"]. In RPC paths everything before the *Service token
- * is the app's package name — the same for every call, so it identifies
- * nothing and is dropped.
- */
+/** Tokenize a path; drop package prefix before *Service in RPC paths. */
 export function pathTokens(path: string): string[] {
   const tokens = path
     .toLowerCase()
@@ -30,16 +22,12 @@ export function pathTokens(path: string): string[] {
 function tokenScore(token: string, cand: string): number {
   if (!cand) return 0;
   if (stem(token) === stem(cand)) return 3;
-  // "memoservice" contains "memo"; guard tiny candidates ("ai") against
-  // matching half the alphabet.
+  // Skip short candidates to avoid false substring hits.
   if (cand.length > 3 && (token.includes(cand) || cand.includes(token))) return 2;
   return 0;
 }
 
-/**
- * The component id a request path lights up, or null when nothing clears the
- * bar. Matches against each component's id leaf, name, and file segments.
- */
+/** Best-matching component id for a request path, or null. */
 export function matchSpan(path: string, components: Component[]): string | null {
   const tokens = pathTokens(path);
   if (tokens.length === 0) return null;

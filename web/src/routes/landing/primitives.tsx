@@ -18,7 +18,7 @@ export function ArrowIcon() {
   );
 }
 
-/** What Terra ingests: a branch, source, a shell invocation, a schema. */
+/** Ingest icons for the drop zone. */
 export function DropIcons() {
   return (
     <div className="sh-drop__icons">
@@ -70,7 +70,7 @@ export function Picture({
   );
 }
 
-/** Brand gradient rectangle — replaces the shuttle icon in nav / Final. */
+/** Brand gradient mark. */
 export function TerraMark({ className }: { className?: string }) {
   return <span className={`sh-terra-mark${className ? ` ${className}` : ""}`} aria-hidden />;
 }
@@ -80,7 +80,7 @@ export function WindowChrome({
   toolbar = true,
 }: {
   children: ReactNode;
-  /** Top chip bar (share). Off for the hero map so the diagram can breathe. */
+  /** Top chip bar; off for the hero map. */
   toolbar?: boolean;
 }) {
   return (
@@ -108,7 +108,6 @@ export function WindowChrome({
   );
 }
 
-/** "Web App" -> "WA", "Analyzer" -> "An": enough to tell nine components apart. */
 function initials(label: string) {
   const words = label.split(" ");
   return words.length > 1
@@ -116,19 +115,14 @@ function initials(label: string) {
     : label.slice(0, 2);
 }
 
-/**
- * Card face for a mapped component. Drawn in CSS rather than shipped as art —
- * the previous clone's thumbnails were photos, which read as the wrong product.
- * `icon="github"` swaps letters for the GitHub mark (hero drag card + twin).
- */
+/** Card face icon (`icon="github"` for the hero drag card). */
 export function ComponentTile({
   label,
   layoutId,
   className,
   transition,
   icon,
-  /** Opt out on the scroll-driven flight card — `layout` projection fights
-      the translate and jitters right as the drag reaches the stage. */
+  /** Disable layout on the scroll-driven flight card. */
   layout = true,
 }: {
   label: string;
@@ -160,7 +154,7 @@ export function ComponentTile({
   );
 }
 
-/** Classic macOS arrow pointer — sits on the flight card to sell the drag. */
+/** macOS arrow for the flight card. */
 export function MacPointer({ className }: { className?: string }) {
   return (
     <svg
@@ -181,9 +175,7 @@ export function MacPointer({ className }: { className?: string }) {
   );
 }
 
-/** Repo window header: GitHub hub tile + repo title + "Map ready" badge.
-    `receiveLayout` makes the tile the landing target of the hero flight
-    card's shared-layout morph (layoutId "2"). */
+/** Repo window header; `receiveLayout` is the flight-card layout morph target. */
 export function RepoWindowHeader({ receiveLayout }: { receiveLayout?: boolean }) {
   return (
     <motion.header
@@ -208,16 +200,7 @@ export function RepoWindowHeader({ receiveLayout }: { receiveLayout?: boolean })
   );
 }
 
-/**
- * The repo map shown in the hero window after the paste drop. A left→right
- * flow: the app people touch, the boxed group of things that do the work, and
- * the place it all gets remembered.
- *
- * The renderer lives in map/RepoDiagram — this wrapper only owns what is
- * landing-specific: the theater a clicked card opens.
- *
- * `hoverOnly` (ops Map tab): hover traces wiring — no click / theater.
- */
+/** Landing repo map wrapper; opens theater on click unless `hoverOnly`. */
 export function RepoMapDiagram({
   receiveLayout,
   hoverOnly = false,
@@ -228,7 +211,6 @@ export function RepoMapDiagram({
   showHeader?: boolean;
 }) {
   const [focus, setFocus] = useState<string | null>(null);
-  /** The card opened in place of the canvas, and its ⤢ escalation. */
   const [open, setOpen] = useState<DiagramNode | null>(null);
   const [escalated, setEscalated] = useState(false);
 
@@ -253,8 +235,6 @@ export function RepoMapDiagram({
         }}
         remeasureKey={open}
         overlay={
-          // Overlay, not a swap: the panel covers the whole diagram card —
-          // header, canvas and legend — at its full size.
           <AnimatePresence initial={false}>
             {open && !escalated && (
               <TheaterPanel
@@ -283,10 +263,10 @@ export function RepoMapDiagram({
 
 /* ---------- scroll-linked hero flights ---------- */
 
-/** Graphite the pencil lays down — trail strokes and the written word share it. */
+/** Graphite ink for pencil trail/headline. */
 export const PENCIL_INK = "#3c3733";
 
-/** How far above its landing spot the star starts its descent, in vh. */
+/** Star descent start offset (vh). */
 export const STAR_ENTRY_RISE_VH = 0.85;
-/** Dock glide length, ms — matches the CSS transition on `.sh-backdrop`. */
+/** Dock glide ms — match `.sh-backdrop` transition. */
 export const STAR_DOCK_MS = 1600;

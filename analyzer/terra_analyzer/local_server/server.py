@@ -1,4 +1,4 @@
-"""Transformers-backed OpenAI-compatible model server for local HF inference."""
+"""Local HF OpenAI-compatible model server."""
 
 from __future__ import annotations
 

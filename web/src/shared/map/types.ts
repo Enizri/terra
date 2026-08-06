@@ -1,4 +1,4 @@
-// TS mirror of internal/graph/types.go — the wire contract with the pipeline.
+// Wire types mirroring internal/graph/types.go.
 
 export interface TerraMap {
   project: Project;

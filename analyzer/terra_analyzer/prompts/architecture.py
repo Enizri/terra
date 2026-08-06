@@ -1,11 +1,10 @@
-"""System prompt and fact rendering for the architecture map task."""
+"""Architecture map system prompt and fact rendering."""
 
 import posixpath
 
 from ..models import ScanResult
 
-# The file list is the bulk of the prompt and has to leave room inside
-# the context for the system prompt, a retry, and the answer itself.
+# Leave room for system prompt, retry, and answer inside context.
 MAX_PROMPT_PATHS = 1200
 MAX_FILES_CHARS = 16000
 MAX_DEPS_PER_MANIFEST = 30
@@ -47,8 +46,7 @@ Return only the JSON object."""
 
 
 def build_prompt(res: ScanResult) -> str:
-    """Renders the scan into the facts message. Deliberately terse: the
-    product model is a small local model with a finite context."""
+    """Render scan facts for the user message (kept short for local models)."""
     parts = [
         f"PROJECT\nname: {res.name}\nrepository: {res.repository_url}\n"
         f"source files: {res.stats.source_files}\n"
@@ -85,8 +83,7 @@ def build_prompt(res: ScanResult) -> str:
 
 
 def file_section(all_paths: list[str]) -> str:
-    """Groups paths under their directory so each directory prefix is written
-    once, then truncates on a character budget."""
+    """Group paths by directory; truncate on character budget."""
     paths, note = sample_paths(all_paths, MAX_PROMPT_PATHS)
 
     by_dir: dict[str, list[str]] = {}
@@ -98,7 +95,6 @@ def file_section(all_paths: list[str]) -> str:
     length = 0
     omitted = 0
     for directory in sorted(by_dir):
-        # Root-level files are listed bare: their path is just the filename.
         line = f"{directory}/: {', '.join(by_dir[directory])}\n"
         if directory == ".":
             line = ", ".join(by_dir[directory]) + "\n"
@@ -115,10 +111,7 @@ def file_section(all_paths: list[str]) -> str:
 
 
 def sample_paths(all_paths: list[str], max_files: int) -> tuple[list[str], str]:
-    """Returns all paths when there are few enough, otherwise an even
-    per-directory sample so every part of the tree stays represented.
-    Port of scan.SamplePaths — the prompt caps at 1200 while the scan caps
-    at 4000, so the analyzer needs its own copy."""
+    """Even per-directory sample (prompt cap 1200; scan caps at 4000)."""
     if len(all_paths) <= max_files:
         return all_paths, ""
     by_dir: dict[str, list[str]] = {}

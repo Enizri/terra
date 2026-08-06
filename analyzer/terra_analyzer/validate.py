@@ -1,23 +1,16 @@
-"""Validation and repair of the model's draft, ported from internal/graph/validate.go."""
+"""Draft validation/repair (ported from internal/graph/validate.go)."""
 
 from .models import Draft, ScanResult
 from .schema import IMPORTANCE_VALUES, TYPE_VALUES
 
 
 def known_paths(res: ScanResult) -> set[str]:
-    """The set of every real file and directory in the scan, used to reject
-    paths the model invented.
-    ponytail: a file dropped by the scan's own sampling is not in this set, so
-    a component citing it loses that one path. Directories are never sampled
-    out, and directories are what components usually cite."""
+    """Real scan files and dirs — used to reject invented paths."""
     return set(res.files) | set(res.dirs)
 
 
 def validate(draft: Draft, known: set[str], strict: bool) -> tuple[list[str], list[str]]:
-    """Normalizes a draft in place and reports what it had to change.
-    Anything unusable is dropped either way; strict decides whether those
-    drops are reported as errors (worth another attempt from the model) or as
-    warnings (accepted, this is the best we are going to get).
+    """Normalize draft in place. strict=True → issues as errors (retry); else warnings.
     Returns (warnings, errors)."""
     issues: list[str] = []
 
@@ -57,11 +50,10 @@ def validate(draft: Draft, known: set[str], strict: bool) -> tuple[list[str], li
         kept.append(component)
     draft.components = kept
 
-    # parent_id resolves only against components that survived above.
+    # parent_id must resolve against survivors only.
     for component in draft.components:
         if component.parent_id is None or not component.parent_id.strip():
-            # An id like "web.editor" already names its parent, so take the
-            # model at its word when it left parent_id blank.
+            # Infer parent from dotted id when model left parent_id blank.
             component.parent_id = None
             at = component.id.rfind(".")
             if at > 0 and component.id[:at] in seen:
@@ -90,9 +82,7 @@ def validate(draft: Draft, known: set[str], strict: bool) -> tuple[list[str], li
             rels.append(relationship)
     draft.relationships = rels
 
-    # A top-level component nothing connects to leaves a hole in the map: the
-    # backbone (frontend -> server -> auth/storage) is the part readers came
-    # for. Flagging it strictly spends the retry on getting those edges.
+    # Unconnected top-level components are strict errors so the retry fills edges.
     connected = {relationship.from_ for relationship in draft.relationships} | {
         relationship.to for relationship in draft.relationships
     }
@@ -110,13 +100,12 @@ def validate(draft: Draft, known: set[str], strict: bool) -> tuple[list[str], li
 
 
 def clean_path(path: str) -> str:
-    """Makes a model's path repo-relative, keeping the trailing slash that
-    marks a directory. Models reliably write "/web/src/" for "web/src/"."""
+    """Repo-relative path; keep trailing slash for directories."""
     return path.strip().removeprefix("./").removeprefix("/")
 
 
 def count_files(draft: Draft, files: list[str]) -> None:
-    """Fills in file_count from the scan, which knows the real numbers."""
+    """Set file_count from the scan."""
     for component in draft.components:
         matched: set[str] = set()
         for entry in component.files:
@@ -128,7 +117,7 @@ def count_files(draft: Draft, files: list[str]) -> None:
 
 
 def retry_message(errs: list[str]) -> str:
-    """Turns validation errors into a correction the model can act on."""
+    """Validation errors as a correction prompt for the model."""
     errs = sorted(errs)[:20]
     return ("Your previous answer had these problems:\n- " + "\n- ".join(errs) +
             "\n\nSend the whole JSON object again, corrected. Only use component ids you "

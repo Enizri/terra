@@ -1,11 +1,4 @@
-// Terra trace hook — preloaded into a previewed app's Node processes via
-// NODE_OPTIONS=--require. Watches requests the app serves (http.Server) and
-// requests it makes (fetch, http/https.request) and reports them to Terra's
-// ingest endpoint, so the map can animate the whole path of a request, not
-// just the edge the proxy sees.
-//
-// Plain CommonJS, zero dependencies, and it must never crash the host app:
-// every patch is wrapped in try/catch and any failure degrades to "no spans".
+// Trace hook via NODE_OPTIONS=--require. Must never crash the host app.
 "use strict";
 
 try {
@@ -15,8 +8,6 @@ try {
 
   const INGEST = process.env.TERRA_TRACE_URL || "";
   const REPO = process.env.TERRA_TRACE_REPO || "";
-  // The header that marks the hook's own ingest POSTs so the client patches
-  // skip them — belt to the URL check's suspenders, no feedback loop either way.
   const INTERNAL_HEADER = "x-terra-trace-internal";
 
   if (INGEST && REPO) {
@@ -34,8 +25,7 @@ try {
       queue = [];
       try {
         const body = JSON.stringify({ repo_url: REPO, spans: batch });
-        // http.request directly (not fetch): fetch would recurse through its
-        // own patch, and the header marks it for the http.request patch.
+        // Prefer http.request over fetch to avoid recursive patches.
         const req = http.request(
           {
             hostname: ingestURL.hostname,
@@ -48,12 +38,12 @@ try {
               [INTERNAL_HEADER]: "1",
             },
           },
-          (res) => res.resume() // drain; fire-and-forget
+          (res) => res.resume()
         );
-        req.on("error", () => {}); // Terra gone? spans just stop.
+        req.on("error", () => {});
         req.end(body);
       } catch (e) {
-        // Never let telemetry take the app down.
+        // ignore
       }
     }
 
@@ -66,7 +56,6 @@ try {
       }
       if (!timer) {
         timer = setTimeout(flush, 500);
-        // A pending flush must not keep the process alive.
         if (timer.unref) timer.unref();
       }
     }
@@ -75,12 +64,9 @@ try {
 
     function isInternal(headers, host, path) {
       if (headers && (headers[INTERNAL_HEADER] || headers[INTERNAL_HEADER.toUpperCase()])) return true;
-      // Anything aimed at the ingest endpoint itself is ours (or a loop).
       return host === ingestURL.host && path === ingestURL.pathname;
     }
 
-    // Best-effort target of an http.request/https.request call: handles
-    // (url[, options]) and (options) shapes. Null when unparseable — skip.
     function targetOf(a, b, defaultProto) {
       let url = null;
       let opts = null;
@@ -97,8 +83,6 @@ try {
         };
       }
       if (!opts) return null;
-      // opts.host may already carry a port (vite's proxy passes "host:port"
-      // plus a separate opts.port) — don't append it twice.
       let host = String(opts.host || opts.hostname || "localhost");
       if (opts.port && !host.includes(":")) host += ":" + opts.port;
       const path = String(opts.path || "/").split("?")[0];
@@ -115,8 +99,6 @@ try {
       push({
         kind: "client",
         method: target.method,
-        // Host prefixed so the map can tell the app's own API from third
-        // parties; spanMatch tokenizes it away either way.
         path: target.host + target.path,
         status: status,
         dur_ms: Date.now() - start,
@@ -170,8 +152,7 @@ try {
       } catch (e) {}
     }
 
-    // http.get calls its module-internal request, not the patched export, so
-    // both entry points need their own wrap.
+    // Patch get and request; http.get does not use the patched request export.
     patchRequest(http, "request", "http:");
     patchRequest(http, "get", "http:");
     patchRequest(https, "request", "https:");
@@ -199,8 +180,6 @@ try {
           const p = origFetch.apply(this, arguments);
           if (target) {
             const start = Date.now();
-            // Both handlers attach to a derived promise, so a rejection here
-            // is observed and the caller's own handling is untouched.
             p.then(
               (res) => clientSpan(target, res.status || 0, start),
               () => clientSpan(target, 0, start)
@@ -212,5 +191,5 @@ try {
     } catch (e) {}
   }
 } catch (e) {
-  // Tracing is optional; the previewed app is not.
+  // ignore
 }

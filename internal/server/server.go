@@ -1,6 +1,4 @@
-// Package server exposes Terra over HTTP: analyze a repository, list past
-// analyses, fetch one. Long analyze work runs as a process-local job so the
-// browser can detach; sync POST /analyze remains for the CLI.
+// Package server is Terra's HTTP API (analyze, jobs, preview, traces, store).
 package server
 
 import (
@@ -25,10 +23,9 @@ import (
 
 type Server struct {
 	DB string
-	// Jobs holds in-flight analyze work. Nil means a fresh hub on first use.
+	// Jobs is nil until Handler creates a hub.
 	Jobs *job.Hub
-	// Scan, Analyze, and RunTask exist so tests can stub I/O; zero values
-	// mean the real thing.
+	// Optional stubs for tests; nil uses production implementations.
 	Scan    func(url string) (*scan.Result, error)
 	Analyze func(res *scan.Result, model string) (*graph.Map, []string, error)
 	RunTask func(name string, payload any) (json.RawMessage, error)
@@ -63,8 +60,7 @@ func (s *Server) Handler() http.Handler {
 	return mux
 }
 
-// ListenAndServe blocks. Sync analyze/ask may still hold a connection for
-// minutes; the job endpoints do not.
+// ListenAndServe starts the HTTP server and blocks.
 func (s *Server) ListenAndServe(addr string) error {
 	fmt.Fprintf(os.Stderr, "terra API listening on %s\n", addr)
 	return (&http.Server{Addr: addr, Handler: s.Handler()}).ListenAndServe()
@@ -79,8 +75,7 @@ func (s *Server) analyze(w http.ResponseWriter, r *http.Request) {
 		httpError(w, http.StatusBadRequest, `body must be {"repo_url": "github.com/user/project"}`)
 		return
 	}
-	// Reject a bad URL here, while a status code is still on the table — once
-	// the stream is flowing the response is already committed to 200.
+	// Validate before streaming: NDJSON commits status 200.
 	if _, _, err := scan.NormalizeURL(req.RepoURL); err != nil {
 		httpError(w, http.StatusBadRequest, err.Error())
 		return
@@ -116,17 +111,13 @@ func (s *Server) analyze(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, repoMap)
 }
 
-// analyzeStream starts the pipeline as a job and streams its events on this
-// response — same NDJSON shape as before, but Analyze runs off the handler
-// goroutine.
+// analyzeStream runs analyze as a job and writes NDJSON events on this response.
 func (s *Server) analyzeStream(w http.ResponseWriter, ctx context.Context, repoURL, model string) {
 	j := s.startAnalyzeJob(repoURL, model)
 	s.streamJobEvents(w, ctx, j)
 }
 
-// enqueueAnalyze starts an analyze job and returns its id immediately so the
-// client can subscribe on GET /jobs/{id}/events without holding this request
-// open for the LLM.
+// enqueueAnalyze starts an analyze job and returns its id.
 func (s *Server) enqueueAnalyze(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		RepoURL string `json:"repo_url"`
@@ -215,8 +206,7 @@ func (s *Server) startAnalyzeJob(repoURL, model string) *job.Job {
 	})
 }
 
-// streamJobEvents writes job events as NDJSON until the job finishes or the
-// client goes away. History replays first so a late subscriber is complete.
+// streamJobEvents writes job events as NDJSON (history first, then live).
 func (s *Server) streamJobEvents(w http.ResponseWriter, ctx context.Context, j *job.Job) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
@@ -252,10 +242,7 @@ func (s *Server) streamJobEvents(w http.ResponseWriter, ctx context.Context, j *
 	}
 }
 
-// preview starts (or reuses) a live dev-server preview of the repo's
-// frontend and returns its URL.
-// ponytail: synchronous like /analyze — npm install can hold the response
-// open for minutes; the UI shows a spinner. Async job is the first upgrade.
+// preview starts or reuses a live frontend preview and returns its URL.
 func (s *Server) preview(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		RepoURL string `json:"repo_url"`
@@ -279,7 +266,7 @@ type askRequest struct {
 	Selections []map[string]any `json:"selections"`
 }
 
-// ask answers synchronously (CLI / older clients). Prefer POST /jobs/ask.
+// ask answers synchronously; prefer POST /jobs/ask for the web client.
 func (s *Server) ask(w http.ResponseWriter, r *http.Request) {
 	req, ok := decodeAsk(w, r)
 	if !ok {
@@ -371,11 +358,7 @@ func (s *Server) askPayload(req askRequest) map[string]any {
 	return payload
 }
 
-// files browses the running preview's checkout: a directory listing, or the
-// contents of one file. Paths are relative to the frontend dir (web/src and
-// friends), which is what the theater's Files tab shows.
-// ponytail: reads straight off disk on every request — the checkout is local
-// and small enough; cache when a listing is measurably slow.
+// files lists a directory or reads a file under the preview frontend dir.
 func (s *Server) files(w http.ResponseWriter, r *http.Request) {
 	repoURL := r.URL.Query().Get("repo_url")
 	if repoURL == "" {
@@ -384,8 +367,6 @@ func (s *Server) files(w http.ResponseWriter, r *http.Request) {
 	}
 	_, appDir, ok := preview.Lookup(repoURL)
 	if !ok {
-		// Not an error: the preview boots on first open and the tab may be
-		// ahead of it. The UI shows the same "starting…" state as the iframe.
 		writeJSON(w, map[string]any{"starting": true})
 		return
 	}
@@ -400,8 +381,6 @@ func (s *Server) files(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !info.IsDir() {
-		// 512KB: enough for any source file, small enough that a stray click
-		// on a bundled asset can't stall the panel.
 		if info.Size() > 512<<10 {
 			httpError(w, http.StatusRequestEntityTooLarge, "file too large to preview")
 			return
@@ -428,7 +407,6 @@ func (s *Server) files(w http.ResponseWriter, r *http.Request) {
 	out := []entry{}
 	for _, ent := range entries {
 		name := ent.Name()
-		// Noise that makes the tree unusable, not a security boundary.
 		if name == ".git" || name == "node_modules" || strings.HasPrefix(name, ".") {
 			continue
 		}
@@ -446,10 +424,7 @@ func (s *Server) files(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{"path": rel, "entries": out})
 }
 
-// traces streams the live preview's request spans for one repo as
-// Server-Sent Events: ring-buffer history first, then live spans until the
-// client goes away. SSE over WebSocket on purpose — fan-out is one-way and
-// the stdlib does it in a handler.
+// traces streams request spans for a repo as SSE (history, then live).
 func (s *Server) traces(w http.ResponseWriter, r *http.Request) {
 	repoURL := r.URL.Query().Get("repo_url")
 	key, _, err := scan.NormalizeURL(repoURL)
@@ -466,8 +441,7 @@ func (s *Server) traces(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache, no-transform")
 	w.Header().Set("X-Accel-Buffering", "no")
 	w.WriteHeader(http.StatusOK)
-	// SSE comment as an immediate hello: without a first flush the headers sit
-	// in the buffer and EventSource never fires `open` on a quiet stream.
+	// Flush a comment so EventSource opens on a quiet stream.
 	fmt.Fprint(w, ": connected\n\n")
 	flusher.Flush()
 
@@ -494,11 +468,7 @@ func (s *Server) traces(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// ingest accepts span batches from the trace hook running inside a previewed
-// app's Node processes and publishes them on the same hub the edge proxy
-// uses, so the map animates the request's whole path. Repo and Time are
-// stamped server-side — the hook is inside untrusted app code and gets to
-// say what happened, not when or for whom.
+// ingest publishes spans from the preview hook. Repo and Time are set server-side.
 func (s *Server) ingest(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		RepoURL string `json:"repo_url"`
@@ -519,7 +489,6 @@ func (s *Server) ingest(w http.ResponseWriter, r *http.Request) {
 		httpError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	// Cap, don't reject: a misbehaving hook loses spans, not the stream.
 	if len(req.Spans) > 100 {
 		req.Spans = req.Spans[:100]
 	}
@@ -541,20 +510,14 @@ func (s *Server) ingest(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// safeJoin resolves a client-supplied path under base and refuses anything
-// that escapes it — `path` crosses a trust boundary, symlinks included.
+// safeJoin resolves rel under base and rejects path escape (including symlinks).
 func safeJoin(base, rel string) (full, clean string, err error) {
-	// Rooting at "/" before Clean is what kills the traversal: the result can
-	// never contain "..", however many the client sent.
 	clean = path.Clean("/" + strings.TrimPrefix(rel, "/"))[1:]
 	realBase, err := filepath.EvalSymlinks(base)
 	if err != nil {
 		return "", "", fmt.Errorf("preview checkout unavailable")
 	}
 	full = filepath.Join(realBase, filepath.FromSlash(clean))
-	// A symlink *inside* the checkout can still point anywhere, and the
-	// textual join above would not notice. Only resolvable paths are checked;
-	// missing ones are the caller's Stat to reject.
 	if realFull, err := filepath.EvalSymlinks(full); err == nil {
 		relPath, err := filepath.Rel(realBase, realFull)
 		if err != nil || relPath == ".." || strings.HasPrefix(relPath, ".."+string(filepath.Separator)) {
@@ -564,15 +527,7 @@ func safeJoin(base, rel string) (full, clean string, err error) {
 	return full, clean, nil
 }
 
-// snippet reads ~150 lines of the selected file, centered on line, from the
-// preview's checkout. The fiber gives a frontend-relative path (src/...), so
-// try it under the frontend dir first, then the repo root.
-//
-// Workspace questions have no preview running, so fall back to a checkout the
-// server already cloned for an earlier preview — reading it only if it is
-// already on disk.
-// ponytail: no clone on demand; that's minutes of synchronous wait inside
-// /ask. Upgrade path is an async fetch job, not a blocking clone here.
+// snippet returns ~150 lines centered on line from an existing checkout.
 func snippet(repoURL, file string, line int) string {
 	if strings.Contains(file, "..") {
 		return ""
@@ -606,9 +561,7 @@ func snippet(repoURL, file string, line int) string {
 	return ""
 }
 
-// cached returns the stored map when the repo's HEAD commit hasn't moved
-// since the last analysis. Everything is keyed by the commit SHA the scan
-// resolved, so a repeat visitor to an unchanged repo never pays the analyzer.
+// cached returns the stored map when HEAD matches the last analysis commit.
 func (s *Server) cached(res *scan.Result) *graph.Map {
 	if s.DB == "" || res.Commit == "" {
 		return nil
@@ -620,7 +573,7 @@ func (s *Server) cached(res *scan.Result) *graph.Map {
 	return repoMap
 }
 
-// storedMap finds the saved analysis for repoURL, or nil.
+// storedMap returns the saved analysis for repoURL, or nil.
 func storedMap(dbPath, repoURL string) *graph.Map {
 	norm, _, err := scan.NormalizeURL(repoURL)
 	if err != nil {

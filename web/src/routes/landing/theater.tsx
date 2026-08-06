@@ -101,7 +101,7 @@ const EXPLORE_TAGS = [
   ["ux", 3],
 ] as const;
 
-/** Designed Memos shell — dark icon rail (logo / memos / explore / …) + explorer. */
+/** Clickable Memos explore replica. */
 export function MemosExploreReplica() {
   return (
     <div className="rp-shell">
@@ -358,7 +358,7 @@ const REPLICAS: Record<string, () => ReactNode> = {
 
 type FileEntry = { name: string; path: string; dir: boolean };
 
-/** Browses the running preview's checkout — the real web/src, read on the fly. */
+/** Browse the preview checkout. */
 function LiveFiles() {
   const [dir, setDir] = useState("");
   const [entries, setEntries] = useState<FileEntry[]>([]);
@@ -447,10 +447,8 @@ const DEFAULT_TF = { cls: "tf-polish", reply: "Tidied spacing, softened the shad
 
 type ChatMessage = { role: "user" | "terra"; text: string; error?: boolean };
 
-/** compact = collapsed pill, sheet = docked thread, full = chat covers the stage. */
 type ChatMode = "compact" | "sheet" | "full";
 
-/** One-shot ask questions — appear after a component is selected, removed on use. */
 const ASK_HINTS = [
   "Explain this selection",
   "Where is this defined?",
@@ -459,10 +457,7 @@ const ASK_HINTS = [
   "Show the evidence",
 ] as const;
 
-/**
- * One-shot frontend design suggestions for Implement with Terra.
- * Each maps to a scripted visual transform so the change is visible in the preview.
- */
+/** One-shot Implement design chips (scripted preview transforms). */
 export const IMPLEMENT_HINTS = [
   "Give this more breathing room",
   "Add a brand accent color",
@@ -472,17 +467,13 @@ export const IMPLEMENT_HINTS = [
 ] as const;
 
 
-/**
- * Floating Terra dock — no free typing. Select a component to reveal one-shot
- * options (ask questions or design tweaks); each option disappears after use.
- */
+/** Floating dock: one-shot chips after selection. */
 function TerraChatDock({
   selectionKey,
   crumb,
   onAsk,
   onHeadPointerDown,
   hints = ASK_HINTS,
-  /** Implement: design chips. Ask: question chips. */
   designMode = false,
 }: {
   selectionKey: string | null;
@@ -495,7 +486,6 @@ function TerraChatDock({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [thinking, setThinking] = useState(false);
   const [mode, setMode] = useState<ChatMode>("compact");
-  /** Options already used for each selected component (by selection key). */
   const [usedBySel, setUsedBySel] = useState<Record<string, string[]>>({});
   const threadRef = useRef<HTMLDivElement | null>(null);
   const open = mode !== "compact";
@@ -505,11 +495,9 @@ function TerraChatDock({
   const exhaustedMsg = designMode
     ? "Every design tweak for this component is already applied. Pick another element."
     : "You've asked every question for this component. Pick another element.";
-  // Idle prompt streams the suggestion list; pause once a component is picked.
   const streaming = !selectionKey && !thinking && hints.length > 0;
   const askHint = useStreamingAskHint(!streaming, hints);
 
-  // Selection opens the dock so option chips stay visible for that component.
   useEffect(() => {
     if (selectionKey) {
       setMode((m) => (m === "compact" ? "sheet" : m));
@@ -527,7 +515,6 @@ function TerraChatDock({
     const q = raw.trim();
     const sel = selectionKey;
     if (!q || thinking || !sel) return;
-    // Pull the option immediately so it can't be spammed while Terra answers.
     if ((usedBySel[sel] ?? []).includes(q)) return;
     setUsedBySel((prev) => ({
       ...prev,
@@ -643,37 +630,28 @@ function TerraChatDock({
 
 /* ---------- theater panel ---------- */
 
-/**
- * The theater itself. Rendered inline inside the repo card; chrome is a single
- * label chip, and the stage is always the live demo in inspect mode.
- */
+/** Inline theater panel (inspect mode). */
 export function TheaterPanel({
   node,
   onClose,
   className = "",
   chatHints,
   designMode = false,
-  /** Force the clickable explore replica instead of the live Ask iframe. */
   exploreReplica = false,
 }: {
   node: DiagramNode;
   onClose: () => void;
   className?: string;
-  /** One-shot option chips — Ask questions or Implement design tweaks. */
   chatHints?: readonly string[];
-  /** Implement tab: scripted visible design tweaks, each once. */
   designMode?: boolean;
   exploreReplica?: boolean;
 }) {
-  // Fixed: no tab bar and no Inspect/Action toggle — the panel is always the
-  // live demo in inspect mode. The Files view stays wired for a future entry point.
   const [tab] = useState<"demo" | "files">("demo");
   const [selected, setSelected] = useState<Picked[]>([]);
   const [picking] = useState(true);
   const selectedEls = useRef<HTMLElement[]>([]);
   const frameRef = useRef<HTMLIFrameElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
-  /** Design transforms already applied per live/replica selection id. */
   const appliedTf = useRef(new Map<string, Set<string>>());
   const { shellRef, onHeadPointerDown, onPointerMove, endGesture } = useFloatingDrag(panelRef);
   const live = node.id === LIVE_NODE_ID && !exploreReplica;
@@ -691,7 +669,6 @@ export function TheaterPanel({
     frameRef.current?.contentWindow?.postMessage({ type: "terra:clear-selection" }, "*");
   };
 
-  // Selections arrive from the injected select.js inside the live iframe.
   useEffect(() => {
     if (!live) return;
     const onMessage = (e: MessageEvent) => {
@@ -709,12 +686,10 @@ export function TheaterPanel({
     return () => window.removeEventListener("message", onMessage);
   }, [live]);
 
-  // Click outside the live/replica screen clears inspect focus.
   useEffect(() => {
     if (!picking || tab !== "demo") return;
     const onPointerDown = (e: PointerEvent) => {
       const t = e.target as HTMLElement;
-      // Anything in the preview surface or Terra chrome keeps the selection.
       if (
         t.closest(
           "iframe.sh-live, .sh-replica--live, .sh-replica:not(.sh-replica--live), .sh-theater__dock, .sh-theater__chrome, .sh-theater__files",
@@ -730,7 +705,6 @@ export function TheaterPanel({
 
   const pick = (e: React.MouseEvent) => {
     const el = (e.target as HTMLElement).closest<HTMLElement>("[data-sel]");
-    // Empty chrome / outside a selectable node resets focus.
     if (!el) {
       clearSelection();
       return;
@@ -758,14 +732,12 @@ export function TheaterPanel({
     });
   };
 
-  /** Apply a one-shot visual design transform to the current selection. */
   const applyDesignTransform = (q: string) => {
     const tf = TRANSFORMS.find((t) => t.match.test(q)) ?? DEFAULT_TF;
     const selKey =
       selected.length > 0
         ? selected.map((s) => s.id).join(",")
         : "__none__";
-    // HMR can leave a stale Set in this ref from the older one-shot shape.
     if (!(appliedTf.current instanceof Map)) {
       appliedTf.current = new Map();
     }
@@ -792,7 +764,6 @@ export function TheaterPanel({
     return tf.reply;
   };
 
-  /** Live repos answer over /ask; design mode + replicas run scripted transforms. */
   const ask = async (q: string) => {
     if (designMode) {
       await new Promise((done) => setTimeout(done, 700));
@@ -814,7 +785,6 @@ export function TheaterPanel({
     ? () => <MemosExploreReplica />
     : REPLICAS[node.id];
 
-  // Esc and ✕ are the only ways out — a stray click outside shouldn't dump a live session.
   return (
     <motion.div
       ref={panelRef}
@@ -860,8 +830,6 @@ export function TheaterPanel({
         )}
       </div>
 
-      {/* ponytail: chrome is a label only — the hero's own tabs do the navigating,
-          and the panel is permanently in Inspect mode. */}
       <div className="sh-theater__chrome">
         <span className="sh-chip sh-theater__label">
           <span className="sh-chip__mark" />
@@ -900,7 +868,7 @@ export function TheaterPanel({
 
 /* ---------- fullscreen escalation ---------- */
 
-/** The ⤢ turn: same panel, portalled over the page. ⤡ hands it back inline. */
+/** Fullscreen theater portal. */
 export function TheaterModal({ node, onClose }: { node: DiagramNode; onClose: () => void }) {
   useEffect(() => {
     document.body.style.overflow = "hidden";

@@ -11,38 +11,26 @@ import { WorkspaceHeader } from "./sections/WorkspaceHeader";
 import { Sidebar } from "./sections/Sidebar";
 import { DropStage } from "./sections/Stage";
 import { AgentDock } from "./sections/AgentDock";
-// Owns its skin import: today terra.css only loads because App statically
-// imports TerraLanding, which stops being true the moment a route is lazy.
 import "../../shared/styles/tokens.css";
 import "../../shared/styles/ui.css";
 import "./workspace.css";
 
-/**
- * The product surface. It owns exactly what two panes have to agree on — the
- * analysis run, what is selected, and what this tab has mapped — and nothing
- * about how any pane draws itself.
- */
+/** Workspace: analysis run, selection, and the mapped tab. */
 export default function Workspace() {
   const { slug = "untitled" } = useParams();
   const { search } = useLocation();
-  // Lifted so the header star can spin while the stage runs.
   const analyze = useAnalyze();
-  /** Up to three cards, oldest first — the theater's cap, for the same reason. */
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [elements, setElements] = useState<LiveSelection[]>([]);
-  /** The store's analyses, newest first — history is the SQLite store now. */
   const [history, setHistory] = useState<HistoryEntry[]>([]);
-  /** A stored map opened from the rail — shown without re-running the pipeline. */
+  /** Stored map from the rail — no pipeline re-run. */
   const [storedMap, setStoredMap] = useState<TerraMap | null>(null);
 
-  // ponytail: dev-only render harness — `?fixture` draws the golden memos map
-  // with no Go server. Upgrade path: a real fixture picker if a second map lands.
   const fixture =
     import.meta.env.DEV && new URLSearchParams(search).has("fixture")
       ? (memosFixture as TerraMap)
       : null;
-  // A live run always wins; a stored map opened from the rail beats the last
-  // finished run (a fresh run clears it again below).
+  // Live run wins; else stored map; else last finished run / fixture.
   const map = analyze.running ? analyze.map : (storedMap ?? analyze.map ?? fixture);
 
   useEffect(() => {
@@ -50,10 +38,8 @@ export default function Workspace() {
     setElements([]);
   }, [map]);
 
-  // History is the store's list: fetched on mount, re-fetched after a run
-  // lands (the run just wrote a row). Server down or empty DB → empty rail.
   useEffect(() => {
-    if (analyze.map) setStoredMap(null); // the fresh run is what's on stage now
+    if (analyze.map) setStoredMap(null);
     const ac = new AbortController();
     analyses(ac.signal)
       .then((rows) => setHistory(toHistory(rows)))
@@ -63,14 +49,11 @@ export default function Workspace() {
     return () => ac.abort();
   }, [analyze.map]);
 
-  // Open a stored analysis's saved map — no pipeline re-run. A failure just
-  // leaves the stage as it was; the row itself is the error surface.
   const open = async (entry: HistoryEntry) => {
     try {
       setStoredMap(await analysis(entry.id));
     } catch {
-      // ponytail: swallowed — no toast layer exists yet. Upgrade path: surface
-      // it in the rail row once the app grows an error affordance.
+      /* leave stage as-is */
     }
   };
 

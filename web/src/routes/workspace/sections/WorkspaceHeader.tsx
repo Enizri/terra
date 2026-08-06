@@ -1,7 +1,6 @@
 import { Link } from "react-router-dom";
 import { ArrowIcon, DownloadIcon } from "../icons";
 
-/** Session name, and the two actions that aren't built yet. */
 export function WorkspaceHeader({ slug, busy }: { slug: string; busy: boolean }) {
   return (
     <header className="sh-ws__head">

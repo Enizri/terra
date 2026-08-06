@@ -1,7 +1,4 @@
-"""LLM facade: architecture map generation over OpenAI-compatible Chat Completions.
-
-Kept as the stable import path for the Go-facing FastAPI app and tests.
-"""
+"""Architecture map generation facade (stable import for FastAPI and tests)."""
 
 import httpx
 
@@ -18,7 +15,6 @@ def generate(
     base_url: str = "",
     client: httpx.Client | None = None,
 ) -> tuple[Draft, list[str]]:
-    """Asks the model for a map draft of the scanned repository."""
     return ArchitectureMapper(client=client).generate(
         res, model=model, base_url=base_url, client=client
     )

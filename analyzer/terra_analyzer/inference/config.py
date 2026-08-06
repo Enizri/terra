@@ -1,21 +1,16 @@
-"""Points the OpenAI-compatible client at a model server."""
+"""OpenAI-compatible client config."""
 
 import os
 
 import httpx
 
-# Terra-owned local HF server (make run-llm). Any OpenAI-compatible endpoint works.
 DEFAULT_BASE_URL = "http://localhost:8020/v1"
 DEFAULT_MODEL = "Qwen/Qwen2.5-0.5B-Instruct"
 MAX_OUTPUT_TOKENS = 4096
 
 
 class Config:
-    """OpenAI-compatible Chat Completions target.
-
-    TERRA_LLM_URL may be a bare host (http://localhost:8020) or already end in
-    /v1 — both normalize to an OpenAI-compatible base URL.
-    """
+    """Chat Completions target. TERRA_LLM_URL may be bare host or already /v1."""
 
     def __init__(
         self,
