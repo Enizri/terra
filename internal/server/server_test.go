@@ -956,6 +956,86 @@ func TestCancelPropagatesToAnalyze(t *testing.T) {
 	}
 }
 
+func TestBodyTooLarge(t *testing.T) {
+	t.Setenv("TERRA_RATE_LIMIT", "0")
+	_, ts := testServer(t)
+	huge := `{"repo_url":"https://github.com/acme/notes","pad":"` +
+		strings.Repeat("x", 2<<20) + `"}`
+	for _, path := range []string{"/analyze", "/jobs/analyze", "/preview", "/jobs/ask", "/traces/ingest"} {
+		resp, err := http.Post(ts.URL+path, "application/json", strings.NewReader(huge))
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusRequestEntityTooLarge {
+			t.Errorf("%s with 2MiB body = %d, want 413", path, resp.StatusCode)
+		}
+	}
+}
+
+func TestAnalyzeQueueRejectsWhenFull(t *testing.T) {
+	t.Setenv("TERRA_ANALYZE_CONCURRENCY", "1")
+	t.Setenv("TERRA_RATE_LIMIT", "0")
+	s, ts := testServer(t)
+	gate := make(chan struct{})
+	s.Analyze = func(ctx context.Context, res *scan.Result, model string) (*graph.Map, []string, error) {
+		<-gate
+		return nil, nil, fmt.Errorf("released")
+	}
+
+	post := func() *http.Response {
+		resp, err := http.Post(ts.URL+"/jobs/analyze", "application/json",
+			strings.NewReader(`{"repo_url":"https://github.com/acme/notes"}`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return resp
+	}
+
+	first := post()
+	var out struct {
+		JobID string `json:"job_id"`
+	}
+	json.NewDecoder(first.Body).Decode(&out)
+	first.Body.Close()
+	if first.StatusCode != 200 || out.JobID == "" {
+		t.Fatalf("first = %d %+v", first.StatusCode, out)
+	}
+
+	// The slot is claimed before the id is returned, so this is a real 429,
+	// not a 200 followed by an error event.
+	second := post()
+	second.Body.Close()
+	if second.StatusCode != 429 {
+		t.Fatalf("second while full = %d, want 429", second.StatusCode)
+	}
+
+	// Sync /analyze shares the same semaphore.
+	syncResp := post2(t, ts, "/analyze")
+	if syncResp != 429 {
+		t.Fatalf("sync /analyze while full = %d, want 429", syncResp)
+	}
+
+	close(gate)
+	lastJobEvent(t, ts, out.JobID) // drain: slot released when the job finishes
+	third := post()
+	third.Body.Close()
+	if third.StatusCode != 200 {
+		t.Fatalf("after release = %d, want 200", third.StatusCode)
+	}
+}
+
+func post2(t *testing.T, ts *httptest.Server, path string) int {
+	t.Helper()
+	resp, err := http.Post(ts.URL+path, "application/json",
+		strings.NewReader(`{"repo_url":"https://github.com/acme/notes"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	return resp.StatusCode
+}
+
 func TestEnqueueAskReturnsBeforeWorkFinishes(t *testing.T) {
 	s, ts := testServer(t)
 	started := make(chan struct{})

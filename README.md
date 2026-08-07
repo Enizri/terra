@@ -129,6 +129,7 @@ Supports `package.json` frontends only; runfile/Go-only repos need `make dev`
 | `TERRA_LLM_TIMEOUT` | analyzer | `600` | Seconds to wait for a chat/completions response (read timeout) |
 | `TERRA_ANALYZE_TIMEOUT` | Go | `15m` | Wall-clock cap for one analyze job |
 | `TERRA_RATE_LIMIT` | Go | `2` | Per-IP requests/sec on jobs/preview/ask (0 disables) |
+| `TERRA_ANALYZE_CONCURRENCY` | Go | `4` | Max analyze jobs in flight; extra requests get 429 |
 | `TERRA_MODEL` | analyzer + local LLM | `Qwen/Qwen2.5-0.5B-Instruct` | Hugging Face model id or path |
 | `TERRA_TOKEN` | Go | _(empty)_ | Shared secret; empty leaves API open (local-only) |
 | `TERRA_PREVIEW_MODE` | Go | _(empty)_ = host | `docker` for Compose sibling previews |

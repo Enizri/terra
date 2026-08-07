@@ -43,6 +43,7 @@ func limiterTestHandler(t *testing.T) http.Handler {
 
 func TestRateLimitPerIP(t *testing.T) {
 	t.Setenv("TERRA_RATE_LIMIT", "1") // burst 10
+	t.Setenv("TERRA_ANALYZE_CONCURRENCY", "1000")
 	h := limiterTestHandler(t)
 
 	for i := 0; i < 10; i++ {
@@ -73,6 +74,7 @@ func TestRateLimitPerIP(t *testing.T) {
 
 func TestRateLimitExemptPaths(t *testing.T) {
 	t.Setenv("TERRA_RATE_LIMIT", "1")
+	t.Setenv("TERRA_ANALYZE_CONCURRENCY", "1000")
 	h := limiterTestHandler(t)
 	for i := 0; i < 50; i++ {
 		if rec := serveAs(h, "GET", "/healthz", "1.2.3.4"); rec.Code == 429 {
@@ -86,6 +88,7 @@ func TestRateLimitExemptPaths(t *testing.T) {
 
 func TestRateLimitDisabled(t *testing.T) {
 	t.Setenv("TERRA_RATE_LIMIT", "0")
+	t.Setenv("TERRA_ANALYZE_CONCURRENCY", "1000")
 	h := limiterTestHandler(t)
 	for i := 0; i < 100; i++ {
 		if rec := serveAs(h, "POST", "/jobs/analyze", "1.2.3.4"); rec.Code == 429 {

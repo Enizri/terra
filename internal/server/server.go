@@ -11,6 +11,7 @@ import (
 	"path"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -34,6 +35,55 @@ type Server struct {
 	Scan    func(url string) (*scan.Result, error)
 	Analyze func(ctx context.Context, res *scan.Result, model string) (*graph.Map, []string, error)
 	RunTask func(ctx context.Context, name string, payload any) (json.RawMessage, error)
+
+	// analyzeSlots caps concurrent analyze work; initialised in Handler so
+	// tests picking TERRA_ANALYZE_CONCURRENCY via t.Setenv take effect.
+	analyzeSlots chan struct{}
+}
+
+// maxBodyBytes caps request bodies on JSON endpoints. Ask payloads carry a
+// question plus selections and ingest is capped at 100 spans; 1 MiB is generous.
+const maxBodyBytes = 1 << 20
+
+func analyzeDepth() int {
+	if n, err := strconv.Atoi(os.Getenv("TERRA_ANALYZE_CONCURRENCY")); err == nil && n >= 1 {
+		return n
+	}
+	return 4
+}
+
+// acquireAnalyze claims a slot without blocking; callers 429 when full.
+func (s *Server) acquireAnalyze() bool {
+	select {
+	case s.analyzeSlots <- struct{}{}:
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *Server) releaseAnalyze() { <-s.analyzeSlots }
+
+func (s *Server) analyzeBusy(w http.ResponseWriter) {
+	w.Header().Set("Retry-After", "30")
+	httpError(w, http.StatusTooManyRequests,
+		fmt.Sprintf("analyze is at capacity (%d in flight); try again shortly", cap(s.analyzeSlots)))
+}
+
+// decodeBody decodes a size-capped JSON body; on failure it writes the error
+// and returns false. shape is the 400 message.
+func decodeBody(w http.ResponseWriter, r *http.Request, dst any, shape string) bool {
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
+	if err := json.NewDecoder(r.Body).Decode(dst); err != nil {
+		var tooBig *http.MaxBytesError
+		if errors.As(err, &tooBig) {
+			httpError(w, http.StatusRequestEntityTooLarge, "request body too large")
+			return false
+		}
+		httpError(w, http.StatusBadRequest, shape)
+		return false
+	}
+	return true
 }
 
 // analyzeTimeout is the wall-clock cap for one analyze job
@@ -73,6 +123,9 @@ func (s *Server) Handler() http.Handler {
 	}
 	if s.Jobs == nil {
 		s.Jobs = job.NewHub()
+	}
+	if s.analyzeSlots == nil {
+		s.analyzeSlots = make(chan struct{}, analyzeDepth())
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", s.root)
@@ -134,7 +187,10 @@ func (s *Server) analyze(w http.ResponseWriter, r *http.Request) {
 		RepoURL string `json:"repo_url"`
 		Model   string `json:"model"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.RepoURL == "" {
+	if !decodeBody(w, r, &req, `body must be {"repo_url": "github.com/user/project"}`) {
+		return
+	}
+	if req.RepoURL == "" {
 		httpError(w, http.StatusBadRequest, `body must be {"repo_url": "github.com/user/project"}`)
 		return
 	}
@@ -143,10 +199,15 @@ func (s *Server) analyze(w http.ResponseWriter, r *http.Request) {
 		httpError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if strings.Contains(r.Header.Get("Accept"), "application/x-ndjson") {
-		s.analyzeStream(w, r.Context(), req.RepoURL, req.Model)
+	if !s.acquireAnalyze() {
+		s.analyzeBusy(w)
 		return
 	}
+	if strings.Contains(r.Header.Get("Accept"), "application/x-ndjson") {
+		s.analyzeStream(w, r.Context(), req.RepoURL, req.Model, s.releaseAnalyze)
+		return
+	}
+	defer s.releaseAnalyze()
 
 	res, err := s.Scan(req.RepoURL)
 	if err != nil {
@@ -175,8 +236,9 @@ func (s *Server) analyze(w http.ResponseWriter, r *http.Request) {
 }
 
 // analyzeStream runs analyze as a job and writes NDJSON events on this response.
-func (s *Server) analyzeStream(w http.ResponseWriter, ctx context.Context, repoURL, model string) {
-	j := s.startAnalyzeJob(repoURL, model)
+// done releases the caller's analyze slot when the job finishes.
+func (s *Server) analyzeStream(w http.ResponseWriter, ctx context.Context, repoURL, model string, done func()) {
+	j := s.startAnalyzeJob(repoURL, model, done)
 	s.streamJobEvents(w, ctx, j)
 }
 
@@ -186,7 +248,10 @@ func (s *Server) enqueueAnalyze(w http.ResponseWriter, r *http.Request) {
 		RepoURL string `json:"repo_url"`
 		Model   string `json:"model"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.RepoURL == "" {
+	if !decodeBody(w, r, &req, `body must be {"repo_url": "github.com/user/project"}`) {
+		return
+	}
+	if req.RepoURL == "" {
 		httpError(w, http.StatusBadRequest, `body must be {"repo_url": "github.com/user/project"}`)
 		return
 	}
@@ -194,7 +259,13 @@ func (s *Server) enqueueAnalyze(w http.ResponseWriter, r *http.Request) {
 		httpError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	j := s.startAnalyzeJob(req.RepoURL, req.Model)
+	// Claim the slot before returning the job id: once the id is out, a
+	// failure can only surface as an event, never a 429.
+	if !s.acquireAnalyze() {
+		s.analyzeBusy(w)
+		return
+	}
+	j := s.startAnalyzeJob(req.RepoURL, req.Model, s.releaseAnalyze)
 	writeJSON(w, map[string]string{"job_id": j.ID})
 }
 
@@ -217,8 +288,9 @@ func (s *Server) cancelJob(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (s *Server) startAnalyzeJob(repoURL, model string) *job.Job {
+func (s *Server) startAnalyzeJob(repoURL, model string, done func()) *job.Job {
 	return s.Jobs.Start(func(jobCtx context.Context, emit func(job.Event)) {
+		defer done() // release the analyze slot on every exit, panic included
 		ctx, cancel := context.WithTimeout(jobCtx, analyzeTimeout())
 		defer cancel()
 		emit(job.Event{Stage: "clone", Label: "Cloning " + repoURL})
@@ -316,7 +388,10 @@ func (s *Server) preview(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		RepoURL string `json:"repo_url"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.RepoURL == "" {
+	if !decodeBody(w, r, &req, `body must be {"repo_url": "github.com/user/project"}`) {
+		return
+	}
+	if req.RepoURL == "" {
 		httpError(w, http.StatusBadRequest, `body must be {"repo_url": "github.com/user/project"}`)
 		return
 	}
@@ -386,7 +461,10 @@ func (s *Server) enqueueAsk(w http.ResponseWriter, r *http.Request) {
 
 func decodeAsk(w http.ResponseWriter, r *http.Request) (askRequest, bool) {
 	var req askRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.RepoURL == "" || req.Question == "" {
+	if !decodeBody(w, r, &req, `body must be {"repo_url": "...", "question": "...", "selection": {...}}`) {
+		return req, false
+	}
+	if req.RepoURL == "" || req.Question == "" {
 		httpError(w, http.StatusBadRequest, `body must be {"repo_url": "...", "question": "...", "selection": {...}}`)
 		return req, false
 	}
@@ -549,7 +627,10 @@ func (s *Server) ingest(w http.ResponseWriter, r *http.Request) {
 			DurMS  int64  `json:"dur_ms"`
 		} `json:"spans"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.RepoURL == "" {
+	if !decodeBody(w, r, &req, `body must be {"repo_url": "...", "spans": [...]}`) {
+		return
+	}
+	if req.RepoURL == "" {
 		httpError(w, http.StatusBadRequest, `body must be {"repo_url": "...", "spans": [...]}`)
 		return
 	}
