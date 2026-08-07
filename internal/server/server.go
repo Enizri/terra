@@ -179,6 +179,16 @@ func (s *Server) root(w http.ResponseWriter, r *http.Request) {
 // ListenAndServe starts the HTTP server and blocks.
 func (s *Server) ListenAndServe(addr string) error {
 	fmt.Fprintf(os.Stderr, "terra API listening on %s\n", addr)
+	token := "set"
+	if strings.TrimSpace(os.Getenv("TERRA_TOKEN")) == "" {
+		token = "OPEN"
+	}
+	rateLimit := "off"
+	if l := newIPLimiter(); l != nil {
+		rateLimit = fmt.Sprintf("%g/s", float64(l.rps))
+	}
+	fmt.Fprintf(os.Stderr, "terra: token=%s rate=%s analyze-depth=%d analyze-timeout=%s\n",
+		token, rateLimit, analyzeDepth(), analyzeTimeout())
 	return (&http.Server{Addr: addr, Handler: s.Handler()}).ListenAndServe()
 }
 

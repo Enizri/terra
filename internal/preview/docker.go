@@ -50,6 +50,7 @@ func (r *dockerRunner) Start(repoURL string) (string, error) {
 	if inst, ok := r.byRepo[key]; ok {
 		if aliveURL(inst.target) {
 			r.resetTTLLocked(key, inst, ttl)
+			fmt.Fprintf(os.Stderr, "preview: reusing %s, ttl reset to %s\n", inst.containerName, ttl)
 			return inst.publicURL, nil
 		}
 		r.stopLocked(inst)
@@ -58,6 +59,7 @@ func (r *dockerRunner) Start(repoURL string) (string, error) {
 
 	max := previewMax()
 	if max >= 0 && len(r.byRepo) >= max {
+		fmt.Fprintf(os.Stderr, "preview: rejected %s, capacity full (%d/%d)\n", key, len(r.byRepo), max)
 		return "", fmt.Errorf("preview capacity full (%d concurrent); stop another preview or raise TERRA_PREVIEW_MAX", max)
 	}
 
@@ -139,6 +141,8 @@ func (r *dockerRunner) Start(repoURL string) (string, error) {
 	}
 	r.resetTTLLocked(key, inst, ttl)
 	r.byRepo[key] = inst
+	fmt.Fprintf(os.Stderr, "preview: started %s at %s (ttl %s, %d/%d slots)\n",
+		name, publicURL, ttl, len(r.byRepo), previewMax())
 	return publicURL, nil
 }
 
@@ -173,6 +177,7 @@ func (r *dockerRunner) stopLocked(inst *dockerInstance) {
 	UnmountPathProxy(inst.liveID)
 	bin := previewDockerBin()
 	_ = exec.Command(bin, "rm", "-f", inst.containerName).Run()
+	fmt.Fprintf(os.Stderr, "preview: stopped %s\n", inst.containerName)
 }
 
 func (r *dockerRunner) resetTTLLocked(key string, inst *dockerInstance, ttl time.Duration) {
@@ -190,6 +195,7 @@ func (r *dockerRunner) resetTTLLocked(key string, inst *dockerInstance, ttl time
 		if !ok || cur != inst {
 			return
 		}
+		fmt.Fprintf(os.Stderr, "preview: idle %s expired, stopping %s (%s)\n", ttl, inst.containerName, key)
 		r.stopLocked(inst)
 		delete(r.byRepo, key)
 	})
