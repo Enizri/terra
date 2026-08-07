@@ -44,5 +44,14 @@ export function useAnalyze() {
     }
   }, []);
 
-  return { start, status, map, error, running, elapsed };
+  // The stream loop's finally skips setRunning after an abort (its guard is
+  // for unmount); reset state here so the form doesn't stay disabled.
+  const cancel = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setRunning(false);
+    setStatus(null);
+  }, []);
+
+  return { start, cancel, status, map, error, running, elapsed };
 }

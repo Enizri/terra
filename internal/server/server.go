@@ -4,12 +4,14 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
 	"path"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -31,8 +33,75 @@ type Server struct {
 	Jobs *job.Hub
 	// Optional stubs for tests; nil uses production implementations.
 	Scan    func(url string) (*scan.Result, error)
-	Analyze func(res *scan.Result, model string) (*graph.Map, []string, error)
-	RunTask func(name string, payload any) (json.RawMessage, error)
+	Analyze func(ctx context.Context, res *scan.Result, model string) (*graph.Map, []string, error)
+	RunTask func(ctx context.Context, name string, payload any) (json.RawMessage, error)
+
+	// analyzeSlots caps concurrent analyze work; initialised in Handler so
+	// tests picking TERRA_ANALYZE_CONCURRENCY via t.Setenv take effect.
+	analyzeSlots chan struct{}
+}
+
+// maxBodyBytes caps request bodies on JSON endpoints. Ask payloads carry a
+// question plus selections and ingest is capped at 100 spans; 1 MiB is generous.
+const maxBodyBytes = 1 << 20
+
+func analyzeDepth() int {
+	if n, err := strconv.Atoi(os.Getenv("TERRA_ANALYZE_CONCURRENCY")); err == nil && n >= 1 {
+		return n
+	}
+	return 4
+}
+
+// acquireAnalyze claims a slot without blocking; callers 429 when full.
+func (s *Server) acquireAnalyze() bool {
+	select {
+	case s.analyzeSlots <- struct{}{}:
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *Server) releaseAnalyze() { <-s.analyzeSlots }
+
+func (s *Server) analyzeBusy(w http.ResponseWriter) {
+	w.Header().Set("Retry-After", "30")
+	httpError(w, http.StatusTooManyRequests,
+		fmt.Sprintf("analyze is at capacity (%d in flight); try again shortly", cap(s.analyzeSlots)))
+}
+
+// decodeBody decodes a size-capped JSON body; on failure it writes the error
+// and returns false. shape is the 400 message.
+func decodeBody(w http.ResponseWriter, r *http.Request, dst any, shape string) bool {
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
+	if err := json.NewDecoder(r.Body).Decode(dst); err != nil {
+		var tooBig *http.MaxBytesError
+		if errors.As(err, &tooBig) {
+			httpError(w, http.StatusRequestEntityTooLarge, "request body too large")
+			return false
+		}
+		httpError(w, http.StatusBadRequest, shape)
+		return false
+	}
+	return true
+}
+
+// analyzeTimeout is the wall-clock cap for one analyze job
+// (TERRA_ANALYZE_TIMEOUT, default 15m; bad values fall back).
+func analyzeTimeout() time.Duration {
+	if d, err := time.ParseDuration(os.Getenv("TERRA_ANALYZE_TIMEOUT")); err == nil && d > 0 {
+		return d
+	}
+	return 15 * time.Minute
+}
+
+// stopLabel distinguishes a user cancel from the deadline. The exact string
+// "cancelled" is load-bearing: the web client treats it as a silent abort.
+func stopLabel(ctx context.Context) string {
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return fmt.Sprintf("analyze exceeded the %s limit (raise TERRA_ANALYZE_TIMEOUT)", analyzeTimeout())
+	}
+	return "cancelled"
 }
 
 func (s *Server) previewRunner() preview.Runner {
@@ -55,6 +124,9 @@ func (s *Server) Handler() http.Handler {
 	if s.Jobs == nil {
 		s.Jobs = job.NewHub()
 	}
+	if s.analyzeSlots == nil {
+		s.analyzeSlots = make(chan struct{}, analyzeDepth())
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", s.root)
 	mux.HandleFunc("GET /healthz", s.healthz)
@@ -73,7 +145,8 @@ func (s *Server) Handler() http.Handler {
 	if s.StaticDir != "" {
 		mux.HandleFunc("GET /{path...}", s.static)
 	}
-	gated := withToken(mux)
+	// Limiter outermost: unauthenticated floods are rejected before token work.
+	gated := withRateLimit(withToken(mux))
 	// Path-based live previews (Compose iframes). Outside the mux so it does not
 	// conflict with GET /{path...}; left open — starting a preview is gated at POST /preview.
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -106,6 +179,16 @@ func (s *Server) root(w http.ResponseWriter, r *http.Request) {
 // ListenAndServe starts the HTTP server and blocks.
 func (s *Server) ListenAndServe(addr string) error {
 	fmt.Fprintf(os.Stderr, "terra API listening on %s\n", addr)
+	token := "set"
+	if strings.TrimSpace(os.Getenv("TERRA_TOKEN")) == "" {
+		token = "OPEN"
+	}
+	rateLimit := "off"
+	if l := newIPLimiter(); l != nil {
+		rateLimit = fmt.Sprintf("%g/s", float64(l.rps))
+	}
+	fmt.Fprintf(os.Stderr, "terra: token=%s rate=%s analyze-depth=%d analyze-timeout=%s\n",
+		token, rateLimit, analyzeDepth(), analyzeTimeout())
 	return (&http.Server{Addr: addr, Handler: s.Handler()}).ListenAndServe()
 }
 
@@ -114,7 +197,10 @@ func (s *Server) analyze(w http.ResponseWriter, r *http.Request) {
 		RepoURL string `json:"repo_url"`
 		Model   string `json:"model"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.RepoURL == "" {
+	if !decodeBody(w, r, &req, `body must be {"repo_url": "github.com/user/project"}`) {
+		return
+	}
+	if req.RepoURL == "" {
 		httpError(w, http.StatusBadRequest, `body must be {"repo_url": "github.com/user/project"}`)
 		return
 	}
@@ -123,10 +209,15 @@ func (s *Server) analyze(w http.ResponseWriter, r *http.Request) {
 		httpError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if strings.Contains(r.Header.Get("Accept"), "application/x-ndjson") {
-		s.analyzeStream(w, r.Context(), req.RepoURL, req.Model)
+	if !s.acquireAnalyze() {
+		s.analyzeBusy(w)
 		return
 	}
+	if strings.Contains(r.Header.Get("Accept"), "application/x-ndjson") {
+		s.analyzeStream(w, r.Context(), req.RepoURL, req.Model, s.releaseAnalyze)
+		return
+	}
+	defer s.releaseAnalyze()
 
 	res, err := s.Scan(req.RepoURL)
 	if err != nil {
@@ -137,7 +228,7 @@ func (s *Server) analyze(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, repoMap)
 		return
 	}
-	repoMap, warnings, err := s.Analyze(res, req.Model)
+	repoMap, warnings, err := s.Analyze(r.Context(), res, req.Model)
 	if err != nil {
 		httpError(w, http.StatusBadGateway, err.Error())
 		return
@@ -155,8 +246,9 @@ func (s *Server) analyze(w http.ResponseWriter, r *http.Request) {
 }
 
 // analyzeStream runs analyze as a job and writes NDJSON events on this response.
-func (s *Server) analyzeStream(w http.ResponseWriter, ctx context.Context, repoURL, model string) {
-	j := s.startAnalyzeJob(repoURL, model)
+// done releases the caller's analyze slot when the job finishes.
+func (s *Server) analyzeStream(w http.ResponseWriter, ctx context.Context, repoURL, model string, done func()) {
+	j := s.startAnalyzeJob(repoURL, model, done)
 	s.streamJobEvents(w, ctx, j)
 }
 
@@ -166,7 +258,10 @@ func (s *Server) enqueueAnalyze(w http.ResponseWriter, r *http.Request) {
 		RepoURL string `json:"repo_url"`
 		Model   string `json:"model"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.RepoURL == "" {
+	if !decodeBody(w, r, &req, `body must be {"repo_url": "github.com/user/project"}`) {
+		return
+	}
+	if req.RepoURL == "" {
 		httpError(w, http.StatusBadRequest, `body must be {"repo_url": "github.com/user/project"}`)
 		return
 	}
@@ -174,7 +269,13 @@ func (s *Server) enqueueAnalyze(w http.ResponseWriter, r *http.Request) {
 		httpError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	j := s.startAnalyzeJob(req.RepoURL, req.Model)
+	// Claim the slot before returning the job id: once the id is out, a
+	// failure can only surface as an event, never a 429.
+	if !s.acquireAnalyze() {
+		s.analyzeBusy(w)
+		return
+	}
+	j := s.startAnalyzeJob(req.RepoURL, req.Model, s.releaseAnalyze)
 	writeJSON(w, map[string]string{"job_id": j.ID})
 }
 
@@ -197,11 +298,14 @@ func (s *Server) cancelJob(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (s *Server) startAnalyzeJob(repoURL, model string) *job.Job {
-	return s.Jobs.Start(func(ctx context.Context, emit func(job.Event)) {
+func (s *Server) startAnalyzeJob(repoURL, model string, done func()) *job.Job {
+	return s.Jobs.Start(func(jobCtx context.Context, emit func(job.Event)) {
+		defer done() // release the analyze slot on every exit, panic included
+		ctx, cancel := context.WithTimeout(jobCtx, analyzeTimeout())
+		defer cancel()
 		emit(job.Event{Stage: "clone", Label: "Cloning " + repoURL})
 		if err := ctx.Err(); err != nil {
-			emit(job.Event{Stage: "error", Label: "cancelled"})
+			emit(job.Event{Stage: "error", Label: stopLabel(ctx)})
 			return
 		}
 		res, err := s.Scan(repoURL)
@@ -219,12 +323,16 @@ func (s *Server) startAnalyzeJob(repoURL, model string) *job.Job {
 			return
 		}
 		if err := ctx.Err(); err != nil {
-			emit(job.Event{Stage: "error", Label: "cancelled"})
+			emit(job.Event{Stage: "error", Label: stopLabel(ctx)})
 			return
 		}
 		emit(job.Event{Stage: "analyze", Label: "Terra is reading the architecture"})
-		repoMap, warnings, err := s.Analyze(res, model)
+		repoMap, warnings, err := s.Analyze(ctx, res, model)
 		if err != nil {
+			if ctx.Err() != nil {
+				emit(job.Event{Stage: "error", Label: stopLabel(ctx)})
+				return
+			}
 			emit(job.Event{Stage: "error", Label: err.Error()})
 			return
 		}
@@ -232,7 +340,7 @@ func (s *Server) startAnalyzeJob(repoURL, model string) *job.Job {
 			fmt.Fprintln(os.Stderr, "warning:", warn)
 		}
 		if err := ctx.Err(); err != nil {
-			emit(job.Event{Stage: "error", Label: "cancelled"})
+			emit(job.Event{Stage: "error", Label: stopLabel(ctx)})
 			return
 		}
 		if s.DB != "" {
@@ -290,7 +398,10 @@ func (s *Server) preview(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		RepoURL string `json:"repo_url"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.RepoURL == "" {
+	if !decodeBody(w, r, &req, `body must be {"repo_url": "github.com/user/project"}`) {
+		return
+	}
+	if req.RepoURL == "" {
 		httpError(w, http.StatusBadRequest, `body must be {"repo_url": "github.com/user/project"}`)
 		return
 	}
@@ -315,7 +426,7 @@ func (s *Server) ask(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	data, err := s.RunTask("qa", s.askPayload(req))
+	data, err := s.RunTask(r.Context(), "qa", s.askPayload(req))
 	if err != nil {
 		httpError(w, http.StatusBadGateway, err.Error())
 		return
@@ -337,7 +448,7 @@ func (s *Server) enqueueAsk(w http.ResponseWriter, r *http.Request) {
 			emit(job.Event{Stage: "error", Label: "cancelled"})
 			return
 		}
-		data, err := s.RunTask("qa", payload)
+		data, err := s.RunTask(ctx, "qa", payload)
 		if err != nil {
 			emit(job.Event{Stage: "error", Label: err.Error()})
 			return
@@ -360,7 +471,10 @@ func (s *Server) enqueueAsk(w http.ResponseWriter, r *http.Request) {
 
 func decodeAsk(w http.ResponseWriter, r *http.Request) (askRequest, bool) {
 	var req askRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.RepoURL == "" || req.Question == "" {
+	if !decodeBody(w, r, &req, `body must be {"repo_url": "...", "question": "...", "selection": {...}}`) {
+		return req, false
+	}
+	if req.RepoURL == "" || req.Question == "" {
 		httpError(w, http.StatusBadRequest, `body must be {"repo_url": "...", "question": "...", "selection": {...}}`)
 		return req, false
 	}
@@ -523,7 +637,10 @@ func (s *Server) ingest(w http.ResponseWriter, r *http.Request) {
 			DurMS  int64  `json:"dur_ms"`
 		} `json:"spans"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.RepoURL == "" {
+	if !decodeBody(w, r, &req, `body must be {"repo_url": "...", "spans": [...]}`) {
+		return
+	}
+	if req.RepoURL == "" {
 		httpError(w, http.StatusBadRequest, `body must be {"repo_url": "...", "spans": [...]}`)
 		return
 	}

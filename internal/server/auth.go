@@ -2,10 +2,26 @@ package server
 
 import (
 	"crypto/subtle"
+	"net"
 	"net/http"
 	"os"
 	"strings"
 )
+
+// LoopbackAddr reports whether a listen address can only be reached from this
+// machine. Empty or unparseable hosts fail closed: ":8080" binds every
+// interface.
+func LoopbackAddr(addr string) bool {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil || host == "" {
+		return false
+	}
+	if host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
 
 // withToken gates expensive/mutating routes when TERRA_TOKEN is set.
 // Empty TERRA_TOKEN leaves the API open (local make dev).

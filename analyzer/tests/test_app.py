@@ -30,6 +30,36 @@ def test_healthz():
     assert "llm_ok" in body
 
 
+def test_lifespan_logs_model_and_url(monkeypatch, capfd):
+    monkeypatch.setenv("TERRA_LLM_API_KEY", "sk-secret-value")
+    with TestClient(app):
+        pass
+    err = capfd.readouterr().err
+    assert "model=" in err
+    assert "base_url=" in err
+    assert "api_key=set" in err
+    assert "sk-secret-value" not in err
+
+
+def test_lifespan_rejects_localhost_in_container(monkeypatch):
+    monkeypatch.setattr(app_module, "_in_container", lambda: True)
+    monkeypatch.setenv("TERRA_LLM_URL", "http://localhost:8020/v1")
+    with pytest.raises(RuntimeError, match="inside a container"):
+        with TestClient(app):
+            pass
+
+
+def test_healthz_reports_llm_error(monkeypatch):
+    from terra_analyzer.inference import client as inference_client
+
+    def boom(cfg):
+        raise LLMError("boom")
+    monkeypatch.setattr(inference_client, "preflight", boom)
+    body = client.get("/healthz").json()
+    assert body["llm_ok"] is False
+    assert "boom" in body["llm_error"]
+
+
 def test_list_tasks():
     response = client.get("/tasks")
     assert response.status_code == 200

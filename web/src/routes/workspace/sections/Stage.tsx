@@ -48,7 +48,7 @@ export function DropStage({
 }) {
   const [over, setOver] = useState(false);
   const [url, setUrl] = useState("");
-  const { start, status, error, running, elapsed } = analyze;
+  const { start, cancel, status, error, running, elapsed } = analyze;
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -67,7 +67,12 @@ export function DropStage({
       {map ? (
         <MapStage map={map} selectedIds={selectedIds} onSelect={onSelect} onElements={onElements} />
       ) : running ? (
-        <StatusLine label={status?.label ?? "Starting"} elapsed={elapsed} />
+        <div className="sh-ws__running">
+          <StatusLine label={status?.label ?? "Starting"} elapsed={elapsed} />
+          <button type="button" className="sh-ws__stop" onClick={cancel}>
+            Stop
+          </button>
+        </div>
       ) : (
         <div
           className={`sh-ws-drop${over ? " is-over" : ""}`}

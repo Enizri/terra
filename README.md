@@ -63,26 +63,40 @@ Ollama’s OpenAI mode) without changing analyzer code.
 One origin on loopback: Go serves the built UI + API; analyzer (and optional local LLM)
 stay on the Compose network.
 
+Hosted-key quickstart:
+
 ```sh
 cp .env.example .env
-# Required for a gated playground: set TERRA_TOKEN to a shared secret.
-# Hosted LLM (default for make up):
-#   TERRA_LLM_URL=https://api.openai.com/v1
-#   TERRA_LLM_API_KEY=sk-...
-#   TERRA_MODEL=gpt-4o-mini   # or your provider's model id
-# Local HF instead:
-#   TERRA_LLM_URL=http://llm:8020/v1
-#   # leave TERRA_LLM_API_KEY empty
-# Optional: GITHUB_TOKEN for higher GitHub rate limits
+cat >> .env <<'EOF'
+TERRA_TOKEN=change-me
+TERRA_LLM_URL=https://api.openai.com/v1
+TERRA_LLM_API_KEY=sk-...
+TERRA_MODEL=gpt-4o-mini
+EOF
 
 make up          # api + analyzer → http://127.0.0.1:8080
-# make up-llm    # also start the local HF server (profile: llm)
+docker compose logs analyzer | head -5   # must show model= and base_url=
 curl -sf http://127.0.0.1:8080/healthz
 make down
 ```
 
+Local HF instead: `TERRA_LLM_URL=http://llm:8020/v1`, leave `TERRA_LLM_API_KEY`
+empty, run `make up-llm`. Optional: `GITHUB_TOKEN` for higher GitHub rate limits.
+
+Troubleshooting (`docker compose logs analyzer`):
+
+| Log line | Fix |
+|---|---|
+| `llm UNREACHABLE: …` | Wrong `TERRA_LLM_URL` or missing/invalid `TERRA_LLM_API_KEY` |
+| `serving X, not Y` | `TERRA_MODEL` doesn't match what the endpoint serves |
+| `points at localhost, but inside a container` | Use a hosted URL or `http://llm:8020/v1` — `localhost` inside Compose is the analyzer itself |
+
 Open `http://127.0.0.1:8080/`. If `TERRA_TOKEN` is set, paste it in the unlock
 panel after a 401.
+
+`TERRA_TOKEN` is required for `make up` — the api container binds `0.0.0.0`
+inside Compose and `terra serve` refuses a non-loopback bind with an empty
+token. `make dev` (loopback) stays open.
 
 **Live preview (Phase 1b):** Compose sets `TERRA_PREVIEW_MODE=docker`, mounts the
 host Docker socket, and shares checkouts via the named `terra-data` volume
@@ -112,6 +126,10 @@ Supports `package.json` frontends only; runfile/Go-only repos need `make dev`
 | `TERRA_ANALYZER_URL` | Go | `http://localhost:8010` | Where the Python analyzer listens (`http://analyzer:8010` in Compose) |
 | `TERRA_LLM_URL` | analyzer | `http://localhost:8020/v1` | OpenAI-compatible base URL (`…/v1`); Compose hosted or `http://llm:8020/v1` |
 | `TERRA_LLM_API_KEY` | analyzer | _(empty)_ | Optional Bearer token for hosted providers |
+| `TERRA_LLM_TIMEOUT` | analyzer | `600` | Seconds to wait for a chat/completions response (read timeout) |
+| `TERRA_ANALYZE_TIMEOUT` | Go | `15m` | Wall-clock cap for one analyze job |
+| `TERRA_RATE_LIMIT` | Go | `2` | Per-IP requests/sec on jobs/preview/ask (0 disables) |
+| `TERRA_ANALYZE_CONCURRENCY` | Go | `4` | Max analyze jobs in flight; extra requests get 429 |
 | `TERRA_MODEL` | analyzer + local LLM | `Qwen/Qwen2.5-0.5B-Instruct` | Hugging Face model id or path |
 | `TERRA_TOKEN` | Go | _(empty)_ | Shared secret; empty leaves API open (local-only) |
 | `TERRA_PREVIEW_MODE` | Go | _(empty)_ = host | `docker` for Compose sibling previews |

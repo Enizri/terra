@@ -3,6 +3,7 @@ package preview
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestDefaultRunnerHostModes(t *testing.T) {
@@ -59,5 +60,24 @@ func TestPackageWrappersUseDefault(t *testing.T) {
 	_, err := Start("https://github.com/acme/notes")
 	if err == nil || !strings.Contains(err.Error(), "capacity full") {
 		t.Fatalf("Start wrapper err = %v", err)
+	}
+}
+
+func TestPreviewTTLParsing(t *testing.T) {
+	cases := []struct {
+		raw  string
+		want time.Duration
+	}{
+		{"", 30 * time.Minute},
+		{"1h", time.Hour},
+		{"0", 0},
+		{"bogus", 30 * time.Minute},
+		{"30m", 30 * time.Minute},
+	}
+	for _, c := range cases {
+		t.Setenv("TERRA_PREVIEW_TTL", c.raw)
+		if got := previewTTL(); got != c.want {
+			t.Errorf("previewTTL(%q) = %s, want %s", c.raw, got, c.want)
+		}
 	}
 }

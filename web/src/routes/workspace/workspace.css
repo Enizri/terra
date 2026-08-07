@@ -421,12 +421,37 @@
   color: var(--sh-muted-2);
 }
 
+.sh-ws__running {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.sh-ws__stop {
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  padding: 4px 16px;
+  cursor: pointer;
+  opacity: 0.6;
+}
+
+.sh-ws__stop:hover {
+  opacity: 1;
+}
+
 .sh-ws__error {
   margin: 0;
   max-width: 560px;
   color: #e8400d;
   font-size: 14px;
   text-align: center;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
 }
 
 /* ---- result: the map fills the stage, everything else is a strip on top ---- */

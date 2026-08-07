@@ -2,6 +2,7 @@ package graph
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -19,6 +20,9 @@ const DefaultAnalyzerURL = "http://localhost:8010"
 
 var client = &http.Client{Timeout: 20 * time.Minute}
 
+// probeClient keeps a dead analyzer from costing the full request timeout.
+var probeClient = &http.Client{Timeout: 5 * time.Second}
+
 // draft is the analyzer response (judgement fields only).
 type draft struct {
 	Description        string         `json:"description"`
@@ -29,12 +33,12 @@ type draft struct {
 }
 
 // Analyze sends the scan to the analyzer and returns an assembled Map.
-func Analyze(res *scan.Result, model string) (*Map, []string, error) {
+func Analyze(ctx context.Context, res *scan.Result, model string) (*Map, []string, error) {
 	base := strings.TrimSuffix(os.Getenv("TERRA_ANALYZER_URL"), "/")
 	if base == "" {
 		base = DefaultAnalyzerURL
 	}
-	if err := preflight(base); err != nil {
+	if err := preflight(ctx, base); err != nil {
 		return nil, nil, err
 	}
 
@@ -42,7 +46,7 @@ func Analyze(res *scan.Result, model string) (*Map, []string, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	resp, err := client.Post(base+"/analyze", "application/json", bytes.NewReader(body))
+	resp, err := post(ctx, base+"/analyze", body)
 	if err != nil {
 		return nil, nil, fmt.Errorf("analyzer: %w", err)
 	}
@@ -75,19 +79,19 @@ func Analyze(res *scan.Result, model string) (*Map, []string, error) {
 }
 
 // RunTask posts payload to /tasks/{name} and returns the JSON result.
-func RunTask(name string, payload any) (json.RawMessage, error) {
+func RunTask(ctx context.Context, name string, payload any) (json.RawMessage, error) {
 	base := strings.TrimSuffix(os.Getenv("TERRA_ANALYZER_URL"), "/")
 	if base == "" {
 		base = DefaultAnalyzerURL
 	}
-	if err := preflight(base); err != nil {
+	if err := preflight(ctx, base); err != nil {
 		return nil, err
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := client.Post(base+"/tasks/"+name, "application/json", bytes.NewReader(body))
+	resp, err := post(ctx, base+"/tasks/"+name, body)
 	if err != nil {
 		return nil, fmt.Errorf("analyzer: %w", err)
 	}
@@ -108,9 +112,23 @@ func RunTask(name string, payload any) (json.RawMessage, error) {
 	return data, nil
 }
 
+// post issues a context-aware JSON POST on the long-request client.
+func post(ctx context.Context, url string, body []byte) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	return client.Do(req)
+}
+
 // preflight checks analyzer /healthz before a long request.
-func preflight(base string) error {
-	resp, err := client.Get(base + "/healthz")
+func preflight(ctx context.Context, base string) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/healthz", nil)
+	if err != nil {
+		return err
+	}
+	resp, err := probeClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("cannot reach the analyzer service at %s: %w\nstart it with `make run-analyzer`, or set TERRA_ANALYZER_URL", base, err)
 	}
