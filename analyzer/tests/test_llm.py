@@ -29,6 +29,23 @@ def test_config_normalizes_bare_url_to_v1():
     assert cfg.base_url == "http://llm:8020/v1"
 
 
+@pytest.mark.parametrize("raw,want", [
+    ("", 600.0),
+    ("30", 30.0),
+    ("bogus", 600.0),
+    ("-1", 600.0),
+])
+def test_config_read_timeout_from_env(monkeypatch, raw, want):
+    monkeypatch.setenv("TERRA_LLM_TIMEOUT", raw)
+    cfg = Config(base_url="http://llm:8020", model="m")
+    try:
+        assert cfg.read_timeout == want
+        assert cfg.client.timeout.read == want
+        assert cfg.client.timeout.connect == 10.0
+    finally:
+        cfg.client.close()
+
+
 def test_config_sends_authorization_when_api_key_set(monkeypatch):
     monkeypatch.setenv("TERRA_LLM_API_KEY", "sk-test-key")
     seen: list[str | None] = []
