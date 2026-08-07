@@ -4,6 +4,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -31,8 +32,26 @@ type Server struct {
 	Jobs *job.Hub
 	// Optional stubs for tests; nil uses production implementations.
 	Scan    func(url string) (*scan.Result, error)
-	Analyze func(res *scan.Result, model string) (*graph.Map, []string, error)
-	RunTask func(name string, payload any) (json.RawMessage, error)
+	Analyze func(ctx context.Context, res *scan.Result, model string) (*graph.Map, []string, error)
+	RunTask func(ctx context.Context, name string, payload any) (json.RawMessage, error)
+}
+
+// analyzeTimeout is the wall-clock cap for one analyze job
+// (TERRA_ANALYZE_TIMEOUT, default 15m; bad values fall back).
+func analyzeTimeout() time.Duration {
+	if d, err := time.ParseDuration(os.Getenv("TERRA_ANALYZE_TIMEOUT")); err == nil && d > 0 {
+		return d
+	}
+	return 15 * time.Minute
+}
+
+// stopLabel distinguishes a user cancel from the deadline. The exact string
+// "cancelled" is load-bearing: the web client treats it as a silent abort.
+func stopLabel(ctx context.Context) string {
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return fmt.Sprintf("analyze exceeded the %s limit (raise TERRA_ANALYZE_TIMEOUT)", analyzeTimeout())
+	}
+	return "cancelled"
 }
 
 func (s *Server) previewRunner() preview.Runner {
@@ -137,7 +156,7 @@ func (s *Server) analyze(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, repoMap)
 		return
 	}
-	repoMap, warnings, err := s.Analyze(res, req.Model)
+	repoMap, warnings, err := s.Analyze(r.Context(), res, req.Model)
 	if err != nil {
 		httpError(w, http.StatusBadGateway, err.Error())
 		return
@@ -198,10 +217,12 @@ func (s *Server) cancelJob(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) startAnalyzeJob(repoURL, model string) *job.Job {
-	return s.Jobs.Start(func(ctx context.Context, emit func(job.Event)) {
+	return s.Jobs.Start(func(jobCtx context.Context, emit func(job.Event)) {
+		ctx, cancel := context.WithTimeout(jobCtx, analyzeTimeout())
+		defer cancel()
 		emit(job.Event{Stage: "clone", Label: "Cloning " + repoURL})
 		if err := ctx.Err(); err != nil {
-			emit(job.Event{Stage: "error", Label: "cancelled"})
+			emit(job.Event{Stage: "error", Label: stopLabel(ctx)})
 			return
 		}
 		res, err := s.Scan(repoURL)
@@ -219,12 +240,16 @@ func (s *Server) startAnalyzeJob(repoURL, model string) *job.Job {
 			return
 		}
 		if err := ctx.Err(); err != nil {
-			emit(job.Event{Stage: "error", Label: "cancelled"})
+			emit(job.Event{Stage: "error", Label: stopLabel(ctx)})
 			return
 		}
 		emit(job.Event{Stage: "analyze", Label: "Terra is reading the architecture"})
-		repoMap, warnings, err := s.Analyze(res, model)
+		repoMap, warnings, err := s.Analyze(ctx, res, model)
 		if err != nil {
+			if ctx.Err() != nil {
+				emit(job.Event{Stage: "error", Label: stopLabel(ctx)})
+				return
+			}
 			emit(job.Event{Stage: "error", Label: err.Error()})
 			return
 		}
@@ -232,7 +257,7 @@ func (s *Server) startAnalyzeJob(repoURL, model string) *job.Job {
 			fmt.Fprintln(os.Stderr, "warning:", warn)
 		}
 		if err := ctx.Err(); err != nil {
-			emit(job.Event{Stage: "error", Label: "cancelled"})
+			emit(job.Event{Stage: "error", Label: stopLabel(ctx)})
 			return
 		}
 		if s.DB != "" {
@@ -315,7 +340,7 @@ func (s *Server) ask(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	data, err := s.RunTask("qa", s.askPayload(req))
+	data, err := s.RunTask(r.Context(), "qa", s.askPayload(req))
 	if err != nil {
 		httpError(w, http.StatusBadGateway, err.Error())
 		return
@@ -337,7 +362,7 @@ func (s *Server) enqueueAsk(w http.ResponseWriter, r *http.Request) {
 			emit(job.Event{Stage: "error", Label: "cancelled"})
 			return
 		}
-		data, err := s.RunTask("qa", payload)
+		data, err := s.RunTask(ctx, "qa", payload)
 		if err != nil {
 			emit(job.Event{Stage: "error", Label: err.Error()})
 			return

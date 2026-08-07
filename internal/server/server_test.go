@@ -2,6 +2,7 @@ package server
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -31,7 +32,7 @@ func testServer(t *testing.T) (*Server, *httptest.Server) {
 				Stats:         scan.Stats{SourceFiles: 3},
 			}, nil
 		},
-		Analyze: func(res *scan.Result, model string) (*graph.Map, []string, error) {
+		Analyze: func(ctx context.Context, res *scan.Result, model string) (*graph.Map, []string, error) {
 			return &graph.Map{
 				Project: graph.Project{Name: "Notes", RepositoryURL: res.RepositoryURL},
 				Components: []graph.Component{{ID: "web", Name: "Web", Purpose: "p",
@@ -90,9 +91,9 @@ func TestAnalyzeReusesStoredMapForUnchangedCommit(t *testing.T) {
 			ScannedAt: time.Now().UTC()}, nil
 	}
 	realAnalyze := s.Analyze
-	s.Analyze = func(res *scan.Result, model string) (*graph.Map, []string, error) {
+	s.Analyze = func(ctx context.Context, res *scan.Result, model string) (*graph.Map, []string, error) {
 		calls++
-		return realAnalyze(res, model)
+		return realAnalyze(ctx, res, model)
 	}
 
 	for i := 0; i < 2; i++ {
@@ -127,7 +128,7 @@ func TestAnalyzeStreamCacheHitEndsWithDone(t *testing.T) {
 			ScannedAt: time.Now().UTC()}, nil
 	}
 	postAnalyze(t, ts, `{"repo_url":"https://github.com/acme/notes"}`) // warm the store
-	s.Analyze = func(res *scan.Result, model string) (*graph.Map, []string, error) {
+	s.Analyze = func(ctx context.Context, res *scan.Result, model string) (*graph.Map, []string, error) {
 		t.Error("analyzer must not run on a cache hit")
 		return nil, nil, fmt.Errorf("unreachable")
 	}
@@ -192,7 +193,7 @@ func TestAnalyzeStreamsStages(t *testing.T) {
 // to arrive as an error event, not a 502.
 func TestAnalyzeStreamsFailureAsEvent(t *testing.T) {
 	s, ts := testServer(t)
-	s.Analyze = func(res *scan.Result, model string) (*graph.Map, []string, error) {
+	s.Analyze = func(ctx context.Context, res *scan.Result, model string) (*graph.Map, []string, error) {
 		return nil, nil, fmt.Errorf("cannot reach the analyzer service")
 	}
 	req, _ := http.NewRequest("POST", ts.URL+"/analyze",
@@ -243,7 +244,7 @@ func TestAnalyzeRejectsBadBody(t *testing.T) {
 
 func TestAnalyzeReportsAnalyzerFailure(t *testing.T) {
 	s, ts := testServer(t)
-	s.Analyze = func(res *scan.Result, model string) (*graph.Map, []string, error) {
+	s.Analyze = func(ctx context.Context, res *scan.Result, model string) (*graph.Map, []string, error) {
 		return nil, nil, fmt.Errorf("cannot reach the analyzer service")
 	}
 	resp := postAnalyze(t, ts, `{"repo_url":"https://github.com/acme/notes"}`)
@@ -538,7 +539,7 @@ type stubPreview struct {
 	url      string
 }
 
-func (s stubPreview) Start(string) (string, error) { return s.url, s.startErr }
+func (s stubPreview) Start(string) (string, error)       { return s.url, s.startErr }
 func (stubPreview) Lookup(string) (string, string, bool) { return "", "", false }
 func (stubPreview) StopAll()                             {}
 
@@ -745,7 +746,7 @@ func TestEnqueueAnalyzeReturnsBeforeWorkFinishes(t *testing.T) {
 	s, ts := testServer(t)
 	started := make(chan struct{})
 	release := make(chan struct{})
-	s.Analyze = func(res *scan.Result, model string) (*graph.Map, []string, error) {
+	s.Analyze = func(ctx context.Context, res *scan.Result, model string) (*graph.Map, []string, error) {
 		close(started)
 		<-release
 		return &graph.Map{
@@ -818,7 +819,7 @@ func TestCancelAnalyzeJob(t *testing.T) {
 		time.Sleep(100 * time.Millisecond) // window for cancel to land
 		return &scan.Result{RepositoryURL: url, Name: "notes", ScannedAt: time.Now().UTC()}, nil
 	}
-	s.Analyze = func(res *scan.Result, model string) (*graph.Map, []string, error) {
+	s.Analyze = func(ctx context.Context, res *scan.Result, model string) (*graph.Map, []string, error) {
 		t.Error("Analyze must not run after cancel")
 		return nil, nil, fmt.Errorf("unreachable")
 	}
@@ -860,11 +861,106 @@ func TestCancelAnalyzeJob(t *testing.T) {
 	}
 }
 
+func lastJobEvent(t *testing.T, ts *httptest.Server, jobID string) (stage, label string) {
+	t.Helper()
+	evResp, err := http.Get(ts.URL + "/jobs/" + jobID + "/events")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer evResp.Body.Close()
+	var last struct{ Stage, Label string }
+	dec := json.NewDecoder(evResp.Body)
+	for dec.More() {
+		if err := dec.Decode(&last); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return last.Stage, last.Label
+}
+
+func startAnalyzeJobHTTP(t *testing.T, ts *httptest.Server) string {
+	t.Helper()
+	resp, err := http.Post(ts.URL+"/jobs/analyze", "application/json",
+		strings.NewReader(`{"repo_url":"https://github.com/acme/notes"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var out struct {
+		JobID string `json:"job_id"`
+	}
+	json.NewDecoder(resp.Body).Decode(&out)
+	return out.JobID
+}
+
+func TestAnalyzeJobDeadline(t *testing.T) {
+	cases := []struct {
+		name    string
+		timeout string
+		block   bool
+		want    string // substring of the terminal label; "" means stage done
+	}{
+		{"deadline fires", "50ms", true, "exceeded the"},
+		{"generous timeout", "1h", false, ""},
+		{"bogus falls back", "bogus", false, ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Setenv("TERRA_ANALYZE_TIMEOUT", c.timeout)
+			s, ts := testServer(t)
+			s.Analyze = func(ctx context.Context, res *scan.Result, model string) (*graph.Map, []string, error) {
+				if c.block {
+					<-ctx.Done()
+					return nil, nil, ctx.Err()
+				}
+				return &graph.Map{
+					Project:    graph.Project{Name: "Notes", RepositoryURL: res.RepositoryURL},
+					Components: []graph.Component{{ID: "web", Name: "Web", Purpose: "p", Importance: "critical", Type: "frontend"}},
+				}, nil, nil
+			}
+			stage, label := lastJobEvent(t, ts, startAnalyzeJobHTTP(t, ts))
+			if c.want == "" {
+				if stage != "done" {
+					t.Fatalf("stage = %q label = %q, want done", stage, label)
+				}
+				return
+			}
+			if stage != "error" || !strings.Contains(label, c.want) {
+				t.Fatalf("stage = %q label = %q, want error containing %q", stage, label, c.want)
+			}
+		})
+	}
+}
+
+func TestCancelPropagatesToAnalyze(t *testing.T) {
+	s, ts := testServer(t)
+	entered := make(chan struct{})
+	s.Analyze = func(ctx context.Context, res *scan.Result, model string) (*graph.Map, []string, error) {
+		close(entered)
+		<-ctx.Done() // hangs forever unless cancel reaches the in-flight call
+		return nil, nil, ctx.Err()
+	}
+	jobID := startAnalyzeJobHTTP(t, ts)
+	<-entered
+
+	cancelResp, err := http.Post(ts.URL+"/jobs/"+jobID+"/cancel", "application/json", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cancelResp.Body.Close()
+
+	stage, label := lastJobEvent(t, ts, jobID)
+	// Exactly "cancelled": the web client treats that label as a silent abort.
+	if stage != "error" || label != "cancelled" {
+		t.Fatalf("stage = %q label = %q, want error/cancelled", stage, label)
+	}
+}
+
 func TestEnqueueAskReturnsBeforeWorkFinishes(t *testing.T) {
 	s, ts := testServer(t)
 	started := make(chan struct{})
 	release := make(chan struct{})
-	s.RunTask = func(name string, payload any) (json.RawMessage, error) {
+	s.RunTask = func(ctx context.Context, name string, payload any) (json.RawMessage, error) {
 		if name != "qa" {
 			t.Fatalf("task = %q", name)
 		}

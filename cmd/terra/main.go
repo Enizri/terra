@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -67,7 +68,7 @@ func runMap(args []string) {
 	}
 	fmt.Fprintf(os.Stderr, "scanned %d source files, asking the analyzer for a map (this takes a minute)...\n", res.Stats.SourceFiles)
 
-	m, warnings, err := graph.Analyze(res, *model)
+	m, warnings, err := graph.Analyze(context.Background(), res, *model)
 	if err != nil {
 		fail(err)
 	}
