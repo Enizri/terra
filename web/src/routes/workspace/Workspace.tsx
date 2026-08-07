@@ -4,6 +4,7 @@ import type { Component, TerraMap } from "../../shared/map/types";
 import type { LiveSelection } from "../../shared/live";
 import memosFixture from "../../data/memos.map.json";
 import { analyses, analysis } from "../../shared/api";
+import { wsCache } from "./cache";
 import { useAnalyze } from "./useAnalyze";
 import { nextSelection } from "./selection";
 import { toHistory, type HistoryEntry } from "./history";
@@ -22,9 +23,9 @@ export default function Workspace() {
   const analyze = useAnalyze();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [elements, setElements] = useState<LiveSelection[]>([]);
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [history, setHistory] = useState<HistoryEntry[]>(wsCache.history ?? []);
   /** Stored map from the rail — no pipeline re-run. */
-  const [storedMap, setStoredMap] = useState<TerraMap | null>(null);
+  const [storedMap, setStoredMap] = useState<TerraMap | null>(wsCache.storedMap);
 
   const fixture =
     import.meta.env.DEV && new URLSearchParams(search).has("fixture")
@@ -39,10 +40,19 @@ export default function Workspace() {
   }, [map]);
 
   useEffect(() => {
-    if (analyze.map) setStoredMap(null);
+    if (analyze.map) {
+      setStoredMap(null);
+      wsCache.storedMap = null;
+    }
+    // Cached history + no fresh run: keep what's on screen, skip the refetch.
+    if (wsCache.history && !analyze.map) return;
     const ac = new AbortController();
     analyses(ac.signal)
-      .then((rows) => setHistory(toHistory(rows)))
+      .then((rows) => {
+        const h = toHistory(rows);
+        wsCache.history = h;
+        setHistory(h);
+      })
       .catch((e: Error) => {
         if (e.name !== "AbortError") setHistory([]);
       });
@@ -51,7 +61,9 @@ export default function Workspace() {
 
   const open = async (entry: HistoryEntry) => {
     try {
-      setStoredMap(await analysis(entry.id));
+      const m = await analysis(entry.id);
+      wsCache.storedMap = m;
+      setStoredMap(m);
     } catch {
       /* leave stage as-is */
     }

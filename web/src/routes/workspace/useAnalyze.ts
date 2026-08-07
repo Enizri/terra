@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { TerraMap } from "../../shared/map/types";
 import { analyze, type AnalyzeEvent } from "../../shared/api";
+import { wsCache } from "./cache";
 
 /** Analyze job: enqueue + event stream; keep only the latest stage. */
 export function useAnalyze() {
   const [status, setStatus] = useState<AnalyzeEvent | null>(null);
-  const [map, setMap] = useState<TerraMap | null>(null);
+  // Seed from the cache so remounts show the last map instead of refetching.
+  const [map, setMap] = useState<TerraMap | null>(wsCache.map);
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -34,7 +36,10 @@ export function useAnalyze() {
     try {
       for await (const ev of analyze(repoUrl, ac.signal)) {
         setStatus(ev);
-        if (ev.stage === "done" && ev.map) setMap(ev.map);
+        if (ev.stage === "done" && ev.map) {
+          wsCache.map = ev.map;
+          setMap(ev.map);
+        }
       }
     } catch (e) {
       if ((e as Error).name === "AbortError") return;
