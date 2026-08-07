@@ -39,6 +39,13 @@ want() {
 pids=()
 names=()
 
+# When the Vite UI is part of this run, point the API's GET / at it and
+# open the browser once Vite answers.
+WEB_URL="${TERRA_WEB_URL:-http://localhost:5173/}"
+if want "web"; then
+  export TERRA_WEB_URL="$WEB_URL"
+fi
+
 cleanup() {
   trap - INT TERM EXIT
   local pid
@@ -85,13 +92,34 @@ fi
 echo "dev: started ${names[*]} (Ctrl-C to stop)"
 for name in "${names[@]}"; do
   case "$name" in
-    llm) echo "  llm       http://localhost:8020/v1" ;;
-    analyzer) echo "  analyzer  http://localhost:8010" ;;
+    web) echo "  UI        ${WEB_URL}" ;;
     api) echo "  api       http://localhost:8080" ;;
-    web) echo "  web       (vite; see [web] logs for the URL)" ;;
+    analyzer) echo "  analyzer  http://localhost:8010" ;;
+    llm) echo "  llm       http://localhost:8020/v1" ;;
   esac
 done
 echo "  tip: first LLM boot downloads/loads the model and can take a while"
+
+open_ui_when_ready() {
+  local i
+  for i in $(seq 1 120); do
+    if curl -sf -o /dev/null "$WEB_URL"; then
+      if command -v open >/dev/null 2>&1; then
+        open "$WEB_URL" >/dev/null 2>&1 || true
+      elif command -v xdg-open >/dev/null 2>&1; then
+        xdg-open "$WEB_URL" >/dev/null 2>&1 || true
+      fi
+      echo "dev: opened ${WEB_URL}"
+      return 0
+    fi
+    sleep 0.25
+  done
+  echo "dev: UI did not become ready at ${WEB_URL}" >&2
+}
+
+if want "web"; then
+  open_ui_when_ready &
+fi
 
 while true; do
   for pid in "${pids[@]}"; do

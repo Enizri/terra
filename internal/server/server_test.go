@@ -255,6 +255,49 @@ func TestAnalyzeReportsAnalyzerFailure(t *testing.T) {
 	}
 }
 
+func TestRootRedirectsWhenWebURLSet(t *testing.T) {
+	t.Setenv("TERRA_WEB_URL", "http://localhost:5173/")
+	_, ts := testServer(t)
+
+	client := &http.Client{
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+	resp, err := client.Get(ts.URL + "/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusFound {
+		t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusFound)
+	}
+	if got := resp.Header.Get("Location"); got != "http://localhost:5173/" {
+		t.Fatalf("Location = %q", got)
+	}
+}
+
+func TestRootJSONWithoutWebURL(t *testing.T) {
+	t.Setenv("TERRA_WEB_URL", "")
+	_, ts := testServer(t)
+
+	resp, err := http.Get(ts.URL + "/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+	var body map[string]string
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if body["service"] != "terra" || body["status"] != "ok" {
+		t.Fatalf("body = %v", body)
+	}
+}
+
 func TestGetUnknownIDIs404(t *testing.T) {
 	_, ts := testServer(t)
 	resp, err := http.Get(ts.URL + "/analyses/999")

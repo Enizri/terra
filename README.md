@@ -40,6 +40,7 @@ to add for a new product under this repo.
 make venv-local
 
 # one terminal: llm (:8020) + analyzer (:8010) + api (:8080) + web (vite)
+# opens http://localhost:5173/ (API GET / redirects there too)
 make dev
 # backend only (no web): make dev-api
 

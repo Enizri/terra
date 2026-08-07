@@ -2,7 +2,13 @@
 
 from terra_analyzer.local_server.server import (ChatCompletionRequest, ChatMessage,
                                                JsonSchemaFormat, ResponseFormat,
-                                               _messages_for_generate)
+                                               _messages_for_generate, root)
+
+
+def test_root():
+    assert root()["service"] == "terra-llm"
+    assert root()["status"] == "ok"
+
 
 
 def test_json_schema_hint_appended_to_system():

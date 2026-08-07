@@ -174,6 +174,11 @@ def generate_chat(req: ChatCompletionRequest) -> tuple[str, str]:
     return content, finish
 
 
+@app.get("/")
+def root() -> dict:
+    return {"service": "terra-llm", "status": "ok", "loaded": state.loaded}
+
+
 @app.get("/healthz")
 def healthz() -> dict:
     return {

@@ -45,6 +45,7 @@ func (s *Server) Handler() http.Handler {
 		s.Jobs = job.NewHub()
 	}
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /{$}", s.root)
 	mux.HandleFunc("POST /analyze", s.analyze)
 	mux.HandleFunc("POST /jobs/analyze", s.enqueueAnalyze)
 	mux.HandleFunc("POST /jobs/ask", s.enqueueAsk)
@@ -58,6 +59,16 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /traces", s.traces)
 	mux.HandleFunc("POST /traces/ingest", s.ingest)
 	return mux
+}
+
+// root sends browsers to the web UI when TERRA_WEB_URL is set (make dev);
+// otherwise returns a small JSON liveness payload.
+func (s *Server) root(w http.ResponseWriter, r *http.Request) {
+	if u := strings.TrimSpace(os.Getenv("TERRA_WEB_URL")); u != "" {
+		http.Redirect(w, r, u, http.StatusFound)
+		return
+	}
+	writeJSON(w, map[string]string{"service": "terra", "status": "ok"})
 }
 
 // ListenAndServe starts the HTTP server and blocks.

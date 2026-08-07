@@ -14,6 +14,12 @@ client = TestClient(app)
 CASE_STUDIES = Path(__file__).resolve().parents[2] / "case-studies"
 
 
+def test_root():
+    response = client.get("/")
+    assert response.status_code == 200
+    assert response.json() == {"service": "terra-analyzer", "status": "ok"}
+
+
 def test_healthz():
     response = client.get("/healthz")
     assert response.status_code == 200

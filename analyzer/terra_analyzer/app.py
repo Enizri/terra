@@ -11,6 +11,11 @@ app = FastAPI(title="terra-analyzer")
 registry = default_registry()
 
 
+@app.get("/")
+def root() -> dict:
+    return {"service": "terra-analyzer", "status": "ok"}
+
+
 @app.get("/healthz")
 def healthz() -> dict:
     import httpx
