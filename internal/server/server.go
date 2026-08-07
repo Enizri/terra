@@ -92,7 +92,8 @@ func (s *Server) Handler() http.Handler {
 	if s.StaticDir != "" {
 		mux.HandleFunc("GET /{path...}", s.static)
 	}
-	gated := withToken(mux)
+	// Limiter outermost: unauthenticated floods are rejected before token work.
+	gated := withRateLimit(withToken(mux))
 	// Path-based live previews (Compose iframes). Outside the mux so it does not
 	// conflict with GET /{path...}; left open — starting a preview is gated at POST /preview.
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
