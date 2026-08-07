@@ -1,5 +1,11 @@
 """Terra analyzer HTTP service (Go backend client)."""
 
+import contextlib
+import sys
+from pathlib import Path
+from urllib.parse import urlparse
+
+import httpx
 from fastapi import FastAPI, HTTPException
 
 from . import llm
@@ -7,7 +13,43 @@ from .agents import default_registry
 from .inference.config import Config
 from .models import AnalyzeRequest, AnalyzeResponse
 
-app = FastAPI(title="terra-analyzer")
+
+def _in_container() -> bool:
+    return Path("/.dockerenv").exists()
+
+
+@contextlib.asynccontextmanager
+async def lifespan(app: FastAPI):
+    cfg = Config(client=httpx.Client(timeout=5.0))
+    try:
+        print(
+            f"terra-analyzer: model={cfg.model} base_url={cfg.base_url} "
+            f"api_key={'set' if cfg.api_key_set else 'unset'}",
+            file=sys.stderr,
+        )
+        host = urlparse(cfg.base_url).hostname
+        if host in ("localhost", "127.0.0.1") and _in_container():
+            raise RuntimeError(
+                f"TERRA_LLM_URL={cfg.base_url} points at localhost, but inside a "
+                "container that is the analyzer itself. Use a hosted provider URL "
+                "(https://api.openai.com/v1) or http://llm:8020/v1 for the Compose llm profile."
+            )
+        try:
+            from .inference.client import preflight
+
+            preflight(cfg)
+            print("terra-analyzer: llm reachable", file=sys.stderr)
+        except Exception as e:
+            print(
+                f"terra-analyzer: llm UNREACHABLE: {e} — /analyze will fail with this error",
+                file=sys.stderr,
+            )
+    finally:
+        cfg.client.close()
+    yield
+
+
+app = FastAPI(title="terra-analyzer", lifespan=lifespan)
 registry = default_registry()
 
 
@@ -18,17 +60,16 @@ def root() -> dict:
 
 @app.get("/healthz")
 def healthz() -> dict:
-    import httpx
-
     cfg = Config(client=httpx.Client(timeout=2.0))
     llm_ok = False
+    llm_error = None
     try:
         from .inference.client import preflight
 
         preflight(cfg)
         llm_ok = True
-    except Exception:
-        llm_ok = False
+    except Exception as e:
+        llm_error = str(e)
     finally:
         cfg.client.close()
     return {
@@ -36,6 +77,7 @@ def healthz() -> dict:
         "model": cfg.model,
         "llm_url": cfg.base_url,
         "llm_ok": llm_ok,
+        "llm_error": llm_error,
         "tasks": registry.list(),
     }
 

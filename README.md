@@ -63,23 +63,33 @@ Ollama’s OpenAI mode) without changing analyzer code.
 One origin on loopback: Go serves the built UI + API; analyzer (and optional local LLM)
 stay on the Compose network.
 
+Hosted-key quickstart:
+
 ```sh
 cp .env.example .env
-# Required for a gated playground: set TERRA_TOKEN to a shared secret.
-# Hosted LLM (default for make up):
-#   TERRA_LLM_URL=https://api.openai.com/v1
-#   TERRA_LLM_API_KEY=sk-...
-#   TERRA_MODEL=gpt-4o-mini   # or your provider's model id
-# Local HF instead:
-#   TERRA_LLM_URL=http://llm:8020/v1
-#   # leave TERRA_LLM_API_KEY empty
-# Optional: GITHUB_TOKEN for higher GitHub rate limits
+cat >> .env <<'EOF'
+TERRA_TOKEN=change-me
+TERRA_LLM_URL=https://api.openai.com/v1
+TERRA_LLM_API_KEY=sk-...
+TERRA_MODEL=gpt-4o-mini
+EOF
 
 make up          # api + analyzer → http://127.0.0.1:8080
-# make up-llm    # also start the local HF server (profile: llm)
+docker compose logs analyzer | head -5   # must show model= and base_url=
 curl -sf http://127.0.0.1:8080/healthz
 make down
 ```
+
+Local HF instead: `TERRA_LLM_URL=http://llm:8020/v1`, leave `TERRA_LLM_API_KEY`
+empty, run `make up-llm`. Optional: `GITHUB_TOKEN` for higher GitHub rate limits.
+
+Troubleshooting (`docker compose logs analyzer`):
+
+| Log line | Fix |
+|---|---|
+| `llm UNREACHABLE: …` | Wrong `TERRA_LLM_URL` or missing/invalid `TERRA_LLM_API_KEY` |
+| `serving X, not Y` | `TERRA_MODEL` doesn't match what the endpoint serves |
+| `points at localhost, but inside a container` | Use a hosted URL or `http://llm:8020/v1` — `localhost` inside Compose is the analyzer itself |
 
 Open `http://127.0.0.1:8080/`. If `TERRA_TOKEN` is set, paste it in the unlock
 panel after a 401.
