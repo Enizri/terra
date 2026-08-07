@@ -58,12 +58,49 @@ exist if you want to run one service alone.
 Point `TERRA_LLM_URL` at any other OpenAI-compatible `/v1` endpoint (cloud, vLLM,
 Ollama’s OpenAI mode) without changing analyzer code.
 
+## Production-shaped playground (Docker Compose)
+
+One origin on loopback: Go serves the built UI + API; analyzer (and optional local LLM)
+stay on the Compose network.
+
+```sh
+cp .env.example .env
+# Required for a gated playground: set TERRA_TOKEN to a shared secret.
+# Hosted LLM (default for make up):
+#   TERRA_LLM_URL=https://api.openai.com/v1
+#   TERRA_LLM_API_KEY=sk-...
+#   TERRA_MODEL=gpt-4o-mini   # or your provider's model id
+# Local HF instead:
+#   TERRA_LLM_URL=http://llm:8020/v1
+#   # leave TERRA_LLM_API_KEY empty
+# Optional: GITHUB_TOKEN for higher GitHub rate limits
+
+make up          # api + analyzer → http://127.0.0.1:8080
+# make up-llm    # also start the local HF server (profile: llm)
+curl -sf http://127.0.0.1:8080/healthz
+make down
+```
+
+Open `http://127.0.0.1:8080/`. If `TERRA_TOKEN` is set, paste it in the unlock
+panel after a 401.
+
+**Live preview (Phase 1b):** Compose sets `TERRA_PREVIEW_MODE=docker`, mounts the
+host Docker socket, and shares checkouts via the named `terra-data` volume
+(`TERRA_CHECKOUT_VOLUME`) so Docker Desktop can mount them into siblings.
+`POST /preview` starts a Node sibling and returns `/__live/{id}/` (same origin).
+Caps: `TERRA_PREVIEW_MAX` (default 2), idle TTL `TERRA_PREVIEW_TTL` (default 30m).
+Supports `package.json` frontends only; runfile/Go-only repos need `make dev`
+(host-exec).
+
 ## Commands
 
 | Command | What it does |
 |---|---|
 | `make dev` | Local full stack: LLM + analyzer + Go API + web |
 | `make dev-api` | Same as `make dev` without the web UI |
+| `make up` | Docker Compose: build/start api + analyzer (detached) |
+| `make up-llm` | Same as `make up` with local HF `llm` profile |
+| `make down` | Docker Compose: stop and remove containers |
 | `terra scan <url>` | Clone + deterministic scan, JSON to stdout |
 | `terra map <url>` | Scan, ask the analyzer for a map, store in `terra.db` |
 | `terra serve` | HTTP API: `POST /analyze`, `GET /analyses`, `GET /analyses/{id}`, `POST /preview`, `POST /ask`, `GET /files` |
@@ -72,10 +109,18 @@ Ollama’s OpenAI mode) without changing analyzer code.
 
 | Variable | Read by | Default | Meaning |
 |---|---|---|---|
-| `TERRA_ANALYZER_URL` | Go | `http://localhost:8010` | Where the Python analyzer listens |
-| `TERRA_LLM_URL` | analyzer | `http://localhost:8020/v1` | OpenAI-compatible base URL (`…/v1`) |
+| `TERRA_ANALYZER_URL` | Go | `http://localhost:8010` | Where the Python analyzer listens (`http://analyzer:8010` in Compose) |
+| `TERRA_LLM_URL` | analyzer | `http://localhost:8020/v1` | OpenAI-compatible base URL (`…/v1`); Compose hosted or `http://llm:8020/v1` |
+| `TERRA_LLM_API_KEY` | analyzer | _(empty)_ | Optional Bearer token for hosted providers |
 | `TERRA_MODEL` | analyzer + local LLM | `Qwen/Qwen2.5-0.5B-Instruct` | Hugging Face model id or path |
-| `TERRA_DEVICE` | local LLM | `auto` (`mps` / `cuda` / `cpu`) | Torch device for `make run-llm` |
+| `TERRA_TOKEN` | Go | _(empty)_ | Shared secret; empty leaves API open (local-only) |
+| `TERRA_PREVIEW_MODE` | Go | _(empty)_ = host | `docker` for Compose sibling previews |
+| `TERRA_CHECKOUT_DIR` | Go | user cache | Shared checkout root (Compose: `/data/checkouts`) |
+| `TERRA_PUBLIC_URL` | Go | `http://127.0.0.1:8080` | Origin used in `/__live/...` preview URLs |
+| `TERRA_PREVIEW_MAX` | Go | `2` | Max concurrent Docker previews |
+| `TERRA_PREVIEW_TTL` | Go | `30m` | Idle TTL before a Docker preview is stopped |
+| `TERRA_DEVICE` | local LLM | `auto` (`mps` / `cuda` / `cpu`) | Torch device for `make run-llm` / Compose `llm` |
+| `GITHUB_TOKEN` | Go scan | _(empty)_ | Optional; higher GitHub API rate limits |
 
 ## Analyzer HTTP surface
 

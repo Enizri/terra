@@ -18,7 +18,7 @@ import (
 const usage = `usage:
   terra scan  <github-url> [-o out.json]
   terra map   <github-url> [-o map.json] [--db terra.db] [--model qwen2.5:3b]
-  terra serve [--addr :8080] [--db terra.db]`
+  terra serve [--addr :8080] [--db terra.db] [--static dir]`
 
 func main() {
 	if len(os.Args) < 2 {
@@ -90,6 +90,7 @@ func runServe(args []string) {
 	fs := flag.NewFlagSet("serve", flag.ExitOnError)
 	addr := fs.String("addr", ":8080", "address to listen on")
 	db := fs.String("db", "terra.db", "SQLite file to store maps in")
+	static := fs.String("static", "", "directory of built web UI to serve (optional)")
 	fs.Parse(args)
 
 	// The trace hook inside previewed apps posts back to this server;
@@ -106,7 +107,7 @@ func runServe(args []string) {
 		os.Exit(0)
 	}()
 
-	if err := (&server.Server{DB: *db}).ListenAndServe(*addr); err != nil {
+	if err := (&server.Server{DB: *db, StaticDir: *static}).ListenAndServe(*addr); err != nil {
 		preview.StopAll()
 		fail(err)
 	}

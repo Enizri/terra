@@ -1,6 +1,10 @@
 /** Go server client (`terra serve`). Same-origin / Vite proxy; errors as {"error":"..."}. */
 import type { TerraMap } from "./map/types";
 import { ndjsonSplitter } from "./ndjson";
+import { getToken, notifyUnauthorized } from "./token";
+import { tracesURL } from "./tracesUrl";
+
+export { tracesURL };
 
 /** Opaque selection for the analyzer (see LiveSelection in live.tsx). */
 export type Selection = Record<string, unknown>;
@@ -20,10 +24,21 @@ export type FilesResponse = {
   starting?: boolean;
 };
 
+function authHeaders(extra?: Record<string, string>): HeadersInit {
+  const headers: Record<string, string> = { ...extra };
+  const token = getToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
+}
+
+function noteUnauthorized(res: Response): void {
+  if (res.status === 401) notifyUnauthorized();
+}
+
 async function post(path: string, body: unknown, signal?: AbortSignal): Promise<Response> {
   return fetch(path, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify(body),
     signal,
   });
@@ -31,6 +46,7 @@ async function post(path: string, body: unknown, signal?: AbortSignal): Promise<
 
 /** JSON response; transport and server errors throw. */
 async function json<T>(res: Response, what: string): Promise<T> {
+  noteUnauthorized(res);
   const data = await res.json().catch(() => null);
   if (!res.ok || (data as { error?: string } | null)?.error) {
     throw new Error((data as { error?: string } | null)?.error ?? `${what} failed (${res.status})`);
@@ -40,7 +56,10 @@ async function json<T>(res: Response, what: string): Promise<T> {
 
 /** Best-effort job cancel — never throws. */
 export function cancelJob(jobId: string): void {
-  void fetch(`/jobs/${jobId}/cancel`, { method: "POST" }).catch(() => {});
+  void fetch(`/jobs/${jobId}/cancel`, {
+    method: "POST",
+    headers: authHeaders(),
+  }).catch(() => {});
 }
 
 async function* jobEvents(jobId: string, signal?: AbortSignal): AsyncGenerator<AnalyzeEvent> {
@@ -48,10 +67,11 @@ async function* jobEvents(jobId: string, signal?: AbortSignal): AsyncGenerator<A
   signal?.addEventListener("abort", onAbort, { once: true });
   try {
     const res = await fetch(`/jobs/${jobId}/events`, {
-      headers: { Accept: "application/x-ndjson" },
+      headers: authHeaders({ Accept: "application/x-ndjson" }),
       signal,
     });
     if (!res.ok || !res.body) {
+      noteUnauthorized(res);
       const detail = await res.json().catch(() => null);
       throw new Error(detail?.error ?? `job events failed (${res.status})`);
     }
@@ -133,7 +153,7 @@ export type TraceSpan = {
 
 /** Subscribe to preview request spans (SSE). Returns unsubscribe. */
 export function traces(repoUrl: string, onSpan: (span: TraceSpan) => void): () => void {
-  const es = new EventSource(`/traces?repo_url=${encodeURIComponent(repoUrl)}`);
+  const es = new EventSource(tracesURL(repoUrl, getToken()));
   es.onmessage = (e) => {
     try {
       onSpan(JSON.parse(e.data) as TraceSpan);
@@ -153,19 +173,19 @@ export type AnalysisSummary = {
 };
 
 export async function analyses(signal?: AbortSignal): Promise<AnalysisSummary[]> {
-  const res = await fetch("/analyses", { signal });
+  const res = await fetch("/analyses", { headers: authHeaders(), signal });
   return json<AnalysisSummary[]>(res, "analyses");
 }
 
 /** Fetch a stored map without re-running the pipeline. */
 export async function analysis(id: number, signal?: AbortSignal): Promise<TerraMap> {
-  const res = await fetch(`/analyses/${id}`, { signal });
+  const res = await fetch(`/analyses/${id}`, { headers: authHeaders(), signal });
   return json<TerraMap>(res, "analysis");
 }
 
 /** List a directory or read a file in the preview checkout. */
 export async function files(repoUrl: string, path: string, signal?: AbortSignal): Promise<FilesResponse> {
   const query = `repo_url=${encodeURIComponent(repoUrl)}&path=${encodeURIComponent(path)}`;
-  const res = await fetch(`/files?${query}`, { signal });
+  const res = await fetch(`/files?${query}`, { headers: authHeaders(), signal });
   return json<FilesResponse>(res, "files");
 }

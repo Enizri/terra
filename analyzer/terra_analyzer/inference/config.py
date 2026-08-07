@@ -21,4 +21,11 @@ class Config:
         raw = (base_url or os.environ.get("TERRA_LLM_URL") or DEFAULT_BASE_URL).rstrip("/")
         self.base_url = raw if raw.endswith("/v1") else raw + "/v1"
         self.model = model or os.environ.get("TERRA_MODEL") or DEFAULT_MODEL
-        self.client = client or httpx.Client(timeout=900)
+        if client is not None:
+            self.client = client
+        else:
+            headers = {}
+            key = (os.environ.get("TERRA_LLM_API_KEY") or "").strip()
+            if key:
+                headers["Authorization"] = f"Bearer {key}"
+            self.client = httpx.Client(timeout=900, headers=headers)

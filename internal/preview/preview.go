@@ -107,11 +107,32 @@ func traceEnv(repoKey string) []string {
 	if err != nil {
 		return nil
 	}
-	return []string{
+	env := []string{
 		"NODE_OPTIONS=" + mergeNodeOptions(os.Getenv("NODE_OPTIONS"), hook),
 		"TERRA_TRACE_URL=http://localhost:" + terraPort() + "/traces/ingest",
 		"TERRA_TRACE_REPO=" + repoKey,
 	}
+	if tok := strings.TrimSpace(os.Getenv("TERRA_TOKEN")); tok != "" {
+		env = append(env, "TERRA_TRACE_TOKEN="+tok)
+	}
+	return env
+}
+
+// dockerTraceVars are hook ingest settings for a sibling container
+// (NODE_OPTIONS is set separately to the in-container hook path).
+func dockerTraceVars(repoKey string) []string {
+	host := strings.TrimSpace(os.Getenv("TERRA_TRACE_HOST"))
+	if host == "" {
+		host = "host.docker.internal"
+	}
+	env := []string{
+		"TERRA_TRACE_URL=http://" + host + ":" + terraPort() + "/traces/ingest",
+		"TERRA_TRACE_REPO=" + repoKey,
+	}
+	if tok := strings.TrimSpace(os.Getenv("TERRA_TOKEN")); tok != "" {
+		env = append(env, "TERRA_TRACE_TOKEN="+tok)
+	}
+	return env
 }
 
 type instance struct {
@@ -123,26 +144,27 @@ type instance struct {
 	proxyURL string
 }
 
-var (
+// hostRunner is today's host-exec preview implementation behind Runner.
+type hostRunner struct {
 	mu     sync.Mutex
-	byRepo = map[string]*instance{}
-)
+	byRepo map[string]*instance
+}
 
 // Start returns a live preview URL for repoURL, reusing a healthy instance.
-func Start(repoURL string) (string, error) {
+func (r *hostRunner) Start(repoURL string) (string, error) {
 	key, _, err := scan.NormalizeURL(repoURL)
 	if err != nil {
 		return "", err
 	}
-	mu.Lock()
-	defer mu.Unlock()
-	if inst, ok := byRepo[key]; ok {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if inst, ok := r.byRepo[key]; ok {
 		if alive(inst.devPort) {
 			return inst.proxyURL, nil
 		}
 		stop(inst.cmd)
 		stop(inst.api)
-		delete(byRepo, key)
+		delete(r.byRepo, key)
 	}
 
 	root, err := scan.Checkout(key)
@@ -151,7 +173,7 @@ func Start(repoURL string) (string, error) {
 	}
 	appDir, script, pm, err := detect(root)
 	if err != nil {
-		return startViaRunfile(key, root, err)
+		return r.startViaRunfile(key, root, err)
 	}
 	if _, err := os.Stat(filepath.Join(appDir, "node_modules")); err != nil {
 		install := exec.Command(pm, "install")
@@ -206,27 +228,28 @@ func Start(repoURL string) (string, error) {
 		return "", fmt.Errorf("dev server never came up: %v\n--- output ---\n%s", err, logs.String())
 	}
 
-	hasAuth := seedAuth(port)
+	targetBase := "http://localhost:" + strconv.Itoa(port)
+	hasAuth := seedAuth(targetBase)
 
-	proxyURL, err := serveProxy(key, port, hasAuth)
+	proxyURL, err := serveProxy(key, targetBase, hasAuth)
 	if err != nil {
 		stop(cmd)
 		stop(apiCmd)
 		return "", err
 	}
-	byRepo[key] = &instance{root: root, appDir: appDir, cmd: cmd, api: apiCmd, devPort: port, proxyURL: proxyURL}
+	r.byRepo[key] = &instance{root: root, appDir: appDir, cmd: cmd, api: apiCmd, devPort: port, proxyURL: proxyURL}
 	return proxyURL, nil
 }
 
 // Lookup returns the checkout root and frontend dir of a running preview.
-func Lookup(repoURL string) (root, appDir string, ok bool) {
+func (r *hostRunner) Lookup(repoURL string) (root, appDir string, ok bool) {
 	key, _, err := scan.NormalizeURL(repoURL)
 	if err != nil {
 		return "", "", false
 	}
-	mu.Lock()
-	defer mu.Unlock()
-	inst, ok := byRepo[key]
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	inst, ok := r.byRepo[key]
 	if !ok {
 		return "", "", false
 	}
@@ -234,13 +257,13 @@ func Lookup(repoURL string) (root, appDir string, ok bool) {
 }
 
 // StopAll kills every dev-server process group. Call on shutdown.
-func StopAll() {
-	mu.Lock()
-	defer mu.Unlock()
-	for key, inst := range byRepo {
+func (r *hostRunner) StopAll() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for key, inst := range r.byRepo {
 		stop(inst.cmd)
 		stop(inst.api)
-		delete(byRepo, key)
+		delete(r.byRepo, key)
 	}
 }
 
@@ -259,7 +282,7 @@ func stop(cmd *exec.Cmd) {
 func detect(root string) (appDir, script, pm string, err error) {
 	type candidate struct {
 		dir, script string
-		score       int
+		score, depth int
 	}
 	var best *candidate
 	filepath.WalkDir(root, func(path string, d fs.DirEntry, walkErr error) error {
@@ -268,7 +291,7 @@ func detect(root string) (appDir, script, pm string, err error) {
 		}
 		if d.IsDir() {
 			name := d.Name()
-			if name == "node_modules" || name == ".git" {
+			if name == "node_modules" || name == ".git" || name == "examples" {
 				return filepath.SkipDir
 			}
 			if depth(root, path) > 2 {
@@ -309,8 +332,12 @@ func detect(root string) (appDir, script, pm string, err error) {
 				score += 2
 			}
 		}
-		if best == nil || score > best.score {
-			best = &candidate{dir: filepath.Dir(path), script: script, score: score}
+		// Prefer Vite/React apps; on a tie, prefer the shallower package.json
+		// so monorepo examples/ don't beat web/ or the repo root.
+		depDepth := depth(root, filepath.Dir(path))
+		better := best == nil || score > best.score || (score == best.score && depDepth < best.depth)
+		if better {
+			best = &candidate{dir: filepath.Dir(path), script: script, score: score, depth: depDepth}
 		}
 		return nil
 	})
@@ -479,8 +506,8 @@ func refreshCookie(resp *http.Response) string {
 }
 
 // seedAuth creates a demo user if needed and returns whether auth is available.
-func seedAuth(devPort int) bool {
-	base := "http://localhost:" + strconv.Itoa(devPort)
+func seedAuth(baseURL string) bool {
+	base := strings.TrimRight(baseURL, "/")
 	client := &http.Client{Timeout: 5 * time.Second}
 
 	resp, err := signinDemo(client, base)
@@ -537,18 +564,39 @@ func seedMemos(client *http.Client, base string, signinResp *http.Response) {
 
 /* ---------- injecting reverse proxy ---------- */
 
-const injectTag = `<script src="/__terra/select.js"></script>`
+// serveProxy reverse-proxies a localhost/dev target on an ephemeral loopback port.
+func serveProxy(repoKey, targetBase string, hasAuth bool) (string, error) {
+	handler, err := newInjectProxy(repoKey, targetBase, hasAuth, "")
+	if err != nil {
+		return "", err
+	}
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return "", err
+	}
+	go http.Serve(ln, handler)
+	return "http://" + ln.Addr().String() + "/", nil
+}
 
-// serveProxy reverse-proxies the dev server, injects select.js, and emits spans.
-func serveProxy(repoKey string, devPort int, hasAuth bool) (string, error) {
-	base := "http://localhost:" + strconv.Itoa(devPort)
-	target, _ := url.Parse(base)
+// newInjectProxy reverse-proxies targetBase, injects select.js, and emits spans.
+// publicPrefix is the browser-visible path prefix for the script tag
+// (e.g. "/__live/id"); the handler itself still serves "/__terra/select.js"
+// after the live hub strips the prefix.
+func newInjectProxy(repoKey, targetBase string, hasAuth bool, publicPrefix string) (http.Handler, error) {
+	base := strings.TrimRight(targetBase, "/")
+	target, err := url.Parse(base)
+	if err != nil || target.Scheme == "" || target.Host == "" {
+		return nil, fmt.Errorf("invalid preview target %q", targetBase)
+	}
+	inject := `<script src="` + publicPrefix + `/__terra/select.js"></script>`
 	authClient := &http.Client{Timeout: 5 * time.Second}
 	rp := httputil.NewSingleHostReverseProxy(target)
 	director := rp.Director
 	rp.Director = func(r *http.Request) {
 		director(r)
-		r.Host = target.Host
+		// Vite 6+ rejects unknown Host values (container DNS names). localhost
+		// is always allowed; the URL still targets the sibling container.
+		r.Host = "localhost"
 		r.Header.Del("Accept-Encoding")
 		// Mint a fresh refresh cookie per auth refresh (tokens rotate).
 		if hasAuth &&
@@ -578,10 +626,11 @@ func serveProxy(repoKey string, devPort int, hasAuth bool) (string, error) {
 		if err != nil {
 			return err
 		}
+		tag := []byte(inject)
 		if i := bytes.Index(body, []byte("</head>")); i >= 0 {
-			body = append(body[:i:i], append([]byte(injectTag), body[i:]...)...)
+			body = append(body[:i:i], append(tag, body[i:]...)...)
 		} else {
-			body = append(body, injectTag...)
+			body = append(body, tag...)
 		}
 		resp.Body = io.NopCloser(bytes.NewReader(body))
 		resp.ContentLength = int64(len(body))
@@ -596,13 +645,7 @@ func serveProxy(repoKey string, devPort int, hasAuth bool) (string, error) {
 		w.Write(loadSelectJS())
 	})
 	mux.Handle("/", rp)
-
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		return "", err
-	}
-	go http.Serve(ln, traceMiddleware(repoKey, mux))
-	return "http://" + ln.Addr().String() + "/", nil
+	return traceMiddleware(repoKey, mux), nil
 }
 
 /* ---------- bounded output buffer ---------- */

@@ -8,6 +8,7 @@ try {
 
   const INGEST = process.env.TERRA_TRACE_URL || "";
   const REPO = process.env.TERRA_TRACE_REPO || "";
+  const TRACE_TOKEN = process.env.TERRA_TRACE_TOKEN || "";
   const INTERNAL_HEADER = "x-terra-trace-internal";
 
   if (INGEST && REPO) {
@@ -25,6 +26,14 @@ try {
       queue = [];
       try {
         const body = JSON.stringify({ repo_url: REPO, spans: batch });
+        const headers = {
+          "content-type": "application/json",
+          "content-length": Buffer.byteLength(body),
+          [INTERNAL_HEADER]: "1",
+        };
+        if (TRACE_TOKEN) {
+          headers.authorization = "Bearer " + TRACE_TOKEN;
+        }
         // Prefer http.request over fetch to avoid recursive patches.
         const req = http.request(
           {
@@ -32,11 +41,7 @@ try {
             port: ingestURL.port,
             path: ingestURL.pathname,
             method: "POST",
-            headers: {
-              "content-type": "application/json",
-              "content-length": Buffer.byteLength(body),
-              [INTERNAL_HEADER]: "1",
-            },
+            headers: headers,
           },
           (res) => res.resume()
         );

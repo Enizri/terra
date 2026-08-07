@@ -95,16 +95,22 @@ func stripRoot(name string) (rel string, ok bool) {
 
 // CheckoutDir is where Checkout keeps rawURL's working copy. It only computes
 // the path — callers that must not download (a request handler) can Stat it.
+// When TERRA_CHECKOUT_DIR is set (Compose: /data/checkouts), checkouts live there
+// so the API container and preview sandboxes share the same files.
 func CheckoutDir(rawURL string) (string, error) {
 	owner, repo, err := ownerRepo(rawURL)
 	if err != nil {
 		return "", err
 	}
+	name := owner + "-" + repo
+	if base := strings.TrimSpace(os.Getenv("TERRA_CHECKOUT_DIR")); base != "" {
+		return filepath.Join(base, name), nil
+	}
 	cache, err := os.UserCacheDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(cache, "terra", "checkouts", owner+"-"+repo), nil
+	return filepath.Join(cache, "terra", "checkouts", name), nil
 }
 
 // checkoutMarker records which commit a checkout was extracted from.
