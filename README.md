@@ -94,6 +94,10 @@ Troubleshooting (`docker compose logs analyzer`):
 Open `http://127.0.0.1:8080/`. If `TERRA_TOKEN` is set, paste it in the unlock
 panel after a 401.
 
+`TERRA_TOKEN` is required for `make up` — the api container binds `0.0.0.0`
+inside Compose and `terra serve` refuses a non-loopback bind with an empty
+token. `make dev` (loopback) stays open.
+
 **Live preview (Phase 1b):** Compose sets `TERRA_PREVIEW_MODE=docker`, mounts the
 host Docker socket, and shares checkouts via the named `terra-data` volume
 (`TERRA_CHECKOUT_VOLUME`) so Docker Desktop can mount them into siblings.

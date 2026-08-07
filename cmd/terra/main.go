@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/Enizri/terra/internal/graph"
@@ -18,7 +19,7 @@ import (
 const usage = `usage:
   terra scan  <github-url> [-o out.json]
   terra map   <github-url> [-o map.json] [--db terra.db] [--model qwen2.5:3b]
-  terra serve [--addr :8080] [--db terra.db] [--static dir]`
+  terra serve [--addr 127.0.0.1:8080] [--db terra.db] [--static dir]`
 
 func main() {
 	if len(os.Args) < 2 {
@@ -88,10 +89,14 @@ func runMap(args []string) {
 
 func runServe(args []string) {
 	fs := flag.NewFlagSet("serve", flag.ExitOnError)
-	addr := fs.String("addr", ":8080", "address to listen on")
+	addr := fs.String("addr", "127.0.0.1:8080", "address to listen on")
 	db := fs.String("db", "terra.db", "SQLite file to store maps in")
 	static := fs.String("static", "", "directory of built web UI to serve (optional)")
 	fs.Parse(args)
+
+	if !server.LoopbackAddr(*addr) && strings.TrimSpace(os.Getenv("TERRA_TOKEN")) == "" {
+		fail(fmt.Errorf("refusing to listen on %s with TERRA_TOKEN empty: set TERRA_TOKEN to a shared secret, or bind 127.0.0.1", *addr))
+	}
 
 	// The trace hook inside previewed apps posts back to this server;
 	// preview.terraPort reads TERRA_ADDR to build that URL. Without this a
