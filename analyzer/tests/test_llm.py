@@ -3,12 +3,14 @@ import json
 import httpx
 import pytest
 
+from terra_analyzer.inference.client import chat
 from terra_analyzer.inference.config import Config
 from terra_analyzer.llm import LLMError, generate
 from terra_analyzer.models import Draft
 from terra_analyzer.schema import DRAFT_SCHEMA
 
-from .conftest import DEFAULT_MODEL, draft_json, mock_client, openai_handler
+from .conftest import (DEFAULT_MODEL, draft_json, mock_client, openai_handler,
+                       schema_rejecting_handler)
 
 
 def test_generate_against_openai_compatible(scan, good_draft_dict):
@@ -111,6 +113,64 @@ def test_retry_once_on_validation_errors(scan, good_draft_dict):
     assert retry_msgs[-2]["role"] == "assistant"
     assert "made/up.go" in retry_msgs[-1]["content"]
     assert draft.components[0].files == ["web/"]
+
+
+def test_falls_back_to_json_object_on_400(scan, good_draft_dict):
+    handler = schema_rejecting_handler(draft_json(good_draft_dict))
+    draft, _ = generate(scan, base_url="http://llm/v1", client=mock_client(handler))
+    assert [component.id for component in draft.components] == ["web", "server", "data"]
+    assert len(handler.chat_bodies) == 2
+    assert handler.chat_bodies[0]["response_format"]["type"] == "json_schema"
+    assert handler.chat_bodies[1]["response_format"] == {"type": "json_object"}
+
+
+def test_fallback_embeds_schema_in_prompt(scan, good_draft_dict):
+    handler = schema_rejecting_handler(draft_json(good_draft_dict))
+    generate(scan, base_url="http://llm/v1", client=mock_client(handler))
+    prompt = json.dumps(handler.chat_bodies[1]["messages"])
+    assert "suggested_questions" in prompt
+
+
+def test_fallback_does_not_mutate_caller_messages(good_draft_dict):
+    handler = schema_rejecting_handler(draft_json(good_draft_dict))
+    cfg = Config(base_url="http://llm/v1", model=DEFAULT_MODEL, client=mock_client(handler))
+    msgs = [{"role": "user", "content": "hi"}]
+    chat(cfg, msgs)
+    assert msgs == [{"role": "user", "content": "hi"}]
+
+
+def test_fallback_is_remembered_per_base_url(good_draft_dict):
+    handler = schema_rejecting_handler(draft_json(good_draft_dict))
+    cfg = Config(base_url="http://llm/v1", model=DEFAULT_MODEL, client=mock_client(handler))
+    chat(cfg, [{"role": "user", "content": "one"}])
+    chat(cfg, [{"role": "user", "content": "two"}])
+    formats = [(b.get("response_format") or {}).get("type") for b in handler.chat_bodies]
+    assert formats == ["json_schema", "json_object", "json_object"]
+
+
+def test_no_fallback_when_use_schema_false(good_draft_dict):
+    handler = schema_rejecting_handler(draft_json(good_draft_dict))
+    cfg = Config(base_url="http://llm/v1", model=DEFAULT_MODEL, client=mock_client(handler))
+    chat(cfg, [{"role": "user", "content": "hi"}], use_schema=False)
+    assert len(handler.chat_bodies) == 1
+    assert "response_format" not in handler.chat_bodies[0]
+
+
+def test_400_on_retry_raises(good_draft_dict):
+    handler = schema_rejecting_handler(draft_json(good_draft_dict), always=True)
+    cfg = Config(base_url="http://llm/v1", model=DEFAULT_MODEL, client=mock_client(handler))
+    with pytest.raises(LLMError, match="400"):
+        chat(cfg, [{"role": "user", "content": "hi"}])
+    assert len(handler.chat_bodies) == 2
+
+
+def test_non_400_does_not_retry(good_draft_dict):
+    handler = schema_rejecting_handler(draft_json(good_draft_dict),
+                                       reject_status=500, always=True)
+    cfg = Config(base_url="http://llm/v1", model=DEFAULT_MODEL, client=mock_client(handler))
+    with pytest.raises(LLMError, match="500"):
+        chat(cfg, [{"role": "user", "content": "hi"}])
+    assert len(handler.chat_bodies) == 1
 
 
 def test_second_attempt_is_lenient(scan, good_draft_dict):

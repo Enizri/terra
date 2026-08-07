@@ -1,5 +1,7 @@
 """OpenAI-compatible Chat Completions client."""
 
+import json
+
 import httpx
 
 from ..schema import DRAFT_SCHEMA
@@ -45,8 +47,13 @@ def preflight(cfg: Config) -> None:
     )
 
 
-def chat(cfg: Config, msgs: list[dict], *, use_schema: bool = True) -> str:
-    """POST /v1/chat/completions. Returns assistant message content."""
+# Base URLs whose provider rejected response_format json_schema with a 400;
+# they skip straight to the json_object fallback on later calls.
+_schema_unsupported: set[str] = set()
+
+
+def _body(cfg: Config, msgs: list[dict], mode: str) -> dict:
+    """mode: "schema" | "json_object" | "none". Never mutates msgs."""
     body: dict = {
         "model": cfg.model,
         "messages": msgs,
@@ -54,7 +61,7 @@ def chat(cfg: Config, msgs: list[dict], *, use_schema: bool = True) -> str:
         "temperature": 0,
         "max_tokens": MAX_OUTPUT_TOKENS,
     }
-    if use_schema:
+    if mode == "schema":
         body["response_format"] = {
             "type": "json_schema",
             "json_schema": {
@@ -63,11 +70,36 @@ def chat(cfg: Config, msgs: list[dict], *, use_schema: bool = True) -> str:
                 "schema": DRAFT_SCHEMA,
             },
         }
+    elif mode == "json_object":
+        body["response_format"] = {"type": "json_object"}
+        body["messages"] = msgs + [{
+            "role": "system",
+            "content": "Reply with one JSON object matching exactly this JSON Schema "
+                       "and nothing else:\n" + json.dumps(DRAFT_SCHEMA),
+        }]
+    return body
 
+
+def _post(cfg: Config, body: dict) -> httpx.Response:
     try:
-        resp = cfg.client.post(cfg.base_url + "/chat/completions", json=body)
+        return cfg.client.post(cfg.base_url + "/chat/completions", json=body)
     except httpx.HTTPError as e:
         raise LLMError(f"chat: {e}") from e
+
+
+def chat(cfg: Config, msgs: list[dict], *, use_schema: bool = True) -> str:
+    """POST /v1/chat/completions. Returns assistant message content."""
+    mode = "schema" if use_schema else "none"
+    if mode == "schema" and cfg.base_url in _schema_unsupported:
+        mode = "json_object"
+
+    resp = _post(cfg, _body(cfg, msgs, mode))
+    if resp.status_code == 400 and mode == "schema":
+        # Provider rejects strict json_schema: retry once with json_object
+        # and the schema embedded in the prompt; validation downstream is
+        # unchanged and still gates the result.
+        _schema_unsupported.add(cfg.base_url)
+        resp = _post(cfg, _body(cfg, msgs, "json_object"))
     if resp.status_code != 200:
         raise LLMError(f"chat: {resp.status_code}: {resp.text.strip()}")
     try:

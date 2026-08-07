@@ -77,5 +77,40 @@ def openai_handler(draft_json: str, model: str = DEFAULT_MODEL):
     return handle
 
 
+def schema_rejecting_handler(draft_json: str, model: str = DEFAULT_MODEL,
+                             reject_status: int = 400, always: bool = False):
+    """Like openai_handler, but 400s any chat body using json_schema.
+
+    Records every chat/completions body on handle.chat_bodies.
+    always=True rejects the json_object fallback too.
+    """
+    def handle(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v1/models":
+            return httpx.Response(200, json={"data": [{"id": model}]})
+        if request.url.path == "/v1/chat/completions":
+            body = json.loads(request.content)
+            handle.chat_bodies.append(body)
+            fmt = (body.get("response_format") or {}).get("type")
+            if always or fmt == "json_schema":
+                return httpx.Response(reject_status, json={
+                    "error": {"message": "response_format.type json_schema is not supported"},
+                })
+            return httpx.Response(200, json={
+                "choices": [{"message": {"role": "assistant", "content": draft_json},
+                             "finish_reason": "stop"}],
+            })
+        return httpx.Response(404)
+    handle.chat_bodies = []
+    return handle
+
+
+@pytest.fixture(autouse=True)
+def _clear_schema_fallback_cache():
+    from terra_analyzer.inference import client
+
+    client._schema_unsupported.clear()
+    yield
+
+
 def draft_json(payload: dict) -> str:
     return json.dumps(payload)
