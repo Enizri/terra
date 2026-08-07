@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"github.com/Enizri/terra/internal/graph"
+	"github.com/Enizri/terra/internal/preview"
 	"github.com/Enizri/terra/internal/scan"
 	"github.com/Enizri/terra/internal/trace"
 )
@@ -298,6 +300,189 @@ func TestRootJSONWithoutWebURL(t *testing.T) {
 	}
 }
 
+func TestHealthz(t *testing.T) {
+	_, ts := testServer(t)
+	resp, err := http.Get(ts.URL + "/healthz")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+	var body map[string]string
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if body["service"] != "terra" || body["status"] != "ok" {
+		t.Fatalf("body = %v", body)
+	}
+}
+
+func TestTokenGate(t *testing.T) {
+	t.Setenv("TERRA_TOKEN", "test-secret")
+	_, ts := testServer(t)
+
+	resp := postAnalyze(t, ts, `{"repo_url":"https://github.com/acme/notes"}`)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("no token: status = %d, want 401", resp.StatusCode)
+	}
+
+	req, err := http.NewRequest("POST", ts.URL+"/analyze",
+		strings.NewReader(`{"repo_url":"https://github.com/acme/notes"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer test-secret")
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != 200 {
+		t.Fatalf("bearer: status = %d, want 200", resp.StatusCode)
+	}
+
+	req, err = http.NewRequest("POST", ts.URL+"/jobs/analyze",
+		strings.NewReader(`{"repo_url":"https://github.com/acme/notes"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Terra-Token", "test-secret")
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != 200 {
+		t.Fatalf("x-terra-token: status = %d, want 200", resp.StatusCode)
+	}
+
+	resp, err = http.Get(ts.URL + "/healthz")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != 200 {
+		t.Fatalf("healthz must stay open: status = %d", resp.StatusCode)
+	}
+}
+
+// EventSource cannot send Authorization; GET /traces accepts ?token= as fallback.
+func TestTokenGateQueryParamSSE(t *testing.T) {
+	t.Setenv("TERRA_TOKEN", "test-secret")
+	_, ts := testServer(t)
+
+	resp, err := http.Get(ts.URL + "/traces?repo_url=github.com/acme/x")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("no token: status = %d, want 401", resp.StatusCode)
+	}
+
+	resp, err = http.Get(ts.URL + "/traces?repo_url=github.com/acme/x&token=wrong")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("wrong token: status = %d, want 401", resp.StatusCode)
+	}
+
+	resp, err = http.Get(ts.URL + "/traces?repo_url=github.com/acme/x&token=test-secret")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		t.Fatalf("query token: status = %d, want 200", resp.StatusCode)
+	}
+	if ct := resp.Header.Get("Content-Type"); ct != "text/event-stream" {
+		t.Fatalf("content-type = %q", ct)
+	}
+
+	// Query token must not unlock POSTs (headers required).
+	req, err := http.NewRequest("POST", ts.URL+"/preview?token=test-secret",
+		strings.NewReader(`{"repo_url":"https://github.com/acme/notes"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("POST with query token: status = %d, want 401", resp.StatusCode)
+	}
+}
+
+func TestStaticSPA(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte("<html>terra</html>"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "assets"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "assets", "app.js"), []byte("console.log(1)"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	s := &Server{StaticDir: dir, DB: filepath.Join(t.TempDir(), "terra.db")}
+	ts := httptest.NewServer(s.Handler())
+	t.Cleanup(ts.Close)
+
+	resp, err := http.Get(ts.URL + "/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != 200 || !strings.Contains(string(body), "terra") {
+		t.Fatalf("GET /: status=%d body=%q", resp.StatusCode, body)
+	}
+
+	resp, err = http.Get(ts.URL + "/new/s/abc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ = io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != 200 || !strings.Contains(string(body), "terra") {
+		t.Fatalf("SPA fallback: status=%d body=%q", resp.StatusCode, body)
+	}
+
+	resp, err = http.Get(ts.URL + "/assets/app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ = io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != 200 || string(body) != "console.log(1)" {
+		t.Fatalf("asset: status=%d body=%q", resp.StatusCode, body)
+	}
+
+	resp, err = http.Get(ts.URL + "/healthz")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var hz map[string]string
+	if err := json.NewDecoder(resp.Body).Decode(&hz); err != nil {
+		t.Fatal(err)
+	}
+	if hz["status"] != "ok" {
+		t.Fatalf("healthz overridden by static: %v", hz)
+	}
+}
+
 func TestGetUnknownIDIs404(t *testing.T) {
 	_, ts := testServer(t)
 	resp, err := http.Get(ts.URL + "/analyses/999")
@@ -322,7 +507,8 @@ func TestSnippetFallsBackToExistingCheckout(t *testing.T) {
 	t.Setenv("XDG_CACHE_HOME", filepath.Join(home, "cache"))
 
 	const repo = "github.com/usememos/memos"
-	if got := snippet(repo, "main.go", 0); got != "" {
+	r := preview.Host()
+	if got := snippet(r, repo, "main.go", 0); got != "" {
 		t.Errorf("no preview and no checkout: snippet = %q, want empty", got)
 	}
 
@@ -336,14 +522,42 @@ func TestSnippetFallsBackToExistingCheckout(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if got := snippet(repo, "main.go", 0); !strings.Contains(got, "package main") {
+	if got := snippet(r, repo, "main.go", 0); !strings.Contains(got, "package main") {
 		t.Errorf("existing checkout: snippet = %q, want the file's contents", got)
 	}
-	if got := snippet(repo, "../outside.go", 0); got != "" {
+	if got := snippet(r, repo, "../outside.go", 0); got != "" {
 		t.Errorf("traversal: snippet = %q, want empty", got)
 	}
-	if got := snippet("not a repo url", "main.go", 0); got != "" {
+	if got := snippet(r, "not a repo url", "main.go", 0); got != "" {
 		t.Errorf("bad url: snippet = %q, want empty", got)
+	}
+}
+
+type stubPreview struct {
+	startErr error
+	url      string
+}
+
+func (s stubPreview) Start(string) (string, error) { return s.url, s.startErr }
+func (stubPreview) Lookup(string) (string, string, bool) { return "", "", false }
+func (stubPreview) StopAll()                             {}
+
+func TestPreviewUsesServerRunner(t *testing.T) {
+	s, ts := testServer(t)
+	s.Preview = stubPreview{startErr: fmt.Errorf("docker preview runner not implemented yet")}
+
+	resp, err := http.Post(ts.URL+"/preview", "application/json",
+		strings.NewReader(`{"repo_url":"https://github.com/acme/notes"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadGateway {
+		t.Fatalf("status = %d, want 502", resp.StatusCode)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	if !strings.Contains(string(body), "not implemented") {
+		t.Fatalf("body = %s", body)
 	}
 }
 

@@ -61,6 +61,19 @@ func TestScanStreamsTarballWithoutGit(t *testing.T) {
 	}
 }
 
+func TestCheckoutDirUsesOverride(t *testing.T) {
+	base := t.TempDir()
+	t.Setenv("TERRA_CHECKOUT_DIR", base)
+	dir, err := CheckoutDir("https://github.com/acme/notes")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Join(base, "acme-notes")
+	if dir != want {
+		t.Fatalf("CheckoutDir = %q, want %q", dir, want)
+	}
+}
+
 func TestResolveCommitReportsAPIFailure(t *testing.T) {
 	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "rate limit exceeded", http.StatusForbidden)

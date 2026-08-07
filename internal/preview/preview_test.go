@@ -162,6 +162,7 @@ func TestTerraPort(t *testing.T) {
 func TestTraceEnvArmsTheHook(t *testing.T) {
 	t.Setenv("TERRA_ADDR", ":9999")
 	t.Setenv("NODE_OPTIONS", "")
+	t.Setenv("TERRA_TOKEN", "")
 	env := traceEnv("https://github.com/acme/notes")
 	if len(env) != 3 {
 		t.Fatalf("env = %v", env)

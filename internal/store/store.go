@@ -41,6 +41,27 @@ CREATE TABLE IF NOT EXISTS relationships (
 	because_json TEXT
 );`
 
+// open opens dbPath with WAL + busy_timeout and ensures the schema exists.
+func open(dbPath string) (*sql.DB, error) {
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := db.Exec(`PRAGMA journal_mode=WAL`); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("enable WAL: %w", err)
+	}
+	if _, err := db.Exec(`PRAGMA busy_timeout=5000`); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("set busy_timeout: %w", err)
+	}
+	if _, err := db.Exec(schema); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("create schema: %w", err)
+	}
+	return db, nil
+}
+
 // Save writes the map to dbPath, replacing whatever was stored for the same
 // repository URL.
 func Save(dbPath string, res *scan.Result, repoMap *graph.Map) error {
@@ -48,14 +69,11 @@ func Save(dbPath string, res *scan.Result, repoMap *graph.Map) error {
 	if err != nil {
 		return err
 	}
-	db, err := sql.Open("sqlite", dbPath)
+	db, err := open(dbPath)
 	if err != nil {
 		return err
 	}
 	defer db.Close()
-	if _, err := db.Exec(schema); err != nil {
-		return fmt.Errorf("create schema: %w", err)
-	}
 
 	tx, err := db.Begin()
 	if err != nil {
@@ -116,14 +134,11 @@ type Summary struct {
 
 // List returns every stored analysis, newest first.
 func List(dbPath string) ([]Summary, error) {
-	db, err := sql.Open("sqlite", dbPath)
+	db, err := open(dbPath)
 	if err != nil {
 		return nil, err
 	}
 	defer db.Close()
-	if _, err := db.Exec(schema); err != nil {
-		return nil, fmt.Errorf("create schema: %w", err)
-	}
 
 	rows, err := db.Query(`SELECT id, repo_url, name, scanned_at FROM projects ORDER BY scanned_at DESC`)
 	if err != nil {
@@ -145,14 +160,11 @@ func List(dbPath string) ([]Summary, error) {
 // Get returns the stored map for one analysis, or (nil, nil) when the id is
 // not in the database.
 func Get(dbPath string, id int64) (*graph.Map, error) {
-	db, err := sql.Open("sqlite", dbPath)
+	db, err := open(dbPath)
 	if err != nil {
 		return nil, err
 	}
 	defer db.Close()
-	if _, err := db.Exec(schema); err != nil {
-		return nil, fmt.Errorf("create schema: %w", err)
-	}
 
 	var mapJSON string
 	err = db.QueryRow(`SELECT map_json FROM projects WHERE id = ?`, id).Scan(&mapJSON)
@@ -173,14 +185,11 @@ func Get(dbPath string, id int64) (*graph.Map, error) {
 // ("", nil, nil) when the repo has never been analyzed. This is the cache
 // lookup that lets a repeat analysis of an unchanged repo skip the analyzer.
 func Find(dbPath, repoURL string) (commit string, repoMap *graph.Map, err error) {
-	db, err := sql.Open("sqlite", dbPath)
+	db, err := open(dbPath)
 	if err != nil {
 		return "", nil, err
 	}
 	defer db.Close()
-	if _, err := db.Exec(schema); err != nil {
-		return "", nil, fmt.Errorf("create schema: %w", err)
-	}
 
 	var mapJSON string
 	err = db.QueryRow(`SELECT commit_hash, map_json FROM projects WHERE repo_url = ?`, repoURL).Scan(&commit, &mapJSON)

@@ -1,0 +1,63 @@
+package preview
+
+import (
+	"strings"
+	"testing"
+)
+
+func TestDefaultRunnerHostModes(t *testing.T) {
+	for _, mode := range []string{"", "host", "HOST", " Host "} {
+		t.Setenv("TERRA_PREVIEW_MODE", mode)
+		if got := Default(); got != Host() {
+			t.Errorf("TERRA_PREVIEW_MODE=%q: Default() = %T, want host", mode, got)
+		}
+	}
+}
+
+func TestDefaultRunnerDockerConstructs(t *testing.T) {
+	t.Setenv("TERRA_PREVIEW_MODE", "docker")
+	r := Default()
+	if r != Docker() {
+		t.Fatalf("Default() = %T, want Docker()", r)
+	}
+	if _, _, ok := r.Lookup("https://github.com/acme/notes"); ok {
+		t.Fatal("Lookup should miss when nothing is running")
+	}
+
+	t.Setenv("TERRA_PREVIEW_MAX", "0")
+	_, err := r.Start("https://github.com/acme/notes")
+	if err == nil || !strings.Contains(err.Error(), "capacity full") {
+		t.Fatalf("max=0 err = %v, want capacity full", err)
+	}
+}
+
+func TestDockerRunnerMissingBinary(t *testing.T) {
+	t.Setenv("TERRA_PREVIEW_MODE", "docker")
+	t.Setenv("TERRA_PREVIEW_MAX", "2")
+	t.Setenv("TERRA_DOCKER", "/nonexistent-terra-docker")
+	t.Setenv("TERRA_PREVIEW_TTL", "1h")
+
+	// Fresh runner state: StopAll clears any prior test residue.
+	Docker().StopAll()
+	_, err := Docker().Start("https://github.com/acme/notes")
+	if err == nil || !strings.Contains(err.Error(), "not found") {
+		t.Fatalf("err = %v, want docker binary not found", err)
+	}
+}
+
+func TestDefaultRunnerUnknownMode(t *testing.T) {
+	t.Setenv("TERRA_PREVIEW_MODE", "firecracker")
+	_, err := Default().Start("https://github.com/acme/notes")
+	if err == nil || !strings.Contains(err.Error(), "unknown TERRA_PREVIEW_MODE") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestPackageWrappersUseDefault(t *testing.T) {
+	t.Setenv("TERRA_PREVIEW_MODE", "docker")
+	t.Setenv("TERRA_PREVIEW_MAX", "0")
+	_, err := Start("https://github.com/acme/notes")
+	if err == nil || !strings.Contains(err.Error(), "capacity full") {
+		t.Fatalf("Start wrapper err = %v", err)
+	}
+}

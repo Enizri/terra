@@ -29,6 +29,47 @@ def test_config_normalizes_bare_url_to_v1():
     assert cfg.base_url == "http://llm:8020/v1"
 
 
+def test_config_sends_authorization_when_api_key_set(monkeypatch):
+    monkeypatch.setenv("TERRA_LLM_API_KEY", "sk-test-key")
+    seen: list[str | None] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        seen.append(request.headers.get("Authorization"))
+        return httpx.Response(200, json={"data": []})
+
+    real_client = httpx.Client
+
+    def client_factory(*args, **kwargs):
+        kwargs.setdefault("transport", httpx.MockTransport(handle))
+        return real_client(*args, **kwargs)
+
+    monkeypatch.setattr("terra_analyzer.inference.config.httpx.Client", client_factory)
+    cfg = Config(base_url="http://llm/v1", model="m")
+    assert cfg.client.get("http://llm/v1/models").status_code == 200
+    assert seen == ["Bearer sk-test-key"]
+
+
+def test_config_omits_authorization_when_api_key_unset(monkeypatch):
+    monkeypatch.delenv("TERRA_LLM_API_KEY", raising=False)
+    monkeypatch.setenv("TERRA_LLM_API_KEY", "")  # empty string also means no auth
+    seen: list[str | None] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        seen.append(request.headers.get("Authorization"))
+        return httpx.Response(200, json={"data": []})
+
+    real_client = httpx.Client
+
+    def client_factory(*args, **kwargs):
+        kwargs.setdefault("transport", httpx.MockTransport(handle))
+        return real_client(*args, **kwargs)
+
+    monkeypatch.setattr("terra_analyzer.inference.config.httpx.Client", client_factory)
+    cfg = Config(base_url="http://llm/v1", model="m")
+    assert cfg.client.get("http://llm/v1/models").status_code == 200
+    assert seen == [None]
+
+
 def test_retry_once_on_validation_errors(scan, good_draft_dict):
     bad = json.loads(json.dumps(good_draft_dict))
     bad["components"][0]["files"] = ["made/up.go"]

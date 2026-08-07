@@ -23,12 +23,23 @@ import (
 
 type Server struct {
 	DB string
+	// StaticDir, when set, serves the built web UI (SPA) for non-API GET paths.
+	StaticDir string
+	// Preview boots live previews; nil uses preview.Default() (host unless TERRA_PREVIEW_MODE).
+	Preview preview.Runner
 	// Jobs is nil until Handler creates a hub.
 	Jobs *job.Hub
 	// Optional stubs for tests; nil uses production implementations.
 	Scan    func(url string) (*scan.Result, error)
 	Analyze func(res *scan.Result, model string) (*graph.Map, []string, error)
 	RunTask func(name string, payload any) (json.RawMessage, error)
+}
+
+func (s *Server) previewRunner() preview.Runner {
+	if s.Preview != nil {
+		return s.Preview
+	}
+	return preview.Default()
 }
 
 func (s *Server) Handler() http.Handler {
@@ -46,6 +57,7 @@ func (s *Server) Handler() http.Handler {
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", s.root)
+	mux.HandleFunc("GET /healthz", s.healthz)
 	mux.HandleFunc("POST /analyze", s.analyze)
 	mux.HandleFunc("POST /jobs/analyze", s.enqueueAnalyze)
 	mux.HandleFunc("POST /jobs/ask", s.enqueueAsk)
@@ -58,12 +70,32 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /files", s.files)
 	mux.HandleFunc("GET /traces", s.traces)
 	mux.HandleFunc("POST /traces/ingest", s.ingest)
-	return mux
+	if s.StaticDir != "" {
+		mux.HandleFunc("GET /{path...}", s.static)
+	}
+	gated := withToken(mux)
+	// Path-based live previews (Compose iframes). Outside the mux so it does not
+	// conflict with GET /{path...}; left open — starting a preview is gated at POST /preview.
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/__live/") {
+			preview.LiveHandler().ServeHTTP(w, r)
+			return
+		}
+		gated.ServeHTTP(w, r)
+	})
 }
 
-// root sends browsers to the web UI when TERRA_WEB_URL is set (make dev);
-// otherwise returns a small JSON liveness payload.
+func (s *Server) healthz(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, map[string]string{"service": "terra", "status": "ok"})
+}
+
+// root serves the SPA index when StaticDir is set; otherwise redirects to
+// TERRA_WEB_URL (make dev) or returns a small JSON liveness payload.
 func (s *Server) root(w http.ResponseWriter, r *http.Request) {
+	if s.StaticDir != "" {
+		http.ServeFile(w, r, filepath.Join(s.StaticDir, "index.html"))
+		return
+	}
 	if u := strings.TrimSpace(os.Getenv("TERRA_WEB_URL")); u != "" {
 		http.Redirect(w, r, u, http.StatusFound)
 		return
@@ -262,7 +294,7 @@ func (s *Server) preview(w http.ResponseWriter, r *http.Request) {
 		httpError(w, http.StatusBadRequest, `body must be {"repo_url": "github.com/user/project"}`)
 		return
 	}
-	url, err := preview.Start(req.RepoURL)
+	url, err := s.previewRunner().Start(req.RepoURL)
 	if err != nil {
 		httpError(w, http.StatusBadGateway, err.Error())
 		return
@@ -357,7 +389,7 @@ func (s *Server) askPayload(req askRequest) map[string]any {
 		if l, ok := primary["line"].(float64); ok {
 			line = int(l)
 		}
-		if snip := snippet(req.RepoURL, file, line); snip != "" {
+		if snip := snippet(s.previewRunner(), req.RepoURL, file, line); snip != "" {
 			payload["file_snippet"] = snip
 		}
 	}
@@ -376,7 +408,7 @@ func (s *Server) files(w http.ResponseWriter, r *http.Request) {
 		httpError(w, http.StatusBadRequest, "repo_url is required")
 		return
 	}
-	_, appDir, ok := preview.Lookup(repoURL)
+	_, appDir, ok := s.previewRunner().Lookup(repoURL)
 	if !ok {
 		writeJSON(w, map[string]any{"starting": true})
 		return
@@ -539,11 +571,11 @@ func safeJoin(base, rel string) (full, clean string, err error) {
 }
 
 // snippet returns ~150 lines centered on line from an existing checkout.
-func snippet(repoURL, file string, line int) string {
+func snippet(r preview.Runner, repoURL, file string, line int) string {
 	if strings.Contains(file, "..") {
 		return ""
 	}
-	root, appDir, ok := preview.Lookup(repoURL)
+	root, appDir, ok := r.Lookup(repoURL)
 	if !ok {
 		dir, err := scan.CheckoutDir(repoURL)
 		if err != nil {

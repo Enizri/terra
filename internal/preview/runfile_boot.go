@@ -16,8 +16,8 @@ import (
 
 // startViaRunfile boots a repo with no frontend from its inferred Runfile —
 // a plain Go or Python service gets proxied (with select.js injected) just
-// like a dev server would. Caller holds mu.
-func startViaRunfile(key, root string, detectErr error) (string, error) {
+// like a dev server would. Caller holds r.mu.
+func (r *hostRunner) startViaRunfile(key, root string, detectErr error) (string, error) {
 	rf, err := runfile.For(root, scan.CheckoutCommit(root))
 	if err != nil {
 		return "", fmt.Errorf("%v; and no runfile evidence either", detectErr)
@@ -61,12 +61,12 @@ func startViaRunfile(key, root string, detectErr error) (string, error) {
 		stop(cmd)
 		return "", fmt.Errorf("runfile service never came up: %v\n--- output ---\n%s", err, logs.String())
 	}
-	proxyURL, err := serveProxy(key, bound, false)
+	proxyURL, err := serveProxy(key, "http://localhost:"+strconv.Itoa(bound), false)
 	if err != nil {
 		stop(cmd)
 		return "", err
 	}
-	byRepo[key] = &instance{root: root, appDir: root, cmd: cmd, devPort: bound, proxyURL: proxyURL}
+	r.byRepo[key] = &instance{root: root, appDir: root, cmd: cmd, devPort: bound, proxyURL: proxyURL}
 	return proxyURL, nil
 }
 

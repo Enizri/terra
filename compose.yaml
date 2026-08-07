@@ -1,0 +1,114 @@
+# Terra production-shaped local playground.
+# Publish only the API on loopback; analyzer/llm stay on the Compose network.
+#
+# Hosted LLM (default):
+#   cp .env.example .env   # set TERRA_TOKEN, TERRA_LLM_URL, TERRA_LLM_API_KEY, TERRA_MODEL
+#   make up
+#
+# Local HF LLM (optional profile):
+#   set TERRA_LLM_URL=http://llm:8020/v1 in .env (and usually clear TERRA_LLM_API_KEY)
+#   make up-llm
+#
+# Live preview (Phase 1b): api mounts the host Docker socket and starts sibling
+# containers; iframes hit http://127.0.0.1:8080/__live/{id}/.
+
+networks:
+  default:
+    name: terra-net
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    ports:
+      - "127.0.0.1:8080:8080"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      TERRA_ANALYZER_URL: http://analyzer:8010
+      TERRA_TOKEN: ${TERRA_TOKEN:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      TERRA_PREVIEW_MODE: docker
+      TERRA_CHECKOUT_DIR: /data/checkouts
+      # Fixed volume name so sibling preview containers can -v terra-data:/data
+      # (Docker Desktop cannot remount API-container paths from the socket).
+      TERRA_CHECKOUT_VOLUME: terra-data
+      TERRA_PUBLIC_URL: http://127.0.0.1:8080
+      TERRA_TRACE_HOST: host.docker.internal
+      TERRA_PREVIEW_NETWORK: terra-net
+      TERRA_ADDR: 0.0.0.0:8080
+    volumes:
+      - terra-data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      analyzer:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+
+  analyzer:
+    build:
+      context: .
+      dockerfile: Dockerfile.analyzer
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # Prefer .env; compose default matches local llm profile hostname.
+      # For hosted providers, set TERRA_LLM_URL (and TERRA_LLM_API_KEY) in .env.
+      TERRA_LLM_URL: ${TERRA_LLM_URL:-http://llm:8020/v1}
+      TERRA_LLM_API_KEY: ${TERRA_LLM_API_KEY:-}
+      TERRA_MODEL: ${TERRA_MODEL:-Qwen/Qwen2.5-0.5B-Instruct}
+    # Not published to the host — only reachable as http://analyzer:8010 on the Compose network.
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8010/healthz')",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+
+  llm:
+    profiles: [llm]
+    build:
+      context: .
+      dockerfile: Dockerfile.llm
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      TERRA_MODEL: ${TERRA_MODEL:-Qwen/Qwen2.5-0.5B-Instruct}
+      TERRA_DEVICE: ${TERRA_DEVICE:-cpu}
+    # Not published to the host — analyzer uses http://llm:8020/v1.
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8020/healthz')",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 600s
+    restart: unless-stopped
+
+volumes:
+  terra-data:
+    name: terra-data
