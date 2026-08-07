@@ -427,6 +427,8 @@
   color: #e8400d;
   font-size: 14px;
   text-align: center;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
 }
 
 /* ---- result: the map fills the stage, everything else is a strip on top ---- */

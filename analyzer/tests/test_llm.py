@@ -173,6 +173,58 @@ def test_non_400_does_not_retry(good_draft_dict):
     assert len(handler.chat_bodies) == 1
 
 
+def _erroring_client(response_or_exc):
+    def handle(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v1/models":
+            return httpx.Response(200, json={"data": [{"id": DEFAULT_MODEL}]})
+        if isinstance(response_or_exc, Exception):
+            raise response_or_exc
+        return response_or_exc
+    return mock_client(handle)
+
+
+@pytest.mark.parametrize("resp,wants", [
+    (httpx.Response(429, text="slow down"),
+     ["llm provider 429", "http://llm/v1"]),
+    (httpx.Response(502, json={"error": {"message": "upstream broke"}}),
+     ["llm provider 502", "upstream broke"]),
+])
+def test_provider_errors_are_descriptive(resp, wants):
+    cfg = Config(base_url="http://llm/v1", model=DEFAULT_MODEL, client=_erroring_client(resp))
+    with pytest.raises(LLMError) as excinfo:
+        chat(cfg, [{"role": "user", "content": "hi"}], use_schema=False)
+    for want in wants:
+        assert want in str(excinfo.value)
+
+
+def test_read_timeout_mentions_knob(monkeypatch):
+    monkeypatch.setenv("TERRA_LLM_TIMEOUT", "30")
+    cfg = Config(base_url="http://llm/v1", model=DEFAULT_MODEL,
+                 client=_erroring_client(httpx.ReadTimeout("slow")))
+    with pytest.raises(LLMError) as excinfo:
+        chat(cfg, [{"role": "user", "content": "hi"}], use_schema=False)
+    assert "timed out after 30s" in str(excinfo.value)
+    assert "TERRA_LLM_TIMEOUT" in str(excinfo.value)
+
+
+def test_provider_error_does_not_leak_api_key(monkeypatch):
+    monkeypatch.setenv("TERRA_LLM_API_KEY", "sk-super-secret")
+    resp = httpx.Response(401, json={"error": {"message": "Incorrect API key provided"}})
+    cfg = Config(base_url="http://llm/v1", model=DEFAULT_MODEL, client=_erroring_client(resp))
+    with pytest.raises(LLMError) as excinfo:
+        chat(cfg, [{"role": "user", "content": "hi"}], use_schema=False)
+    assert "sk-super-secret" not in str(excinfo.value)
+    assert "llm provider 401" in str(excinfo.value)
+
+
+def test_provider_error_truncated_to_400_chars():
+    resp = httpx.Response(400, json={"error": {"message": "x" * 5000}})
+    cfg = Config(base_url="http://llm/v1", model=DEFAULT_MODEL, client=_erroring_client(resp))
+    with pytest.raises(LLMError) as excinfo:
+        chat(cfg, [{"role": "user", "content": "hi"}], use_schema=False)
+    assert len(str(excinfo.value)) < 600
+
+
 def test_second_attempt_is_lenient(scan, good_draft_dict):
     bad = json.loads(json.dumps(good_draft_dict))
     bad["components"][0]["files"] = ["made/up.go", "web/"]

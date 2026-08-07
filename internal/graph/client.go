@@ -19,6 +19,9 @@ const DefaultAnalyzerURL = "http://localhost:8010"
 
 var client = &http.Client{Timeout: 20 * time.Minute}
 
+// probeClient keeps a dead analyzer from costing the full request timeout.
+var probeClient = &http.Client{Timeout: 5 * time.Second}
+
 // draft is the analyzer response (judgement fields only).
 type draft struct {
 	Description        string         `json:"description"`
@@ -110,7 +113,7 @@ func RunTask(name string, payload any) (json.RawMessage, error) {
 
 // preflight checks analyzer /healthz before a long request.
 func preflight(base string) error {
-	resp, err := client.Get(base + "/healthz")
+	resp, err := probeClient.Get(base + "/healthz")
 	if err != nil {
 		return fmt.Errorf("cannot reach the analyzer service at %s: %w\nstart it with `make run-analyzer`, or set TERRA_ANALYZER_URL", base, err)
 	}

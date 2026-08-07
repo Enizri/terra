@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Enizri/terra/internal/scan"
 )
@@ -111,8 +112,12 @@ func TestAnalyzePropagates502Detail(t *testing.T) {
 func TestAnalyzeWhenServiceIsDown(t *testing.T) {
 	t.Setenv("TERRA_ANALYZER_URL", "http://127.0.0.1:1")
 
+	start := time.Now()
 	_, _, err := Analyze(testScan(), "")
 	if err == nil || !strings.Contains(err.Error(), "TERRA_ANALYZER_URL") {
 		t.Fatalf("err = %v, want a hint mentioning TERRA_ANALYZER_URL", err)
+	}
+	if elapsed := time.Since(start); elapsed > 2*time.Second {
+		t.Fatalf("dead analyzer took %s to fail; preflight should give up in ~5s, not hang", elapsed)
 	}
 }

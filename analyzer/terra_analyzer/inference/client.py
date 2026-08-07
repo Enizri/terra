@@ -80,9 +80,31 @@ def _body(cfg: Config, msgs: list[dict], mode: str) -> dict:
     return body
 
 
+def _provider_error(cfg: Config, resp: httpx.Response) -> LLMError:
+    """One dialect for provider failures: status, endpoint, model, message."""
+    msg = resp.text.strip()
+    try:
+        parsed = resp.json()
+        detail = (parsed.get("error") or {}).get("message")
+        if detail:
+            msg = str(detail)
+    except ValueError:
+        pass
+    return LLMError(
+        f"llm provider {resp.status_code} at {cfg.base_url} (model {cfg.model}): {msg[:400]}"
+    )
+
+
 def _post(cfg: Config, body: dict) -> httpx.Response:
     try:
         return cfg.client.post(cfg.base_url + "/chat/completions", json=body)
+    except httpx.ReadTimeout as e:
+        raise LLMError(
+            f"llm timed out after {cfg.read_timeout:.0f}s waiting for {cfg.model} at "
+            f"{cfg.base_url}; raise TERRA_LLM_TIMEOUT or use a faster model"
+        ) from e
+    except httpx.ConnectError as e:
+        raise LLMError(f"cannot connect to {cfg.base_url}: {e}") from e
     except httpx.HTTPError as e:
         raise LLMError(f"chat: {e}") from e
 
@@ -101,7 +123,7 @@ def chat(cfg: Config, msgs: list[dict], *, use_schema: bool = True) -> str:
         _schema_unsupported.add(cfg.base_url)
         resp = _post(cfg, _body(cfg, msgs, "json_object"))
     if resp.status_code != 200:
-        raise LLMError(f"chat: {resp.status_code}: {resp.text.strip()}")
+        raise _provider_error(cfg, resp)
     try:
         out = resp.json()
     except ValueError as e:
