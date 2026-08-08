@@ -11,7 +11,7 @@ func TestLiveCheckoutNoGit(t *testing.T) {
 	if os.Getenv("TERRA_LIVE") != "1" {
 		t.Skip("set TERRA_LIVE=1 for live GitHub checkout test")
 	}
-	dir, err := Checkout("github.com/octocat/Hello-World")
+	dir, err := Checkout("", "github.com/octocat/Hello-World")
 	if err != nil {
 		t.Fatal(err)
 	}

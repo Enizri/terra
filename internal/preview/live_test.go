@@ -9,8 +9,6 @@ import (
 )
 
 func TestMountPathProxyRoutesAndInjects(t *testing.T) {
-	t.Setenv("TERRA_PUBLIC_URL", "http://127.0.0.1:8080")
-
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/":
@@ -27,7 +25,7 @@ func TestMountPathProxyRoutesAndInjects(t *testing.T) {
 	id := "test-live-" + t.Name()
 	t.Cleanup(func() { UnmountPathProxy(id) })
 
-	publicURL, err := MountPathProxy(id, upstream.URL, "https://github.com/acme/notes", false)
+	publicURL, err := MountPathProxy("http://127.0.0.1:8080", id, upstream.URL, "https://github.com/acme/notes", false)
 	if err != nil {
 		t.Fatal(err)
 	}

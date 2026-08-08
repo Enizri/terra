@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
+
 	"strings"
 	"time"
 	"unicode"
@@ -32,9 +32,10 @@ type draft struct {
 	SuggestedQuestions []string       `json:"suggested_questions"`
 }
 
-// Analyze sends the scan to the analyzer and returns an assembled Map.
-func Analyze(ctx context.Context, res *scan.Result, model string) (*Map, []string, error) {
-	base := strings.TrimSuffix(os.Getenv("TERRA_ANALYZER_URL"), "/")
+// Analyze sends the scan to the analyzer at base (config.AnalyzerURL) and
+// returns an assembled Map.
+func Analyze(ctx context.Context, base string, res *scan.Result, model string) (*Map, []string, error) {
+	base = strings.TrimSuffix(base, "/")
 	if base == "" {
 		base = DefaultAnalyzerURL
 	}
@@ -78,9 +79,9 @@ func Analyze(ctx context.Context, res *scan.Result, model string) (*Map, []strin
 	return assemble(res, &out.Draft), out.Warnings, nil
 }
 
-// RunTask posts payload to /tasks/{name} and returns the JSON result.
-func RunTask(ctx context.Context, name string, payload any) (json.RawMessage, error) {
-	base := strings.TrimSuffix(os.Getenv("TERRA_ANALYZER_URL"), "/")
+// RunTask posts payload to /tasks/{name} at base and returns the JSON result.
+func RunTask(ctx context.Context, base, name string, payload any) (json.RawMessage, error) {
+	base = strings.TrimSuffix(base, "/")
 	if base == "" {
 		base = DefaultAnalyzerURL
 	}

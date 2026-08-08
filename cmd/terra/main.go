@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 
+	"github.com/Enizri/terra/internal/config"
 	"github.com/Enizri/terra/internal/graph"
 	"github.com/Enizri/terra/internal/preview"
 	"github.com/Enizri/terra/internal/scan"
@@ -68,7 +68,7 @@ func runMap(args []string) {
 	}
 	fmt.Fprintf(os.Stderr, "scanned %d source files, asking the analyzer for a map (this takes a minute)...\n", res.Stats.SourceFiles)
 
-	m, warnings, err := graph.Analyze(context.Background(), res, *model)
+	m, warnings, err := graph.Analyze(context.Background(), config.FromEnv().AnalyzerURL, res, *model)
 	if err != nil {
 		fail(err)
 	}
@@ -95,14 +95,14 @@ func runServe(args []string) {
 	static := fs.String("static", "", "directory of built web UI to serve (optional)")
 	fs.Parse(args)
 
-	if !server.LoopbackAddr(*addr) && strings.TrimSpace(os.Getenv("TERRA_TOKEN")) == "" {
+	cfg := config.FromEnv()
+	// The trace hook inside previewed apps posts back to this server; without
+	// this a non-default --addr silently loses all in-process spans.
+	cfg.Addr = *addr
+
+	if !server.LoopbackAddr(*addr) && cfg.Token == "" {
 		fail(fmt.Errorf("refusing to listen on %s with TERRA_TOKEN empty: set TERRA_TOKEN to a shared secret, or bind 127.0.0.1", *addr))
 	}
-
-	// The trace hook inside previewed apps posts back to this server;
-	// preview.terraPort reads TERRA_ADDR to build that URL. Without this a
-	// non-default --addr silently loses all in-process spans.
-	os.Setenv("TERRA_ADDR", *addr)
 
 	// Preview dev servers are child process groups; reap them on Ctrl-C.
 	sig := make(chan os.Signal, 1)
@@ -113,7 +113,7 @@ func runServe(args []string) {
 		os.Exit(0)
 	}()
 
-	if err := (&server.Server{DB: *db, StaticDir: *static}).ListenAndServe(*addr); err != nil {
+	if err := (&server.Server{DB: *db, StaticDir: *static, Cfg: cfg}).ListenAndServe(*addr); err != nil {
 		preview.StopAll()
 		fail(err)
 	}

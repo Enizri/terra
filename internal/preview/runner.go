@@ -2,8 +2,8 @@ package preview
 
 import (
 	"fmt"
-	"os"
-	"strings"
+
+	"github.com/Enizri/terra/internal/config"
 )
 
 // Runner boots and looks up live preview instances for a repository.
@@ -14,36 +14,35 @@ type Runner interface {
 	StopAll()
 }
 
-// Default returns the Runner selected by TERRA_PREVIEW_MODE.
+// Default returns the Runner selected by c.PreviewMode.
 // Empty or "host" → host-exec (make dev). "docker" → sibling containers.
-func Default() Runner {
-	mode := strings.ToLower(strings.TrimSpace(os.Getenv("TERRA_PREVIEW_MODE")))
-	switch mode {
+func Default(c *config.Config) Runner {
+	switch c.PreviewMode {
 	case "", "host":
-		return Host()
+		return Host(c)
 	case "docker":
-		return Docker()
+		return Docker(c)
 	default:
-		return invalidRunner{mode: mode}
+		return invalidRunner{mode: c.PreviewMode}
 	}
 }
 
 // host is the process-wide host-exec runner (shared preview state).
 var host = &hostRunner{byRepo: map[string]*instance{}}
 
-// Host returns the process-local host-exec preview runner.
-func Host() Runner { return host }
-
-// Start is a thin wrapper around Default().Start.
-func Start(repoURL string) (string, error) { return Default().Start(repoURL) }
-
-// Lookup is a thin wrapper around Default().Lookup.
-func Lookup(repoURL string) (root, appDir string, ok bool) {
-	return Default().Lookup(repoURL)
+// Host returns the process-local host-exec preview runner, configured with c.
+func Host(c *config.Config) Runner {
+	host.mu.Lock()
+	host.cfg = c
+	host.mu.Unlock()
+	return host
 }
 
-// StopAll is a thin wrapper around Default().StopAll.
-func StopAll() { Default().StopAll() }
+// StopAll kills every preview from both runners. Call on shutdown.
+func StopAll() {
+	host.StopAll()
+	dockerDefault.StopAll()
+}
 
 type invalidRunner struct{ mode string }
 
