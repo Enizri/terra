@@ -15,7 +15,9 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import HeroBackdrop from "../HeroBackdrop";
 import { rise, stagger } from "../../../shared/motion";
 import { copy, users } from "../data";
-import { ComponentTile, DropIcons, MacPointer, PENCIL_INK, RepoMapDiagram, WindowChrome } from "../primitives";
+import { ComponentTile, MacPointer, PENCIL_INK, WindowChrome } from "../primitives";
+import { WsDropCard } from "../../../shared/workspace/DropCard";
+import { HeroScriptedDemo } from "./HeroDemo";
 
 /** Lerp follower for scroll-driven flight; RAF only while catching up. */
 function useLerp(source: MotionValue<number>, factor = 0.1, frozen = false) {
@@ -550,39 +552,37 @@ export function Hero() {
         <LayoutGroup>
           <div className="sh-stage" ref={stageRef}>
             <motion.div className="sh-window-wrap" variants={rise}>
-              <WindowChrome toolbar={false}>
-                <AnimatePresence mode="popLayout" initial={false}>
-                  {!filesDropped ? (
-                    <motion.div
-                      key="drop"
-                      className="sh-drop"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.25, ease: "easeOut" }}
-                    >
-                      <DropIcons />
-                      <div className="sh-drop__label">Paste a repo URL</div>
-                    </motion.div>
-                  ) : (
-                    <motion.div
-                      key="folders"
-                      className="sh-window-body"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.3, ease: "easeOut" }}
-                    >
-                      <RepoMapDiagram receiveLayout hoverOnly />
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </WindowChrome>
+              {/* Same scenic wallpaper frame as the Power of Terra card. */}
+              <div className="sh-power-theater sh-hero-theater">
+                <img
+                  className="sh-power-theater__wallpaper"
+                  src="/images/theater/power-wallpaper.jpg"
+                  alt=""
+                  aria-hidden
+                  draggable={false}
+                />
+                <div className="sh-power-theater__screen">
+                  {/* Small static drop window pre-drop; the box expands into
+                      the full workspace film once the GitHub card lands. */}
+                  <div className={`sh-hero-screen${filesDropped ? " is-expanded" : ""}`}>
+                    <WindowChrome toolbar={false}>
+                      <div className="sh-window-body">
+                        {filesDropped ? (
+                          <HeroScriptedDemo dropped={filesDropped} />
+                        ) : (
+                          <div className="sh-hero-mini">
+                            <WsDropCard />
+                          </div>
+                        )}
+                      </div>
+                    </WindowChrome>
+                  </div>
+                </div>
+              </div>
             </motion.div>
 
-            {/* One right-side flight card stays mounted after the drop: Motion
-                needs both the flying card and its grid twin alive to run the
-                shared-layout morph that lands the file inside the window. */}
+            {/* One right-side flight card flies with the scroll and fades out
+                the moment the drop lands and the window starts expanding. */}
             {!filesDropped && <DragTrail start={flightStart} progress={scrollYProgress} />}
 
             <AnimatePresence>

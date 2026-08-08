@@ -1,10 +1,15 @@
 import { AnimatePresence, motion, type Transition } from "motion/react";
-import { useState, type ReactNode } from "react";
+import { useImperativeHandle, useState, type ReactNode, type Ref } from "react";
 import { Link } from "react-router-dom";
 import RepoDiagram from "../../shared/map/RepoDiagram";
 import { rise, spring } from "../../shared/motion";
 import { diagramEdges, diagramGroups, diagramNodes, type DiagramNode } from "./data";
-import { TheaterModal, TheaterPanel } from "./theater";
+import {
+  TheaterModal,
+  TheaterPanel,
+  type ChatMessage,
+  type TheaterScriptHandle,
+} from "./theater";
 
 export const MotionLink = motion.create(Link);
 
@@ -200,25 +205,63 @@ export function RepoWindowHeader({ receiveLayout }: { receiveLayout?: boolean })
   );
 }
 
+/** Imperative map controls for the scripted hero film. */
+export type RepoMapScriptHandle = {
+  hoverNode(id: string | null): void;
+  /** Opens the theater panel for a node id; null closes it. */
+  openNode(id: string | null): void;
+};
+
 /** Landing repo map wrapper; opens theater on click unless `hoverOnly`. */
 export function RepoMapDiagram({
   receiveLayout,
   hoverOnly = false,
   showHeader = true,
+  scripted = false,
+  scriptRef,
+  theaterScriptRef,
+  demoReplica,
+  designMode = false,
+  initialChat,
+  legendNote,
+  theaterHideDock = false,
 }: {
   receiveLayout?: boolean;
   hoverOnly?: boolean;
   showHeader?: boolean;
+  /** Scripted hero film: inert container, driven via the refs below. */
+  scripted?: boolean;
+  scriptRef?: Ref<RepoMapScriptHandle>;
+  theaterScriptRef?: Ref<TheaterScriptHandle>;
+  demoReplica?: "home" | "explore";
+  designMode?: boolean;
+  initialChat?: ChatMessage[];
+  legendNote?: string;
+  /** Chat lives outside the panel (workspace dock column). */
+  theaterHideDock?: boolean;
 }) {
   const [focus, setFocus] = useState<string | null>(null);
   const [open, setOpen] = useState<DiagramNode | null>(null);
   const [escalated, setEscalated] = useState(false);
+  const [scriptHover, setScriptHover] = useState<string | null>(null);
 
   const closePanel = () => {
     setOpen(null);
     setEscalated(false);
     setFocus(null);
   };
+
+  useImperativeHandle(scriptRef, () => ({
+    hoverNode: setScriptHover,
+    openNode: (id: string | null) => {
+      if (!id) {
+        closePanel();
+        return;
+      }
+      setFocus(id);
+      setOpen(diagramNodes.find((n) => n.id === id) ?? null);
+    },
+  }));
 
   return (
     <>
@@ -229,6 +272,9 @@ export function RepoMapDiagram({
         hoverOnly={hoverOnly}
         header={showHeader ? <RepoWindowHeader receiveLayout={receiveLayout} /> : undefined}
         selectedId={focus}
+        scripted={scripted}
+        scriptHoverId={scripted ? scriptHover : null}
+        legendNote={legendNote}
         onSelect={(id) => {
           setFocus(id);
           setOpen(id ? (diagramNodes.find((n) => n.id === id) ?? null) : null);
@@ -242,6 +288,12 @@ export function RepoMapDiagram({
                 node={open}
                 className="sh-theater__panel--inline"
                 onClose={closePanel}
+                demoReplica={demoReplica}
+                designMode={designMode}
+                scripted={scripted}
+                scriptRef={theaterScriptRef}
+                initialMessages={initialChat}
+                hideDock={theaterHideDock}
               />
             )}
           </AnimatePresence>

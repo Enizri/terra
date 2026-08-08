@@ -1,6 +1,7 @@
 import type { AnalysisSummary } from "../../shared/api";
+import type { HistoryEntry } from "../../shared/workspace/Sidebar";
 
-export type HistoryEntry = { id: number; repoUrl: string; name: string; scannedAt: string };
+export type { HistoryEntry } from "../../shared/workspace/Sidebar";
 
 export const HISTORY_CAP = 8;
 

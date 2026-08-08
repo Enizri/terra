@@ -133,6 +133,8 @@ export default function RepoDiagram({
   legendNote,
   labelsOnHover = false,
   remeasureKey,
+  scriptHoverId = null,
+  scripted = false,
 }: {
   nodes: DiagramNodeView[];
   edges: DiagramEdgeView[];
@@ -147,12 +149,16 @@ export default function RepoDiagram({
   /** Show edge captions only while lit. */
   labelsOnHover?: boolean;
   remeasureKey?: unknown;
+  /** Script-driven hover (hero film) — real hover still wins. */
+  scriptHoverId?: string | null;
+  /** Inert scripted film: window-level listeners would leak to the page. */
+  scripted?: boolean;
 }) {
   const byId = Object.fromEntries(nodes.map((n) => [n.id, n]));
   const reduced = useReducedMotion();
   const [hover, setHover] = useState<string | null>(null);
   const focus = hoverOnly ? null : selectedId;
-  const active = hover ?? focus;
+  const active = hover ?? scriptHoverId ?? focus;
 
   const select = (id: string | null, additive?: boolean) => onSelect?.(id, additive);
 
@@ -171,7 +177,7 @@ export default function RepoDiagram({
   const lastGeom = useRef("");
 
   useEffect(() => {
-    if (hoverOnly || !focus) return;
+    if (hoverOnly || scripted || !focus) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") select(null);
     };
@@ -206,24 +212,37 @@ export default function RepoDiagram({
         const route = routeEdge(a, b, ra, rb);
         if (route) next[edgeKey(e)] = route;
       }
-      // Scale content to fit tall columns; routes stay valid under the scale.
+      // Scale content to fit the canvas on both axes; routes stay valid under
+      // the scale. Where the columns are still allowed to flex-shrink, the
+      // width term is ~1 and this behaves exactly like the old height-only fit.
       let topY = Infinity;
       let botY = -Infinity;
+      let leftX = Infinity;
+      let rightX = -Infinity;
       for (const el of canvas.querySelectorAll<HTMLElement>(
         ".sh-diagram__group, .sh-diagram__node",
       )) {
         const at = offsetWithin(el, canvas);
         topY = Math.min(topY, at.y);
         botY = Math.max(botY, at.y + el.offsetHeight);
+        leftX = Math.min(leftX, at.x);
+        rightX = Math.max(rightX, at.x + el.offsetWidth);
       }
       const flowEl = canvas.querySelector<HTMLElement>(".sh-diagram__flow");
-      const avail = flowEl?.offsetHeight ?? 0;
+      const availH = flowEl?.offsetHeight ?? 0;
+      const availW = flowEl?.offsetWidth ?? 0;
       const contentH = botY - topY;
-      const f = avail > 0 && contentH > avail ? avail / contentH : 1;
+      const contentW = rightX - leftX;
+      const fy = availH > 0 && contentH > availH ? availH / contentH : 1;
+      const fx = availW > 0 && contentW > availW ? availW / contentW : 1;
+      // Shrink only: scaling past 1 would fatten the fixed-size arrowheads.
+      const f = Math.min(fx, fy);
 
       const w = canvas.clientWidth;
       const h = canvas.clientHeight;
-      const sig = `${w}x${h}|${JSON.stringify(next)}`;
+      // `f` belongs in the signature: a resize can change the fit without
+      // moving a single route, and this guard would then skip setFit.
+      const sig = `${w}x${h}|${f}|${JSON.stringify(next)}`;
       if (sig === lastGeom.current) return;
       lastGeom.current = sig;
 
@@ -302,6 +321,7 @@ export default function RepoDiagram({
   const renderNode = (n: DiagramNodeView) => {
     const dim = active !== null && !linked.has(n.id);
     const lit = hoverOnly ? active === n.id : focus === n.id;
+    const scriptHover = scriptHoverId === n.id ? " is-script-hover" : "";
     const enter = {
       initial: { opacity: 0, scale: 0.94, x: -12 },
       animate: { opacity: 1, scale: 1, x: 0 },
@@ -315,9 +335,10 @@ export default function RepoDiagram({
           ref={(el: HTMLDivElement | null) => {
             nodeEls.current[n.id] = el;
           }}
+          data-node-id={n.id}
           className={`sh-diagram__node sh-diagram__node--${n.kind} sh-diagram__node--hover-only${
             lit ? " is-focus" : ""
-          }${dim ? " is-dim" : ""}`}
+          }${dim ? " is-dim" : ""}${scriptHover}`}
           onMouseEnter={() => setHover(n.id)}
           onMouseLeave={() => setHover((h) => (h === n.id ? null : h))}
           {...enter}
@@ -333,9 +354,10 @@ export default function RepoDiagram({
         ref={(el: HTMLButtonElement | null) => {
           nodeEls.current[n.id] = el;
         }}
+        data-node-id={n.id}
         className={`sh-diagram__node sh-diagram__node--${n.kind}${lit ? " is-focus" : ""}${
           dim ? " is-dim" : ""
-        }${pulseId === n.id ? " is-pulse" : ""}`}
+        }${pulseId === n.id ? " is-pulse" : ""}${scriptHover}`}
         aria-pressed={focus === n.id}
         onMouseEnter={() => setHover(n.id)}
         onMouseLeave={() => setHover((h) => (h === n.id ? null : h))}

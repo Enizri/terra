@@ -1,36 +1,12 @@
-import { useState, type DragEvent, type FormEvent } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { useState, type ClipboardEvent, type DragEvent, type FormEvent } from "react";
 import type { TerraMap } from "../../../shared/map/types";
 import type { LiveSelection } from "../../../shared/live";
 import type { useAnalyze } from "../useAnalyze";
-import { ArrowIcon, RepoIcon } from "../icons";
+import { extractGitHubURL, githubURLFromDataTransfer } from "../githubUrl";
+import { ArrowIcon } from "../../../shared/workspace/icons";
+import { StatusLine } from "../../../shared/workspace/StatusLine";
+import { WsDropCard } from "../../../shared/workspace/DropCard";
 import { MapStage } from "./MapStage";
-
-function clock(seconds: number) {
-  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
-}
-
-/** Single evolving status line. */
-function StatusLine({ label, elapsed }: { label: string; elapsed: number }) {
-  return (
-    <div className="sh-ws__status" aria-live="polite">
-      <span className="sh-terra-mark sh-terra-mark--spin sh-ws__status-mark" aria-hidden />
-      <AnimatePresence mode="wait">
-        <motion.span
-          key={label}
-          className="sh-ws__status-label"
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -6 }}
-          transition={{ duration: 0.22 }}
-        >
-          {label}
-        </motion.span>
-      </AnimatePresence>
-      <em className="sh-ws__status-time">{clock(elapsed)}</em>
-    </div>
-  );
-}
 
 /** Centre column: drop / mapping / map. */
 export function DropStage({
@@ -48,24 +24,61 @@ export function DropStage({
 }) {
   const [over, setOver] = useState(false);
   const [url, setUrl] = useState("");
-  const { start, cancel, status, error, running, elapsed } = analyze;
+  const [intakeError, setIntakeError] = useState<string | null>(null);
+  const { start, cancel, status, error, running, elapsed, partial } = analyze;
+
+  const begin = (repo: string) => {
+    setIntakeError(null);
+    setUrl(repo);
+    start(repo);
+  };
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
     const repo = url.trim();
     if (!repo || running) return;
-    start(repo);
+    const normalized = extractGitHubURL(repo) ?? repo;
+    begin(normalized);
   };
 
   const onDrop = (e: DragEvent) => {
     e.preventDefault();
     setOver(false);
+    if (running) return;
+    const repo = githubURLFromDataTransfer(e.dataTransfer);
+    if (!repo) {
+      setIntakeError("Drop a GitHub repository URL (github.com/owner/repo)");
+      return;
+    }
+    begin(repo);
+  };
+
+  const onPaste = (e: ClipboardEvent) => {
+    if (running || map) return;
+    const text = e.clipboardData.getData("text/plain");
+    const repo = extractGitHubURL(text);
+    if (!repo) return;
+    e.preventDefault();
+    begin(repo);
   };
 
   return (
     <main className={`sh-ws__stage${map ? " is-map" : ""}`}>
       {map ? (
-        <MapStage map={map} selectedIds={selectedIds} onSelect={onSelect} onElements={onElements} />
+        <>
+          <MapStage map={map} selectedIds={selectedIds} onSelect={onSelect} onElements={onElements} />
+          {running && (
+            <div className="sh-ws__mapping-bar" aria-live="polite">
+              <StatusLine
+                label={status?.label ?? (partial ? "Terra is reading the architecture" : "Working")}
+                elapsed={elapsed}
+              />
+              <button type="button" className="sh-ws__stop" onClick={cancel}>
+                Stop
+              </button>
+            </div>
+          )}
+        </>
       ) : running ? (
         <div className="sh-ws__running">
           <StatusLine label={status?.label ?? "Starting"} elapsed={elapsed} />
@@ -74,29 +87,28 @@ export function DropStage({
           </button>
         </div>
       ) : (
-        <div
-          className={`sh-ws-drop${over ? " is-over" : ""}`}
+        <WsDropCard
+          over={over}
           onDragOver={(e) => {
             e.preventDefault();
             setOver(true);
           }}
           onDragLeave={() => setOver(false)}
           onDrop={onDrop}
-        >
-          <span className="sh-ws-drop__glow" aria-hidden />
-          <RepoIcon />
-          <h1 className="sh-ws-drop__title">Drop a GitHub repo</h1>
-          <p className="sh-ws-drop__sub">Terra reads the code and draws the map. No config, no setup.</p>
-        </div>
+          onPaste={onPaste}
+        />
       )}
 
-      {error && <p className="sh-ws__error">{error}</p>}
+      {(intakeError || error) && <p className="sh-ws__error">{intakeError ?? error}</p>}
 
       <form className="sh-ws__url" onSubmit={submit}>
         <input
           className="sh-ws__input"
           value={url}
-          onChange={(e) => setUrl(e.target.value)}
+          onChange={(e) => {
+            setUrl(e.target.value);
+            setIntakeError(null);
+          }}
           placeholder="github.com/usememos/memos"
           aria-label="GitHub repository URL"
           spellCheck={false}
