@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"os"
 	"strings"
+
+	"github.com/Enizri/terra/internal/trace"
 )
 
 // LoopbackAddr reports whether a listen address can only be reached from this
@@ -32,6 +34,12 @@ func withToken(next http.Handler) http.Handler {
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !requiresToken(r) {
+			next.ServeHTTP(w, r)
+			return
+		}
+		// The preview trace hook runs inside untrusted repos, so it gets the
+		// scoped ingest token, never the real API token.
+		if r.Method == http.MethodPost && r.URL.Path == "/traces/ingest" && tokenMatches(r, trace.IngestToken()) {
 			next.ServeHTTP(w, r)
 			return
 		}

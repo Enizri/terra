@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Enizri/terra/internal/graph"
@@ -39,6 +40,10 @@ type Server struct {
 	// analyzeSlots caps concurrent analyze work; initialised in Handler so
 	// tests picking TERRA_ANALYZE_CONCURRENCY via t.Setenv take effect.
 	analyzeSlots chan struct{}
+
+	// initOnce guards Handler's lazy field assignments: two concurrent calls
+	// would otherwise race and split jobs across two hubs.
+	initOnce sync.Once
 }
 
 // maxBodyBytes caps request bodies on JSON endpoints. Ask payloads carry a
@@ -112,21 +117,23 @@ func (s *Server) previewRunner() preview.Runner {
 }
 
 func (s *Server) Handler() http.Handler {
-	if s.Scan == nil {
-		s.Scan = scan.Scan
-	}
-	if s.Analyze == nil {
-		s.Analyze = graph.Analyze
-	}
-	if s.RunTask == nil {
-		s.RunTask = graph.RunTask
-	}
-	if s.Jobs == nil {
-		s.Jobs = job.NewHub()
-	}
-	if s.analyzeSlots == nil {
-		s.analyzeSlots = make(chan struct{}, analyzeDepth())
-	}
+	s.initOnce.Do(func() {
+		if s.Scan == nil {
+			s.Scan = scan.Scan
+		}
+		if s.Analyze == nil {
+			s.Analyze = graph.Analyze
+		}
+		if s.RunTask == nil {
+			s.RunTask = graph.RunTask
+		}
+		if s.Jobs == nil {
+			s.Jobs = job.NewHub()
+		}
+		if s.analyzeSlots == nil {
+			s.analyzeSlots = make(chan struct{}, analyzeDepth())
+		}
+	})
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", s.root)
 	mux.HandleFunc("GET /healthz", s.healthz)

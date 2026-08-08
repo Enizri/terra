@@ -38,7 +38,10 @@ func limiterTestHandler(t *testing.T) http.Handler {
 			}, nil, nil
 		},
 	}
-	return s.Handler()
+	h := s.Handler()
+	// Background jobs write s.DB inside t.TempDir; drain them before cleanup.
+	t.Cleanup(s.Jobs.Wait)
+	return h
 }
 
 func TestRateLimitPerIP(t *testing.T) {

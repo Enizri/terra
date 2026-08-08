@@ -1,5 +1,5 @@
 import { motion, useReducedMotion } from "motion/react";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { inView, rise, stagger } from "../../../shared/motion";
 import { copy, diagramNodes } from "../data";
 import { IMPLEMENT_HINTS, TheaterPanel } from "../theater";
@@ -131,18 +131,35 @@ function TryItNote() {
 
 export function PowerSection() {
   const [active, setActive] = useState<OpsTabId>("ask");
-  // Keep-alive: once a tab has been opened, leave its tree mounted.
-  const [mounted, setMounted] = useState<ReadonlySet<OpsTabId>>(
-    () => new Set<OpsTabId>(["ask"]),
-  );
+  // Keep-alive: once a tab has been opened, leave its tree mounted. Starts
+  // empty — the ask pane boots a real dev-server preview (POST /preview), so
+  // don't spend that on visitors who never scroll here.
+  const [mounted, setMounted] = useState<ReadonlySet<OpsTabId>>(() => new Set<OpsTabId>());
+  const sectionRef = useRef<HTMLElement | null>(null);
 
   const selectTab = (id: OpsTabId) => {
     setActive(id);
     setMounted((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
   };
 
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((e) => e.isIntersecting)) return;
+        io.disconnect();
+        setMounted((prev) => (prev.has("ask") ? prev : new Set(prev).add("ask")));
+      },
+      { rootMargin: "200px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
   return (
     <motion.section
+      ref={sectionRef}
       className="sh-section"
       initial="hidden"
       whileInView="show"

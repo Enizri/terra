@@ -32,12 +32,26 @@ func (r *Runfile) HostRunnable() bool {
 // ErrUnknown means no manifest matched.
 var ErrUnknown = errors.New("no runfile evidence found")
 
-// Infer tries Dockerfile → compose → package.json → go.mod → python.
+// Infer tries Dockerfile → compose → package.json → go.mod → python, but a
+// host-runnable answer always wins: most services ship a Dockerfile, and
+// returning it first would block a repo the go.mod/package.json evidence can
+// actually boot (the result is cached by commit, so the wrong answer sticks).
 func Infer(root string) (*Runfile, error) {
+	var first *Runfile
 	for _, try := range []func(string) *Runfile{fromDockerfile, fromCompose, fromPackageJSON, fromGoMod, fromPython} {
-		if rf := try(root); rf != nil {
+		rf := try(root)
+		if rf == nil {
+			continue
+		}
+		if rf.HostRunnable() {
 			return rf, nil
 		}
+		if first == nil {
+			first = rf
+		}
+	}
+	if first != nil {
+		return first, nil
 	}
 	return nil, ErrUnknown
 }

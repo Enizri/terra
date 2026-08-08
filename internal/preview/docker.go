@@ -29,6 +29,7 @@ type dockerInstance struct {
 	containerName string
 	publicURL     string
 	target        string
+	readyURL      string
 	liveID        string
 	timer         *time.Timer
 }
@@ -48,7 +49,11 @@ func (r *dockerRunner) Start(repoURL string) (string, error) {
 
 	ttl := previewTTL()
 	if inst, ok := r.byRepo[key]; ok {
-		if aliveURL(inst.target) {
+		check := inst.readyURL
+		if check == "" {
+			check = inst.target
+		}
+		if aliveURL(check) {
 			r.resetTTLLocked(key, inst, ttl)
 			fmt.Fprintf(os.Stderr, "preview: reusing %s, ttl reset to %s\n", inst.containerName, ttl)
 			return inst.publicURL, nil
@@ -110,7 +115,8 @@ func (r *dockerRunner) Start(repoURL string) (string, error) {
 	} else {
 		args = append(args, "-p", "127.0.0.1::"+strconv.Itoa(dockerPreviewPort))
 	}
-	args = append(args, image, "bash", "-lc", dockerDevCommand(pm, script))
+	basePath := "/__live/" + liveID + "/"
+	args = append(args, image, "bash", "-lc", dockerDevCommand(pm, script, basePath))
 
 	out, err := exec.Command(dockerBin, args...).CombinedOutput()
 	if err != nil {
@@ -122,7 +128,8 @@ func (r *dockerRunner) Start(repoURL string) (string, error) {
 		_ = exec.Command(dockerBin, "rm", "-f", name).Run()
 		return "", err
 	}
-	if err := waitURLReady(target+"/", 3*time.Minute); err != nil {
+	readyURL := strings.TrimRight(target, "/") + basePath
+	if err := waitURLReady(readyURL, 3*time.Minute); err != nil {
 		logs, _ := exec.Command(dockerBin, "logs", "--tail", "80", name).CombinedOutput()
 		_ = exec.Command(dockerBin, "rm", "-f", name).Run()
 		return "", fmt.Errorf("preview container never became ready: %v\n--- docker logs ---\n%s", err, tail(logs))
@@ -137,7 +144,7 @@ func (r *dockerRunner) Start(repoURL string) (string, error) {
 
 	inst := &dockerInstance{
 		root: root, appDir: appDir, containerName: name,
-		publicURL: publicURL, target: target, liveID: liveID,
+		publicURL: publicURL, target: target, readyURL: readyURL, liveID: liveID,
 	}
 	r.resetTTLLocked(key, inst, ttl)
 	r.byRepo[key] = inst
@@ -201,6 +208,12 @@ func (r *dockerRunner) resetTTLLocked(key string, inst *dockerInstance, ttl time
 	})
 }
 
+// inContainer reports whether this process runs inside a Docker container.
+func inContainer() bool {
+	_, err := os.Stat("/.dockerenv")
+	return err == nil
+}
+
 func (r *dockerRunner) resolveTarget(dockerBin, name, network string) (string, error) {
 	if network != "" {
 		return fmt.Sprintf("http://%s:%d", name, dockerPreviewPort), nil
@@ -216,7 +229,16 @@ func (r *dockerRunner) resolveTarget(dockerBin, name, network string) (string, e
 		if hostPort != "" {
 			gateway := strings.TrimSpace(os.Getenv("TERRA_TRACE_HOST"))
 			if gateway == "" {
-				gateway = "host.docker.internal"
+				// The published port lives on the Docker host. From inside a
+				// container that's host.docker.internal; from a Terra process
+				// running directly on the host it's plain loopback — the
+				// container-only name resolves nowhere there (and never on
+				// plain Linux), burning the whole ready-wait budget.
+				if inContainer() {
+					gateway = "host.docker.internal"
+				} else {
+					gateway = "127.0.0.1"
+				}
 			}
 			return fmt.Sprintf("http://%s:%s", gateway, hostPort), nil
 		}
@@ -244,7 +266,7 @@ func dockerMountArgs(root string) []string {
 	return []string{"-v", root + ":" + root}
 }
 
-func dockerDevCommand(pm, script string) string {
+func dockerDevCommand(pm, script, basePath string) string {
 	prefix := ""
 	switch pm {
 	case "pnpm", "yarn":
@@ -255,8 +277,9 @@ func dockerDevCommand(pm, script string) string {
 	if pm == "npm" {
 		args += " --"
 	}
-	// --host so sibling containers / the API can reach Vite (default is localhost-only).
-	args += fmt.Sprintf(" --host 0.0.0.0 --port %d --strictPort", dockerPreviewPort)
+	// --host: Vite defaults to localhost-only (unreachable from the API container).
+	// --base: path proxy lives under /__live/{id}/; absolute /@vite/* must match.
+	args += fmt.Sprintf(" --host 0.0.0.0 --port %d --strictPort --base %s", dockerPreviewPort, basePath)
 	return fmt.Sprintf("%s%s install && %s %s", prefix, pm, pm, args)
 }
 
@@ -312,13 +335,21 @@ func aliveURL(base string) bool {
 }
 
 func waitURLReady(rawURL string, budget time.Duration) error {
-	client := &http.Client{Timeout: 2 * time.Second}
+	// Do not follow redirects: Vite --base may 302 "/" to the base path.
+	client := &http.Client{
+		Timeout: 2 * time.Second,
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
 	deadline := time.Now().Add(budget)
 	for time.Now().Before(deadline) {
 		resp, err := client.Get(rawURL)
 		if err == nil {
 			resp.Body.Close()
-			return nil
+			if resp.StatusCode < 500 {
+				return nil
+			}
 		}
 		time.Sleep(500 * time.Millisecond)
 	}

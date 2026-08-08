@@ -42,6 +42,8 @@ func testServer(t *testing.T) (*Server, *httptest.Server) {
 	}
 	ts := httptest.NewServer(s.Handler())
 	t.Cleanup(ts.Close)
+	// Background jobs write s.DB inside t.TempDir; drain them before cleanup.
+	t.Cleanup(s.Jobs.Wait)
 	return s, ts
 }
 
@@ -369,6 +371,36 @@ func TestTokenGate(t *testing.T) {
 	resp.Body.Close()
 	if resp.StatusCode != 200 {
 		t.Fatalf("healthz must stay open: status = %d", resp.StatusCode)
+	}
+}
+
+// The per-process ingest token opens /traces/ingest for the preview hook,
+// and nothing else — untrusted repo code must not reach the rest of the API.
+func TestIngestTokenScopedToIngest(t *testing.T) {
+	t.Setenv("TERRA_TOKEN", "test-secret")
+	_, ts := testServer(t)
+
+	do := func(path, body string) int {
+		req, err := http.NewRequest("POST", ts.URL+path, strings.NewReader(body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Terra-Token", trace.IngestToken())
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		return resp.StatusCode
+	}
+
+	span := `{"repo_url":"github.com/acme/notes","spans":[{"kind":"server","method":"GET","path":"/x","status":200}]}`
+	if code := do("/traces/ingest", span); code != http.StatusNoContent {
+		t.Errorf("ingest with ingest token: status = %d, want 204", code)
+	}
+	if code := do("/analyze", `{"repo_url":"https://github.com/acme/notes"}`); code != http.StatusUnauthorized {
+		t.Errorf("analyze with ingest token: status = %d, want 401", code)
 	}
 }
 

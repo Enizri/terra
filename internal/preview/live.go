@@ -27,7 +27,7 @@ func (h *liveHub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	id, path, _ := strings.Cut(rest, "/")
+	id, _, _ := strings.Cut(rest, "/")
 	if id == "" {
 		http.NotFound(w, r)
 		return
@@ -39,18 +39,8 @@ func (h *liveHub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	r2 := r.Clone(r.Context())
-	u := *r.URL
-	if path == "" {
-		u.Path = "/"
-	} else {
-		u.Path = "/" + path
-	}
-	if !strings.HasPrefix(u.Path, "/") {
-		u.Path = "/" + u.Path
-	}
-	r2.URL = &u
-	handler.ServeHTTP(w, r2)
+	// Keep the full /__live/{id}/... path — Vite is started with matching --base.
+	handler.ServeHTTP(w, r)
 }
 
 // MountPathProxy mounts a reverse proxy at /__live/{id}/ and returns the public URL.
@@ -85,5 +75,7 @@ func publicBaseURL() string {
 	if u := strings.TrimSpace(os.Getenv("TERRA_PUBLIC_URL")); u != "" {
 		return strings.TrimRight(u, "/")
 	}
-	return "http://127.0.0.1:8080"
+	// Follow the real listen address (TERRA_ADDR, set by `terra serve`) so a
+	// non-default --addr doesn't hand out iframe URLs pointing at port 8080.
+	return "http://127.0.0.1:" + terraPort()
 }

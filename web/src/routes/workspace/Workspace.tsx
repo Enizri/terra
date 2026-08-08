@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
 import type { Component, TerraMap } from "../../shared/map/types";
 import type { LiveSelection } from "../../shared/live";
@@ -39,11 +39,17 @@ export default function Workspace() {
     setElements([]);
   }, [map]);
 
+  // A new run replaces whatever stored map is on stage. Keyed on `running`,
+  // not `analyze.map`: the latter is seeded from wsCache on remount and would
+  // wipe a stored map the user just opened (landing <-> workspace roundtrip).
   useEffect(() => {
-    if (analyze.map) {
+    if (analyze.running) {
       setStoredMap(null);
       wsCache.storedMap = null;
     }
+  }, [analyze.running]);
+
+  useEffect(() => {
     // Cached history + no fresh run: keep what's on screen, skip the refetch.
     if (wsCache.history && !analyze.map) return;
     const ac = new AbortController();
@@ -54,18 +60,27 @@ export default function Workspace() {
         setHistory(h);
       })
       .catch((e: Error) => {
-        if (e.name !== "AbortError") setHistory([]);
+        if (e.name === "AbortError") return;
+        wsCache.history = null;
+        setHistory([]);
       });
     return () => ac.abort();
   }, [analyze.map]);
 
+  // Last click wins: abort the previous fetch so two rapid rail clicks can't
+  // land out of order (and a late response can't set state after unmount).
+  const openAbort = useRef<AbortController | null>(null);
+  useEffect(() => () => openAbort.current?.abort(), []);
   const open = async (entry: HistoryEntry) => {
+    openAbort.current?.abort();
+    const ac = new AbortController();
+    openAbort.current = ac;
     try {
-      const m = await analysis(entry.id);
+      const m = await analysis(entry.id, ac.signal);
       wsCache.storedMap = m;
       setStoredMap(m);
     } catch {
-      /* leave stage as-is */
+      /* aborted or failed: leave stage as-is */
     }
   };
 
@@ -84,7 +99,7 @@ export default function Workspace() {
 
   return (
     <div className="sh-root sh-ws">
-      <WorkspaceHeader slug={slug} busy={analyze.running} />
+      <WorkspaceHeader slug={slug} title={map?.project.name} busy={analyze.running} />
       <Sidebar
         map={map}
         history={history}

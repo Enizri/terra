@@ -29,6 +29,9 @@ export function useAnalyze() {
 
     setStatus(null);
     setMap(null);
+    // Keep cache and state in sync: a failed run must not resurrect the
+    // previous map on the next remount.
+    wsCache.map = null;
     setError(null);
     setElapsed(0);
     setRunning(true);
