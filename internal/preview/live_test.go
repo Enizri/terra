@@ -40,7 +40,7 @@ func TestMountPathProxyRoutesAndInjects(t *testing.T) {
 	}))
 	t.Cleanup(upstream.Close)
 
-	publicURL, err := MountPathProxy(id, upstream.URL, "https://github.com/acme/notes", false)
+	publicURL, err := MountPathProxy(id, upstream.URL, "https://github.com/acme/notes", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

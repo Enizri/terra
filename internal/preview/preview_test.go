@@ -193,3 +193,9 @@ func TestTraceEnvArmsTheHook(t *testing.T) {
 		t.Error("traceEnv leaked TERRA_TOKEN to the previewed app")
 	}
 }
+
+func TestSeedDemoAuthUnknownRepoIsNil(t *testing.T) {
+	if seedDemoAuth("https://github.com/acme/notes", "http://localhost:1") != nil {
+		t.Fatal("expected nil hook for repo without a demo-auth entry")
+	}
+}

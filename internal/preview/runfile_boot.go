@@ -61,7 +61,7 @@ func (r *hostRunner) startViaRunfile(key, root string, detectErr error) (string,
 		stop(cmd)
 		return "", nil, fmt.Errorf("runfile service never came up: %v\n--- output ---\n%s", err, logs.String())
 	}
-	proxyURL, proxyLn, err := serveProxy(key, "http://localhost:"+strconv.Itoa(bound), false)
+	proxyURL, proxyLn, err := serveProxy(key, "http://localhost:"+strconv.Itoa(bound), nil)
 	if err != nil {
 		stop(cmd)
 		return "", nil, err
