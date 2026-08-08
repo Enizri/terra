@@ -27,7 +27,7 @@ func TestMountPathProxyRoutesAndInjects(t *testing.T) {
 	id := "test-live-" + t.Name()
 	t.Cleanup(func() { UnmountPathProxy(id) })
 
-	publicURL, err := MountPathProxy(id, upstream.URL, "https://github.com/acme/notes", false)
+	publicURL, err := MountPathProxy(id, upstream.URL, "https://github.com/acme/notes", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

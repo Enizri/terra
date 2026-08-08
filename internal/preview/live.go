@@ -54,7 +54,7 @@ func (h *liveHub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // MountPathProxy mounts a reverse proxy at /__live/{id}/ and returns the public URL.
-func MountPathProxy(id, targetBaseURL, repoKey string, hasAuth bool) (publicURL string, err error) {
+func MountPathProxy(id, targetBaseURL, repoKey string, authFix func(*http.Request)) (publicURL string, err error) {
 	id = strings.Trim(id, "/")
 	if id == "" || strings.Contains(id, "/") {
 		return "", fmt.Errorf("invalid live proxy id %q", id)
@@ -63,7 +63,7 @@ func MountPathProxy(id, targetBaseURL, repoKey string, hasAuth bool) (publicURL 
 		return "", fmt.Errorf("invalid preview target: %w", err)
 	}
 	prefix := "/__live/" + id
-	handler, err := newInjectProxy(repoKey, targetBaseURL, hasAuth, prefix)
+	handler, err := newInjectProxy(repoKey, targetBaseURL, authFix, prefix)
 	if err != nil {
 		return "", err
 	}

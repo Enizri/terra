@@ -183,3 +183,9 @@ func TestTraceEnvArmsTheHook(t *testing.T) {
 		t.Errorf("trace repo = %q", env[2])
 	}
 }
+
+func TestSeedDemoAuthUnknownRepoIsNil(t *testing.T) {
+	if seedDemoAuth("https://github.com/acme/notes", "http://localhost:1") != nil {
+		t.Fatal("expected nil hook for repo without a demo-auth entry")
+	}
+}

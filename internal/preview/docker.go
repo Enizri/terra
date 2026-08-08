@@ -128,8 +128,8 @@ func (r *dockerRunner) Start(repoURL string) (string, error) {
 		return "", fmt.Errorf("preview container never became ready: %v\n--- docker logs ---\n%s", err, tail(logs))
 	}
 
-	hasAuth := seedAuth(target)
-	publicURL, err := MountPathProxy(liveID, target, key, hasAuth)
+	authFix := seedDemoAuth(key, target)
+	publicURL, err := MountPathProxy(liveID, target, key, authFix)
 	if err != nil {
 		_ = exec.Command(dockerBin, "rm", "-f", name).Run()
 		return "", err
