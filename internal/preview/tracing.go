@@ -1,6 +1,8 @@
 package preview
 
 import (
+	"bufio"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -22,7 +24,10 @@ func traceMiddleware(repo, prefix string, next http.Handler) http.Handler {
 				appPath = "/"
 			}
 		}
-		if !trace.WorthKeeping(appPath) {
+		// Protocol upgrades (Vite HMR WebSocket on "/") must not be wrapped:
+		// after a 101 there is no meaningful status to record, and any
+		// recorder that fails to expose Hijack breaks the reverse proxy.
+		if !trace.WorthKeeping(appPath) || r.Header.Get("Upgrade") != "" {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -51,16 +56,25 @@ func (rec *statusRecorder) WriteHeader(code int) {
 	rec.ResponseWriter.WriteHeader(code)
 }
 
-// Flush keeps the recorder transparent for streaming responses (Vite HMR,
-// SSE endpoints inside previewed apps).
+// Flush keeps the recorder transparent for streaming responses (SSE
+// endpoints inside previewed apps).
 func (rec *statusRecorder) Flush() {
 	if flusher, ok := rec.ResponseWriter.(http.Flusher); ok {
 		flusher.Flush()
 	}
 }
 
-// Unwrap lets http.ResponseController reach the underlying writer so the
-// reverse proxy can hijack the connection for WebSocket (101) upgrades.
+// Hijack delegates so httputil.ReverseProxy can complete WebSocket upgrades
+// even if a caller forgot to skip Upgrade requests above.
+func (rec *statusRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hj, ok := rec.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, http.ErrNotSupported
+	}
+	return hj.Hijack()
+}
+
+// Unwrap lets http.ResponseController reach the underlying writer.
 func (rec *statusRecorder) Unwrap() http.ResponseWriter {
 	return rec.ResponseWriter
 }

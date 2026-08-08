@@ -1,6 +1,7 @@
 package preview
 
 import (
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -84,6 +85,41 @@ func TestStartWaitsForInFlightBoot(t *testing.T) {
 		}
 	case <-time.After(3 * time.Second):
 		t.Fatal("Start never returned after the boot finished")
+	}
+}
+
+func TestHostStopAllKillsStarting(t *testing.T) {
+	r := &hostRunner{
+		byRepo:   map[string]*instance{},
+		starting: map[string]*instance{},
+	}
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := "https://github.com/acme/notes"
+	r.starting[key] = &instance{proxyLn: ln}
+	r.StopAll()
+	if len(r.starting) != 0 {
+		t.Fatalf("starting left %d entries after StopAll", len(r.starting))
+	}
+	// Closing twice must not panic — StopAll nils the listener.
+	if err := ln.Close(); err == nil {
+		t.Fatal("expected listener already closed by StopAll")
+	}
+}
+
+func TestDockerStopAllKillsStarting(t *testing.T) {
+	r := &dockerRunner{
+		cfg:      &config.Config{DockerBin: "/nonexistent-terra-docker"},
+		byRepo:   map[string]*dockerInstance{},
+		starting: map[string]*dockerInstance{},
+	}
+	key := "https://github.com/acme/notes"
+	r.starting[key] = &dockerInstance{containerName: "terra-preview-test", liveID: "test"}
+	r.StopAll()
+	if len(r.starting) != 0 || len(r.byRepo) != 0 {
+		t.Fatal("StopAll left starting/byRepo entries")
 	}
 }
 

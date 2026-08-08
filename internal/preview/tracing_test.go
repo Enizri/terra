@@ -1,8 +1,12 @@
 package preview
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/http/httputil"
+	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -94,5 +98,62 @@ func TestStatusRecorderSupportsHijack(t *testing.T) {
 	resp, err := http.Get(ts.URL + "/api/v1/upgrade")
 	if err == nil {
 		resp.Body.Close()
+	}
+}
+
+// Vite HMR upgrades "/" through the reverse proxy; the middleware must not
+// produce "non-Hijacker ResponseWriter type *preview.statusRecorder".
+func TestTraceMiddlewareAllowsWebSocketUpgradeViaProxy(t *testing.T) {
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.EqualFold(r.Header.Get("Upgrade"), "websocket") {
+			http.Error(w, "expected upgrade", http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Connection", "Upgrade")
+		w.Header().Set("Upgrade", "websocket")
+		w.WriteHeader(http.StatusSwitchingProtocols)
+		conn, bufrw, err := w.(http.Hijacker).Hijack()
+		if err != nil {
+			t.Errorf("backend hijack: %v", err)
+			return
+		}
+		bufrw.WriteString("upgraded")
+		bufrw.Flush()
+		conn.Close()
+	}))
+	t.Cleanup(backend.Close)
+
+	target, err := url.Parse(backend.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	proxy := httputil.NewSingleHostReverseProxy(target)
+	front := httptest.NewServer(traceMiddleware("https://github.com/test/ws", "", proxy))
+	t.Cleanup(front.Close)
+
+	u, err := url.Parse(front.URL + "/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.DefaultTransport.RoundTrip(&http.Request{
+		Method: http.MethodGet,
+		URL:    u,
+		Header: http.Header{
+			"Connection":           {"Upgrade"},
+			"Upgrade":              {"websocket"},
+			"Sec-WebSocket-Version": {"13"},
+			"Sec-WebSocket-Key":    {"dGhlIHNhbXBsZSBub25jZQ=="},
+		},
+		Proto:      "HTTP/1.1",
+		ProtoMajor: 1,
+		ProtoMinor: 1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusSwitchingProtocols {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status = %d, want 101; body %s", resp.StatusCode, body)
 	}
 }

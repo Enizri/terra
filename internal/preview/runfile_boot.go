@@ -55,6 +55,8 @@ func (r *hostRunner) startViaRunfile(key, root string, detectErr error) (string,
 	if err := cmd.Start(); err != nil {
 		return "", nil, fmt.Errorf("runfile run (%s): %w", shell, err)
 	}
+	inst := &instance{root: root, appDir: root, cmd: cmd, devPort: port}
+	r.trackStarting(key, inst)
 	// Go services may compile first; same budget as startBackend.
 	bound, err := waitReady(port, logs, watch(cmd), 5*time.Minute)
 	if err != nil {
@@ -66,7 +68,9 @@ func (r *hostRunner) startViaRunfile(key, root string, detectErr error) (string,
 		stop(cmd)
 		return "", nil, err
 	}
-	inst := &instance{root: root, appDir: root, cmd: cmd, devPort: bound, proxyURL: proxyURL, proxyLn: proxyLn}
+	inst.devPort = bound
+	inst.proxyURL = proxyURL
+	inst.proxyLn = proxyLn
 	return proxyURL, inst, nil
 }
 

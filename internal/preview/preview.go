@@ -164,6 +164,9 @@ type hostRunner struct {
 	cfg    *config.Config
 	byRepo map[string]*instance
 	boots  map[string]chan struct{} // in-flight boots; closed when done
+	// starting tracks processes owned by an in-flight boot so StopAll can
+	// kill them on Ctrl-C before they land in byRepo.
+	starting map[string]*instance
 }
 
 // Start returns a live preview URL for repoURL, reusing a healthy instance.
@@ -178,17 +181,16 @@ func (r *hostRunner) Start(repoURL string) (string, error) {
 	for {
 		r.mu.Lock()
 		if inst, ok := r.byRepo[key]; ok {
-			if alive(inst.devPort) {
-				url := inst.proxyURL
-				r.mu.Unlock()
+			port, url := inst.devPort, inst.proxyURL
+			r.mu.Unlock()
+			if alive(port) {
 				return url, nil
 			}
-			stop(inst.cmd)
-			stop(inst.api)
-			if inst.proxyLn != nil {
-				inst.proxyLn.Close()
+			r.mu.Lock()
+			if cur, ok := r.byRepo[key]; ok && cur == inst {
+				r.stopInstanceLocked(cur)
+				delete(r.byRepo, key)
 			}
-			delete(r.byRepo, key)
 		}
 		if ch, ok := r.boots[key]; ok {
 			// Someone else is booting this repo; wait and re-check.
@@ -203,16 +205,46 @@ func (r *hostRunner) Start(repoURL string) (string, error) {
 		r.boots[key] = ch
 		r.mu.Unlock()
 
-		url, inst, err := r.boot(key)
-		r.mu.Lock()
-		if err == nil {
-			r.byRepo[key] = inst
+		url, err := r.runBoot(key, ch)
+		return url, err
+	}
+}
+
+// runBoot runs boot and always clears the boots entry, even on panic.
+func (r *hostRunner) runBoot(key string, ch chan struct{}) (url string, err error) {
+	var inst *instance
+	defer func() {
+		if rec := recover(); rec != nil {
+			err = fmt.Errorf("preview boot panicked: %v", rec)
+			inst = nil
 		}
+		r.mu.Lock()
+		if err == nil && inst != nil {
+			r.byRepo[key] = inst
+		} else {
+			if inst != nil {
+				r.stopInstanceLocked(inst)
+			} else if partial := r.starting[key]; partial != nil {
+				r.stopInstanceLocked(partial)
+			}
+		}
+		delete(r.starting, key)
 		delete(r.boots, key)
 		close(ch)
 		r.mu.Unlock()
-		return url, err
+	}()
+	url, inst, err = r.boot(key)
+	return url, err
+}
+
+// trackStarting publishes an in-flight instance so StopAll can reach it.
+func (r *hostRunner) trackStarting(key string, inst *instance) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.starting == nil {
+		r.starting = map[string]*instance{}
 	}
+	r.starting[key] = inst
 }
 
 // boot does the heavy lifting for one repo. It must not touch r.mu.
@@ -271,6 +303,8 @@ func (r *hostRunner) boot(key string) (string, *instance, error) {
 		stop(apiCmd)
 		return "", nil, fmt.Errorf("start dev server (%s run %s): %w", pm, script, err)
 	}
+	inst := &instance{root: root, appDir: appDir, cmd: cmd, api: apiCmd, devPort: devPort}
+	r.trackStarting(key, inst)
 
 	port, err := waitReady(devPort, logs, watch(cmd), 2*time.Minute, apiPort)
 	if err != nil {
@@ -288,7 +322,9 @@ func (r *hostRunner) boot(key string) (string, *instance, error) {
 		stop(apiCmd)
 		return "", nil, err
 	}
-	inst := &instance{root: root, appDir: appDir, cmd: cmd, api: apiCmd, devPort: port, proxyURL: proxyURL, proxyLn: proxyLn}
+	inst.devPort = port
+	inst.proxyURL = proxyURL
+	inst.proxyLn = proxyLn
 	return proxyURL, inst, nil
 }
 
@@ -307,17 +343,27 @@ func (r *hostRunner) Lookup(repoURL string) (root, appDir string, ok bool) {
 	return inst.root, inst.appDir, true
 }
 
-// StopAll kills every dev-server process group. Call on shutdown.
+// StopAll kills every dev-server process group, including in-flight boots.
+// Call on shutdown.
 func (r *hostRunner) StopAll() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	for key, inst := range r.starting {
+		r.stopInstanceLocked(inst)
+		delete(r.starting, key)
+	}
 	for key, inst := range r.byRepo {
-		stop(inst.cmd)
-		stop(inst.api)
-		if inst.proxyLn != nil {
-			inst.proxyLn.Close()
-		}
+		r.stopInstanceLocked(inst)
 		delete(r.byRepo, key)
+	}
+}
+
+func (r *hostRunner) stopInstanceLocked(inst *instance) {
+	stop(inst.cmd)
+	stop(inst.api)
+	if inst.proxyLn != nil {
+		inst.proxyLn.Close()
+		inst.proxyLn = nil
 	}
 }
 
