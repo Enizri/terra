@@ -16,14 +16,6 @@ export type AnalyzeEvent = {
   answer?: string;
 };
 
-export type FilesResponse = {
-  path?: string;
-  entries?: { name: string; path: string; dir: boolean }[];
-  content?: string;
-  /** Checkout still booting. */
-  starting?: boolean;
-};
-
 function authHeaders(extra?: Record<string, string>): HeadersInit {
   const headers: Record<string, string> = { ...extra };
   const token = getToken();
@@ -206,11 +198,4 @@ export async function analyses(signal?: AbortSignal): Promise<AnalysisSummary[]>
 export async function analysis(id: number, signal?: AbortSignal): Promise<TerraMap> {
   const res = await fetch(`/analyses/${id}`, { headers: authHeaders(), signal });
   return json<TerraMap>(res, "analysis");
-}
-
-/** List a directory or read a file in the preview checkout. */
-export async function files(repoUrl: string, path: string, signal?: AbortSignal): Promise<FilesResponse> {
-  const query = `repo_url=${encodeURIComponent(repoUrl)}&path=${encodeURIComponent(path)}`;
-  const res = await fetch(`/files?${query}`, { headers: authHeaders(), signal });
-  return json<FilesResponse>(res, "files");
 }
