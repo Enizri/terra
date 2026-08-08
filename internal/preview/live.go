@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"sync"
 )
@@ -43,8 +42,9 @@ func (h *liveHub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	handler.ServeHTTP(w, r)
 }
 
-// MountPathProxy mounts a reverse proxy at /__live/{id}/ and returns the public URL.
-func MountPathProxy(id, targetBaseURL, repoKey string, authFix func(*http.Request)) (publicURL string, err error) {
+// MountPathProxy mounts a reverse proxy at /__live/{id}/ and returns the
+// public URL under publicBase (config.PublicURL).
+func MountPathProxy(publicBase, id, targetBaseURL, repoKey string, authFix func(*http.Request)) (publicURL string, err error) {
 	id = strings.Trim(id, "/")
 	if id == "" || strings.Contains(id, "/") {
 		return "", fmt.Errorf("invalid live proxy id %q", id)
@@ -60,7 +60,7 @@ func MountPathProxy(id, targetBaseURL, repoKey string, authFix func(*http.Reques
 	live.mu.Lock()
 	live.byID[id] = handler
 	live.mu.Unlock()
-	return publicBaseURL() + prefix + "/", nil
+	return strings.TrimRight(publicBase, "/") + prefix + "/", nil
 }
 
 // UnmountPathProxy removes a previously mounted /__live/{id}/ proxy.
@@ -69,13 +69,4 @@ func UnmountPathProxy(id string) {
 	live.mu.Lock()
 	delete(live.byID, id)
 	live.mu.Unlock()
-}
-
-func publicBaseURL() string {
-	if u := strings.TrimSpace(os.Getenv("TERRA_PUBLIC_URL")); u != "" {
-		return strings.TrimRight(u, "/")
-	}
-	// Follow the real listen address (TERRA_ADDR, set by `terra serve`) so a
-	// non-default --addr doesn't hand out iframe URLs pointing at port 8080.
-	return "http://127.0.0.1:" + terraPort()
 }

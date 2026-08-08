@@ -11,11 +11,11 @@ import (
 	"path"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/Enizri/terra/internal/config"
 	"github.com/Enizri/terra/internal/graph"
 	"github.com/Enizri/terra/internal/job"
 	"github.com/Enizri/terra/internal/preview"
@@ -28,7 +28,10 @@ type Server struct {
 	DB string
 	// StaticDir, when set, serves the built web UI (SPA) for non-API GET paths.
 	StaticDir string
-	// Preview boots live previews; nil uses preview.Default() (host unless TERRA_PREVIEW_MODE).
+	// Cfg holds the parsed TERRA_* settings; nil makes Handler call
+	// config.FromEnv() (so tests using t.Setenv keep working).
+	Cfg *config.Config
+	// Preview boots live previews; nil uses preview.Default(Cfg).
 	Preview preview.Runner
 	// Jobs is nil until Handler creates a hub.
 	Jobs *job.Hub
@@ -37,8 +40,7 @@ type Server struct {
 	Analyze func(ctx context.Context, res *scan.Result, model string) (*graph.Map, []string, error)
 	RunTask func(ctx context.Context, name string, payload any) (json.RawMessage, error)
 
-	// analyzeSlots caps concurrent analyze work; initialised in Handler so
-	// tests picking TERRA_ANALYZE_CONCURRENCY via t.Setenv take effect.
+	// analyzeSlots caps concurrent analyze work (Cfg.AnalyzeConcurrency).
 	analyzeSlots chan struct{}
 
 	// initOnce guards Handler's lazy field assignments: two concurrent calls
@@ -49,13 +51,6 @@ type Server struct {
 // maxBodyBytes caps request bodies on JSON endpoints. Ask payloads carry a
 // question plus selections and ingest is capped at 100 spans; 1 MiB is generous.
 const maxBodyBytes = 1 << 20
-
-func analyzeDepth() int {
-	if n, err := strconv.Atoi(os.Getenv("TERRA_ANALYZE_CONCURRENCY")); err == nil && n >= 1 {
-		return n
-	}
-	return 4
-}
 
 // acquireAnalyze claims a slot without blocking; callers 429 when full.
 func (s *Server) acquireAnalyze() bool {
@@ -91,20 +86,11 @@ func decodeBody(w http.ResponseWriter, r *http.Request, dst any, shape string) b
 	return true
 }
 
-// analyzeTimeout is the wall-clock cap for one analyze job
-// (TERRA_ANALYZE_TIMEOUT, default 15m; bad values fall back).
-func analyzeTimeout() time.Duration {
-	if d, err := time.ParseDuration(os.Getenv("TERRA_ANALYZE_TIMEOUT")); err == nil && d > 0 {
-		return d
-	}
-	return 15 * time.Minute
-}
-
 // stopLabel distinguishes a user cancel from the deadline. The exact string
 // "cancelled" is load-bearing: the web client treats it as a silent abort.
-func stopLabel(ctx context.Context) string {
+func stopLabel(ctx context.Context, timeout time.Duration) string {
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-		return fmt.Sprintf("analyze exceeded the %s limit (raise TERRA_ANALYZE_TIMEOUT)", analyzeTimeout())
+		return fmt.Sprintf("analyze exceeded the %s limit (raise TERRA_ANALYZE_TIMEOUT)", timeout)
 	}
 	return "cancelled"
 }
@@ -113,25 +99,32 @@ func (s *Server) previewRunner() preview.Runner {
 	if s.Preview != nil {
 		return s.Preview
 	}
-	return preview.Default()
+	return preview.Default(s.Cfg)
 }
 
 func (s *Server) Handler() http.Handler {
 	s.initOnce.Do(func() {
+		if s.Cfg == nil {
+			s.Cfg = config.FromEnv()
+		}
 		if s.Scan == nil {
 			s.Scan = scan.Scan
 		}
 		if s.Analyze == nil {
-			s.Analyze = graph.Analyze
+			s.Analyze = func(ctx context.Context, res *scan.Result, model string) (*graph.Map, []string, error) {
+				return graph.Analyze(ctx, s.Cfg.AnalyzerURL, res, model)
+			}
 		}
 		if s.RunTask == nil {
-			s.RunTask = graph.RunTask
+			s.RunTask = func(ctx context.Context, name string, payload any) (json.RawMessage, error) {
+				return graph.RunTask(ctx, s.Cfg.AnalyzerURL, name, payload)
+			}
 		}
 		if s.Jobs == nil {
 			s.Jobs = job.NewHub()
 		}
 		if s.analyzeSlots == nil {
-			s.analyzeSlots = make(chan struct{}, analyzeDepth())
+			s.analyzeSlots = make(chan struct{}, s.Cfg.AnalyzeConcurrency)
 		}
 	})
 	mux := http.NewServeMux()
@@ -153,7 +146,7 @@ func (s *Server) Handler() http.Handler {
 		mux.HandleFunc("GET /{path...}", s.static)
 	}
 	// Limiter outermost: unauthenticated floods are rejected before token work.
-	gated := withRateLimit(withToken(mux))
+	gated := withRateLimit(s.Cfg.RateLimit, withToken(s.Cfg.Token, mux))
 	// Path-based live previews (Compose iframes). Outside the mux so it does not
 	// conflict with GET /{path...}; left open — starting a preview is gated at POST /preview.
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -176,8 +169,8 @@ func (s *Server) root(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, filepath.Join(s.StaticDir, "index.html"))
 		return
 	}
-	if u := strings.TrimSpace(os.Getenv("TERRA_WEB_URL")); u != "" {
-		http.Redirect(w, r, u, http.StatusFound)
+	if s.Cfg.WebURL != "" {
+		http.Redirect(w, r, s.Cfg.WebURL, http.StatusFound)
 		return
 	}
 	writeJSON(w, map[string]string{"service": "terra", "status": "ok"})
@@ -185,18 +178,19 @@ func (s *Server) root(w http.ResponseWriter, r *http.Request) {
 
 // ListenAndServe starts the HTTP server and blocks.
 func (s *Server) ListenAndServe(addr string) error {
+	handler := s.Handler() // also fills in s.Cfg
 	fmt.Fprintf(os.Stderr, "terra API listening on %s\n", addr)
 	token := "set"
-	if strings.TrimSpace(os.Getenv("TERRA_TOKEN")) == "" {
+	if s.Cfg.Token == "" {
 		token = "OPEN"
 	}
 	rateLimit := "off"
-	if l := newIPLimiter(); l != nil {
+	if l := newIPLimiter(s.Cfg.RateLimit); l != nil {
 		rateLimit = fmt.Sprintf("%g/s", float64(l.rps))
 	}
 	fmt.Fprintf(os.Stderr, "terra: token=%s rate=%s analyze-depth=%d analyze-timeout=%s\n",
-		token, rateLimit, analyzeDepth(), analyzeTimeout())
-	return (&http.Server{Addr: addr, Handler: s.Handler()}).ListenAndServe()
+		token, rateLimit, s.Cfg.AnalyzeConcurrency, s.Cfg.AnalyzeTimeout)
+	return (&http.Server{Addr: addr, Handler: handler}).ListenAndServe()
 }
 
 func (s *Server) analyze(w http.ResponseWriter, r *http.Request) {
@@ -306,13 +300,14 @@ func (s *Server) cancelJob(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) startAnalyzeJob(repoURL, model string, done func()) *job.Job {
+	timeout := s.Cfg.AnalyzeTimeout
 	return s.Jobs.Start(func(jobCtx context.Context, emit func(job.Event)) {
 		defer done() // release the analyze slot on every exit, panic included
-		ctx, cancel := context.WithTimeout(jobCtx, analyzeTimeout())
+		ctx, cancel := context.WithTimeout(jobCtx, timeout)
 		defer cancel()
 		emit(job.Event{Stage: "clone", Label: "Cloning " + repoURL})
 		if err := ctx.Err(); err != nil {
-			emit(job.Event{Stage: "error", Label: stopLabel(ctx)})
+			emit(job.Event{Stage: "error", Label: stopLabel(ctx, timeout)})
 			return
 		}
 		res, err := s.Scan(repoURL)
@@ -330,14 +325,14 @@ func (s *Server) startAnalyzeJob(repoURL, model string, done func()) *job.Job {
 			return
 		}
 		if err := ctx.Err(); err != nil {
-			emit(job.Event{Stage: "error", Label: stopLabel(ctx)})
+			emit(job.Event{Stage: "error", Label: stopLabel(ctx, timeout)})
 			return
 		}
 		emit(job.Event{Stage: "analyze", Label: "Terra is reading the architecture"})
 		repoMap, warnings, err := s.Analyze(ctx, res, model)
 		if err != nil {
 			if ctx.Err() != nil {
-				emit(job.Event{Stage: "error", Label: stopLabel(ctx)})
+				emit(job.Event{Stage: "error", Label: stopLabel(ctx, timeout)})
 				return
 			}
 			emit(job.Event{Stage: "error", Label: err.Error()})
@@ -347,7 +342,7 @@ func (s *Server) startAnalyzeJob(repoURL, model string, done func()) *job.Job {
 			fmt.Fprintln(os.Stderr, "warning:", warn)
 		}
 		if err := ctx.Err(); err != nil {
-			emit(job.Event{Stage: "error", Label: stopLabel(ctx)})
+			emit(job.Event{Stage: "error", Label: stopLabel(ctx, timeout)})
 			return
 		}
 		if s.DB != "" {
@@ -510,7 +505,7 @@ func (s *Server) askPayload(req askRequest) map[string]any {
 		if l, ok := primary["line"].(float64); ok {
 			line = int(l)
 		}
-		if snip := snippet(s.previewRunner(), req.RepoURL, file, line); snip != "" {
+		if snip := snippet(s.previewRunner(), s.Cfg.CheckoutDir, req.RepoURL, file, line); snip != "" {
 			payload["file_snippet"] = snip
 		}
 	}
@@ -695,13 +690,14 @@ func safeJoin(base, rel string) (full, clean string, err error) {
 }
 
 // snippet returns ~150 lines centered on line from an existing checkout.
-func snippet(r preview.Runner, repoURL, file string, line int) string {
+// checkoutBase is Cfg.CheckoutDir.
+func snippet(r preview.Runner, checkoutBase, repoURL, file string, line int) string {
 	if strings.Contains(file, "..") {
 		return ""
 	}
 	root, appDir, ok := r.Lookup(repoURL)
 	if !ok {
-		dir, err := scan.CheckoutDir(repoURL)
+		dir, err := scan.CheckoutDir(checkoutBase, repoURL)
 		if err != nil {
 			return ""
 		}

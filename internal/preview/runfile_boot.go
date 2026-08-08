@@ -46,7 +46,7 @@ func (r *hostRunner) startViaRunfile(key, root string, detectErr error) (string,
 	// Only Node runs get the trace hook; NODE_OPTIONS means nothing to a Go
 	// binary or a uvicorn process.
 	if rf.Source == "package.json" {
-		cmd.Env = append(cmd.Env, traceEnv(key)...)
+		cmd.Env = append(cmd.Env, traceEnv(r.cfg, key)...)
 	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	logs := &boundedBuf{}

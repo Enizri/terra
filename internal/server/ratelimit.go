@@ -3,8 +3,6 @@ package server
 import (
 	"net"
 	"net/http"
-	"os"
-	"strconv"
 	"sync"
 	"time"
 
@@ -24,15 +22,9 @@ type visitor struct {
 	last time.Time
 }
 
-// newIPLimiter reads TERRA_RATE_LIMIT (requests/sec per IP, default 2;
+// newIPLimiter builds a limiter for rps (Cfg.RateLimit, requests/sec per IP;
 // 0 disables and returns nil). Burst is derived: 10x rps clamped to [10, 100].
-func newIPLimiter() *ipLimiter {
-	rps := 2.0
-	if raw := os.Getenv("TERRA_RATE_LIMIT"); raw != "" {
-		if v, err := strconv.ParseFloat(raw, 64); err == nil && v >= 0 {
-			rps = v
-		}
-	}
+func newIPLimiter(rps float64) *ipLimiter {
 	if rps == 0 {
 		return nil
 	}
@@ -78,8 +70,8 @@ func rateLimited(r *http.Request) bool {
 	return requiresToken(r)
 }
 
-func withRateLimit(next http.Handler) http.Handler {
-	l := newIPLimiter()
+func withRateLimit(rps float64, next http.Handler) http.Handler {
+	l := newIPLimiter(rps)
 	if l == nil {
 		return next
 	}

@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Enizri/terra/internal/config"
 	"github.com/Enizri/terra/internal/scan"
 )
 
@@ -20,8 +21,13 @@ const dockerPreviewPort = 5173
 // dockerDefault is the process-wide Docker sibling preview runner.
 var dockerDefault = &dockerRunner{byRepo: map[string]*dockerInstance{}}
 
-// Docker returns the process-local Docker sibling preview runner.
-func Docker() Runner { return dockerDefault }
+// Docker returns the process-local Docker sibling preview runner, configured with c.
+func Docker(c *config.Config) Runner {
+	dockerDefault.mu.Lock()
+	dockerDefault.cfg = c
+	dockerDefault.mu.Unlock()
+	return dockerDefault
+}
 
 type dockerInstance struct {
 	root          string
@@ -36,6 +42,7 @@ type dockerInstance struct {
 
 type dockerRunner struct {
 	mu     sync.Mutex
+	cfg    *config.Config
 	byRepo map[string]*dockerInstance
 }
 
@@ -47,7 +54,7 @@ func (r *dockerRunner) Start(repoURL string) (string, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	ttl := previewTTL()
+	ttl := r.cfg.PreviewTTL
 	if inst, ok := r.byRepo[key]; ok {
 		check := inst.readyURL
 		if check == "" {
@@ -62,18 +69,18 @@ func (r *dockerRunner) Start(repoURL string) (string, error) {
 		delete(r.byRepo, key)
 	}
 
-	max := previewMax()
+	max := r.cfg.PreviewMax
 	if max >= 0 && len(r.byRepo) >= max {
 		fmt.Fprintf(os.Stderr, "preview: rejected %s, capacity full (%d/%d)\n", key, len(r.byRepo), max)
 		return "", fmt.Errorf("preview capacity full (%d concurrent); stop another preview or raise TERRA_PREVIEW_MAX", max)
 	}
 
-	dockerBin := previewDockerBin()
+	dockerBin := r.cfg.DockerBin
 	if _, err := exec.LookPath(dockerBin); err != nil {
 		return "", fmt.Errorf("docker preview: %q not found on PATH (set TERRA_DOCKER): %w", dockerBin, err)
 	}
 
-	root, err := scan.Checkout(key)
+	root, err := scan.Checkout(r.cfg.CheckoutDir, key)
 	if err != nil {
 		return "", err
 	}
@@ -93,21 +100,18 @@ func (r *dockerRunner) Start(repoURL string) (string, error) {
 		return "", err
 	}
 
-	image := strings.TrimSpace(os.Getenv("TERRA_PREVIEW_IMAGE"))
-	if image == "" {
-		image = "node:22-bookworm"
-	}
-	network := strings.TrimSpace(os.Getenv("TERRA_PREVIEW_NETWORK"))
+	image := r.cfg.PreviewImage
+	network := r.cfg.PreviewNetwork
 
 	args := []string{"run", "-d", "--name", name}
-	args = append(args, dockerMountArgs(root)...)
+	args = append(args, dockerMountArgs(r.cfg, root)...)
 	args = append(args,
 		"-w", appDir,
 		"-e", "PORT="+strconv.Itoa(dockerPreviewPort),
 		"-e", "BROWSER=none",
 		"-e", "NODE_OPTIONS=--require "+hookPath,
 	)
-	for _, kv := range dockerTraceVars(key) {
+	for _, kv := range dockerTraceVars(r.cfg, key) {
 		args = append(args, "-e", kv)
 	}
 	if network != "" {
@@ -136,7 +140,7 @@ func (r *dockerRunner) Start(repoURL string) (string, error) {
 	}
 
 	authFix := seedDemoAuth(key, target)
-	publicURL, err := MountPathProxy(liveID, target, key, authFix)
+	publicURL, err := MountPathProxy(r.cfg.PublicBase(), liveID, target, key, authFix)
 	if err != nil {
 		_ = exec.Command(dockerBin, "rm", "-f", name).Run()
 		return "", err
@@ -149,7 +153,7 @@ func (r *dockerRunner) Start(repoURL string) (string, error) {
 	r.resetTTLLocked(key, inst, ttl)
 	r.byRepo[key] = inst
 	fmt.Fprintf(os.Stderr, "preview: started %s at %s (ttl %s, %d/%d slots)\n",
-		name, publicURL, ttl, len(r.byRepo), previewMax())
+		name, publicURL, ttl, len(r.byRepo), max)
 	return publicURL, nil
 }
 
@@ -182,7 +186,7 @@ func (r *dockerRunner) stopLocked(inst *dockerInstance) {
 		inst.timer = nil
 	}
 	UnmountPathProxy(inst.liveID)
-	bin := previewDockerBin()
+	bin := r.cfg.DockerBin
 	_ = exec.Command(bin, "rm", "-f", inst.containerName).Run()
 	fmt.Fprintf(os.Stderr, "preview: stopped %s\n", inst.containerName)
 }
@@ -227,7 +231,7 @@ func (r *dockerRunner) resolveTarget(dockerBin, name, network string) (string, e
 	if i := strings.LastIndex(line, ":"); i >= 0 {
 		hostPort := strings.TrimSpace(line[i+1:])
 		if hostPort != "" {
-			gateway := strings.TrimSpace(os.Getenv("TERRA_TRACE_HOST"))
+			gateway := r.cfg.TraceHost
 			if gateway == "" {
 				// The published port lives on the Docker host. From inside a
 				// container that's host.docker.internal; from a Terra process
@@ -249,16 +253,15 @@ func (r *dockerRunner) resolveTarget(dockerBin, name, network string) (string, e
 // dockerMountArgs returns -v flags so the checkout is visible inside the sibling.
 // Prefer a named volume (Compose) or host bind remap — Docker Desktop resolves
 // -v against the host, so API-container paths like /data/... cannot be remounted as-is.
-func dockerMountArgs(root string) []string {
-	if vol := strings.TrimSpace(os.Getenv("TERRA_CHECKOUT_VOLUME")); vol != "" {
-		return []string{"-v", vol + ":/data"}
+func dockerMountArgs(c *config.Config, root string) []string {
+	if c.CheckoutVolume != "" {
+		return []string{"-v", c.CheckoutVolume + ":/data"}
 	}
-	if hostBase := strings.TrimSpace(os.Getenv("TERRA_HOST_CHECKOUT_DIR")); hostBase != "" {
-		checkoutBase := strings.TrimSpace(os.Getenv("TERRA_CHECKOUT_DIR"))
+	if c.HostCheckoutDir != "" {
 		src := root
-		if checkoutBase != "" {
-			if rel, err := filepath.Rel(checkoutBase, root); err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-				src = filepath.Join(hostBase, rel)
+		if c.CheckoutDir != "" {
+			if rel, err := filepath.Rel(c.CheckoutDir, root); err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+				src = filepath.Join(c.HostCheckoutDir, rel)
 			}
 		}
 		return []string{"-v", src + ":" + root}
@@ -281,37 +284,6 @@ func dockerDevCommand(pm, script, basePath string) string {
 	// --base: path proxy lives under /__live/{id}/; absolute /@vite/* must match.
 	args += fmt.Sprintf(" --host 0.0.0.0 --port %d --strictPort --base %s", dockerPreviewPort, basePath)
 	return fmt.Sprintf("%s%s install && %s %s", prefix, pm, pm, args)
-}
-
-func previewDockerBin() string {
-	if b := strings.TrimSpace(os.Getenv("TERRA_DOCKER")); b != "" {
-		return b
-	}
-	return "docker"
-}
-
-func previewMax() int {
-	v := strings.TrimSpace(os.Getenv("TERRA_PREVIEW_MAX"))
-	if v == "" {
-		return 2
-	}
-	n, err := strconv.Atoi(v)
-	if err != nil || n < 0 {
-		return 2
-	}
-	return n
-}
-
-func previewTTL() time.Duration {
-	v := strings.TrimSpace(os.Getenv("TERRA_PREVIEW_TTL"))
-	if v == "" {
-		return 30 * time.Minute
-	}
-	d, err := time.ParseDuration(v)
-	if err != nil {
-		return 30 * time.Minute
-	}
-	return d
 }
 
 var safeKeyRe = regexp.MustCompile(`[^a-zA-Z0-9_.-]+`)

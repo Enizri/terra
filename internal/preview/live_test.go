@@ -6,23 +6,20 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/Enizri/terra/internal/config"
 )
 
-func TestPublicBaseURLFollowsListenAddr(t *testing.T) {
-	t.Setenv("TERRA_PUBLIC_URL", "")
-	t.Setenv("TERRA_ADDR", "127.0.0.1:9000")
-	if got := publicBaseURL(); got != "http://127.0.0.1:9000" {
-		t.Errorf("publicBaseURL() = %q, want the --addr port", got)
+func TestPublicBaseFollowsListenAddr(t *testing.T) {
+	if got := (&config.Config{Addr: "127.0.0.1:9000"}).PublicBase(); got != "http://127.0.0.1:9000" {
+		t.Errorf("PublicBase() = %q, want the --addr port", got)
 	}
-	t.Setenv("TERRA_PUBLIC_URL", "https://terra.example/")
-	if got := publicBaseURL(); got != "https://terra.example" {
-		t.Errorf("publicBaseURL() = %q, want the explicit public URL", got)
+	if got := (&config.Config{PublicURL: "https://terra.example"}).PublicBase(); got != "https://terra.example" {
+		t.Errorf("PublicBase() = %q, want the explicit public URL", got)
 	}
 }
 
 func TestMountPathProxyRoutesAndInjects(t *testing.T) {
-	t.Setenv("TERRA_PUBLIC_URL", "http://127.0.0.1:8080")
-
 	id := "test-live-hub"
 	prefix := "/__live/" + id
 	t.Cleanup(func() { UnmountPathProxy(id) })
@@ -40,7 +37,7 @@ func TestMountPathProxyRoutesAndInjects(t *testing.T) {
 	}))
 	t.Cleanup(upstream.Close)
 
-	publicURL, err := MountPathProxy(id, upstream.URL, "https://github.com/acme/notes", nil)
+	publicURL, err := MountPathProxy("http://127.0.0.1:8080", id, upstream.URL, "https://github.com/acme/notes", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -4,7 +4,6 @@ import (
 	"crypto/subtle"
 	"net"
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/Enizri/terra/internal/trace"
@@ -25,10 +24,9 @@ func LoopbackAddr(addr string) bool {
 	return ip != nil && ip.IsLoopback()
 }
 
-// withToken gates expensive/mutating routes when TERRA_TOKEN is set.
-// Empty TERRA_TOKEN leaves the API open (local make dev).
-func withToken(next http.Handler) http.Handler {
-	want := strings.TrimSpace(os.Getenv("TERRA_TOKEN"))
+// withToken gates expensive/mutating routes when want (Cfg.Token) is set.
+// Empty token leaves the API open (local make dev).
+func withToken(want string, next http.Handler) http.Handler {
 	if want == "" {
 		return next
 	}

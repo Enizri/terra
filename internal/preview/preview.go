@@ -23,6 +23,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Enizri/terra/internal/config"
 	"github.com/Enizri/terra/internal/scan"
 	"github.com/Enizri/terra/internal/trace"
 )
@@ -101,27 +102,16 @@ func mergeNodeOptions(existing, hookPath string) string {
 	return existing + " " + opt
 }
 
-// terraPort is where the preview reports spans (from TERRA_ADDR, default 8080).
-func terraPort() string {
-	addr := os.Getenv("TERRA_ADDR")
-	if addr == "" {
-		return "8080"
-	}
-	if i := strings.LastIndex(addr, ":"); i >= 0 {
-		return addr[i+1:]
-	}
-	return addr
-}
-
 // traceEnv returns env vars that preload hook.js for in-process spans.
-func traceEnv(repoKey string) []string {
+// Spans post back to the Terra API port (c.Port()).
+func traceEnv(c *config.Config, repoKey string) []string {
 	hook, err := hookJSPath()
 	if err != nil {
 		return nil
 	}
 	env := []string{
 		"NODE_OPTIONS=" + mergeNodeOptions(os.Getenv("NODE_OPTIONS"), hook),
-		"TERRA_TRACE_URL=http://localhost:" + terraPort() + "/traces/ingest",
+		"TERRA_TRACE_URL=http://localhost:" + c.Port() + "/traces/ingest",
 		"TERRA_TRACE_REPO=" + repoKey,
 		"TERRA_TRACE_TOKEN=" + trace.IngestToken(),
 	}
@@ -146,13 +136,13 @@ func childEnv() []string {
 
 // dockerTraceVars are hook ingest settings for a sibling container
 // (NODE_OPTIONS is set separately to the in-container hook path).
-func dockerTraceVars(repoKey string) []string {
-	host := strings.TrimSpace(os.Getenv("TERRA_TRACE_HOST"))
+func dockerTraceVars(c *config.Config, repoKey string) []string {
+	host := c.TraceHost
 	if host == "" {
 		host = "host.docker.internal"
 	}
 	return []string{
-		"TERRA_TRACE_URL=http://" + host + ":" + terraPort() + "/traces/ingest",
+		"TERRA_TRACE_URL=http://" + host + ":" + c.Port() + "/traces/ingest",
 		"TERRA_TRACE_REPO=" + repoKey,
 		"TERRA_TRACE_TOKEN=" + trace.IngestToken(),
 	}
@@ -171,6 +161,7 @@ type instance struct {
 // hostRunner is today's host-exec preview implementation behind Runner.
 type hostRunner struct {
 	mu     sync.Mutex
+	cfg    *config.Config
 	byRepo map[string]*instance
 	boots  map[string]chan struct{} // in-flight boots; closed when done
 }
@@ -226,7 +217,7 @@ func (r *hostRunner) Start(repoURL string) (string, error) {
 
 // boot does the heavy lifting for one repo. It must not touch r.mu.
 func (r *hostRunner) boot(key string) (string, *instance, error) {
-	root, err := scan.Checkout(key)
+	root, err := scan.Checkout(r.cfg.CheckoutDir, key)
 	if err != nil {
 		return "", nil, err
 	}
@@ -271,7 +262,7 @@ func (r *hostRunner) boot(key string) (string, *instance, error) {
 	cmd.Dir = appDir
 	cmd.Env = append(childEnv(), "PORT="+strconv.Itoa(devPort), "BROWSER=none")
 	cmd.Env = append(cmd.Env, apiEnv...)
-	cmd.Env = append(cmd.Env, traceEnv(key)...)
+	cmd.Env = append(cmd.Env, traceEnv(r.cfg, key)...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	logs := &boundedBuf{}
 	cmd.Stdout = logs

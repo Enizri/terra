@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Enizri/terra/internal/config"
 	"github.com/Enizri/terra/internal/trace"
 )
 
@@ -153,19 +154,18 @@ func TestMergeNodeOptions(t *testing.T) {
 }
 
 func TestTerraPort(t *testing.T) {
-	for env, want := range map[string]string{"": "8080", ":9000": "9000", "localhost:7777": "7777"} {
-		t.Setenv("TERRA_ADDR", env)
-		if got := terraPort(); got != want {
-			t.Errorf("TERRA_ADDR=%q: port = %q, want %q", env, got, want)
+	for addr, want := range map[string]string{"": "8080", ":9000": "9000", "localhost:7777": "7777"} {
+		c := &config.Config{Addr: addr}
+		if got := c.Port(); got != want {
+			t.Errorf("Addr=%q: port = %q, want %q", addr, got, want)
 		}
 	}
 }
 
 func TestTraceEnvArmsTheHook(t *testing.T) {
-	t.Setenv("TERRA_ADDR", ":9999")
 	t.Setenv("NODE_OPTIONS", "")
 	t.Setenv("TERRA_TOKEN", "real-api-secret")
-	env := traceEnv("https://github.com/acme/notes")
+	env := traceEnv(&config.Config{Addr: ":9999"}, "https://github.com/acme/notes")
 	if len(env) != 4 {
 		t.Fatalf("env = %v", env)
 	}
