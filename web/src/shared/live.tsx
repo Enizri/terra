@@ -164,23 +164,29 @@ export function useStreamingAskHint(paused: boolean, hints: readonly string[]) {
   const phase = useRef<"type" | "hold" | "delete">("type");
   const typed = useRef(0);
   const hintsKey = hints.join("\0");
+  // Callers often rebuild the hints array every render; depending on its
+  // identity would reset the animation on every typed character. Key the
+  // effects on content (hintsKey) and read the array through a ref.
+  const hintsRef = useRef(hints);
+  hintsRef.current = hints;
 
   useEffect(() => {
     index.current = 0;
     phase.current = "type";
     typed.current = 0;
     setHint("");
-    setFull(hints[0] ?? "");
-  }, [hintsKey, hints]);
+    setFull(hintsRef.current[0] ?? "");
+  }, [hintsKey]);
 
   useEffect(() => {
-    if (paused || hints.length === 0) {
+    if (paused || hintsRef.current.length === 0) {
       setHint("");
       return;
     }
 
     let timer = 0;
     const tick = () => {
+      const hints = hintsRef.current;
       const current = hints[index.current % hints.length];
       setFull(current);
       if (phase.current === "type") {
@@ -212,7 +218,7 @@ export function useStreamingAskHint(paused: boolean, hints: readonly string[]) {
 
     timer = window.setTimeout(tick, 160);
     return () => window.clearTimeout(timer);
-  }, [paused, hints, hintsKey]);
+  }, [paused, hintsKey]);
 
   return { text: hint, full };
 }

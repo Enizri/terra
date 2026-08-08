@@ -25,6 +25,7 @@ import (
 
 	"github.com/Enizri/terra/internal/config"
 	"github.com/Enizri/terra/internal/scan"
+	"github.com/Enizri/terra/internal/trace"
 )
 
 //go:embed select.js
@@ -71,7 +72,18 @@ func hookJSPath() (string, error) {
 			return filepath.Abs(cand)
 		}
 	}
-	hookPath := filepath.Join(os.TempDir(), "terra-hook.js")
+	// Per-user cache dir, not the shared os.TempDir(): a fixed name in a
+	// world-writable directory lets another local user plant a file that gets
+	// --require'd into every previewed Node process.
+	cache, err := os.UserCacheDir()
+	if err != nil {
+		return "", err
+	}
+	dir := filepath.Join(cache, "terra")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return "", err
+	}
+	hookPath := filepath.Join(dir, "terra-hook.js")
 	if err := os.WriteFile(hookPath, hookJS, 0o644); err != nil {
 		return "", err
 	}
@@ -101,9 +113,23 @@ func traceEnv(c *config.Config, repoKey string) []string {
 		"NODE_OPTIONS=" + mergeNodeOptions(os.Getenv("NODE_OPTIONS"), hook),
 		"TERRA_TRACE_URL=http://localhost:" + c.Port() + "/traces/ingest",
 		"TERRA_TRACE_REPO=" + repoKey,
+		"TERRA_TRACE_TOKEN=" + trace.IngestToken(),
 	}
-	if c.Token != "" {
-		env = append(env, "TERRA_TRACE_TOKEN="+c.Token)
+	return env
+}
+
+// childEnv is the environment for processes running untrusted repo code:
+// just enough for npm/go toolchains, never the full host environment (which
+// carries TERRA_TOKEN, cloud credentials, etc.).
+func childEnv() []string {
+	var env []string
+	for _, key := range []string{
+		"PATH", "HOME", "TMPDIR", "LANG", "LC_ALL", "TERM", "USER", "LOGNAME", "SHELL",
+		"GOPATH", "GOCACHE", "GOMODCACHE", "GOTOOLCHAIN", "GOPROXY",
+	} {
+		if v, ok := os.LookupEnv(key); ok {
+			env = append(env, key+"="+v)
+		}
 	}
 	return env
 }
@@ -111,14 +137,15 @@ func traceEnv(c *config.Config, repoKey string) []string {
 // dockerTraceVars are hook ingest settings for a sibling container
 // (NODE_OPTIONS is set separately to the in-container hook path).
 func dockerTraceVars(c *config.Config, repoKey string) []string {
-	env := []string{
-		"TERRA_TRACE_URL=http://" + c.TraceHost + ":" + c.Port() + "/traces/ingest",
+	host := c.TraceHost
+	if host == "" {
+		host = "host.docker.internal"
+	}
+	return []string{
+		"TERRA_TRACE_URL=http://" + host + ":" + c.Port() + "/traces/ingest",
 		"TERRA_TRACE_REPO=" + repoKey,
+		"TERRA_TRACE_TOKEN=" + trace.IngestToken(),
 	}
-	if c.Token != "" {
-		env = append(env, "TERRA_TRACE_TOKEN="+c.Token)
-	}
-	return env
 }
 
 type instance struct {
@@ -128,6 +155,7 @@ type instance struct {
 	api      *exec.Cmd // the repo's own backend, if it has one
 	devPort  int       // the repo's dev server, behind the proxy
 	proxyURL string
+	proxyLn  net.Listener // closed on stop, or each restart leaks a listener
 }
 
 // hostRunner is today's host-exec preview implementation behind Runner.
@@ -135,28 +163,95 @@ type hostRunner struct {
 	mu     sync.Mutex
 	cfg    *config.Config
 	byRepo map[string]*instance
+	boots  map[string]chan struct{} // in-flight boots; closed when done
+	// starting tracks processes owned by an in-flight boot so StopAll can
+	// kill them on Ctrl-C before they land in byRepo.
+	starting map[string]*instance
 }
 
 // Start returns a live preview URL for repoURL, reusing a healthy instance.
+// Boots run outside the mutex: holding it across npm install + ready-waits
+// (minutes) would block Lookup — and with it every /files request — and
+// serialize unrelated repos behind one slow boot.
 func (r *hostRunner) Start(repoURL string) (string, error) {
 	key, _, err := scan.NormalizeURL(repoURL)
 	if err != nil {
 		return "", err
 	}
+	for {
+		r.mu.Lock()
+		if inst, ok := r.byRepo[key]; ok {
+			port, url := inst.devPort, inst.proxyURL
+			r.mu.Unlock()
+			if alive(port) {
+				return url, nil
+			}
+			r.mu.Lock()
+			if cur, ok := r.byRepo[key]; ok && cur == inst {
+				r.stopInstanceLocked(cur)
+				delete(r.byRepo, key)
+			}
+		}
+		if ch, ok := r.boots[key]; ok {
+			// Someone else is booting this repo; wait and re-check.
+			r.mu.Unlock()
+			<-ch
+			continue
+		}
+		if r.boots == nil {
+			r.boots = map[string]chan struct{}{}
+		}
+		ch := make(chan struct{})
+		r.boots[key] = ch
+		r.mu.Unlock()
+
+		url, err := r.runBoot(key, ch)
+		return url, err
+	}
+}
+
+// runBoot runs boot and always clears the boots entry, even on panic.
+func (r *hostRunner) runBoot(key string, ch chan struct{}) (url string, err error) {
+	var inst *instance
+	defer func() {
+		if rec := recover(); rec != nil {
+			err = fmt.Errorf("preview boot panicked: %v", rec)
+			inst = nil
+		}
+		r.mu.Lock()
+		if err == nil && inst != nil {
+			r.byRepo[key] = inst
+		} else {
+			if inst != nil {
+				r.stopInstanceLocked(inst)
+			} else if partial := r.starting[key]; partial != nil {
+				r.stopInstanceLocked(partial)
+			}
+		}
+		delete(r.starting, key)
+		delete(r.boots, key)
+		close(ch)
+		r.mu.Unlock()
+	}()
+	url, inst, err = r.boot(key)
+	return url, err
+}
+
+// trackStarting publishes an in-flight instance so StopAll can reach it.
+func (r *hostRunner) trackStarting(key string, inst *instance) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if inst, ok := r.byRepo[key]; ok {
-		if alive(inst.devPort) {
-			return inst.proxyURL, nil
-		}
-		stop(inst.cmd)
-		stop(inst.api)
-		delete(r.byRepo, key)
+	if r.starting == nil {
+		r.starting = map[string]*instance{}
 	}
+	r.starting[key] = inst
+}
 
+// boot does the heavy lifting for one repo. It must not touch r.mu.
+func (r *hostRunner) boot(key string) (string, *instance, error) {
 	root, err := scan.Checkout(r.cfg.CheckoutDir, key)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	appDir, script, pm, err := detect(root)
 	if err != nil {
@@ -165,8 +260,9 @@ func (r *hostRunner) Start(repoURL string) (string, error) {
 	if _, err := os.Stat(filepath.Join(appDir, "node_modules")); err != nil {
 		install := exec.Command(pm, "install")
 		install.Dir = appDir
+		install.Env = childEnv()
 		if out, err := install.CombinedOutput(); err != nil {
-			return "", fmt.Errorf("%s install in %s: %v: %s", pm, appDir, err, tail(out))
+			return "", nil, fmt.Errorf("%s install in %s: %v: %s", pm, appDir, err, tail(out))
 		}
 	}
 
@@ -177,7 +273,7 @@ func (r *hostRunner) Start(repoURL string) (string, error) {
 	if pkg, ok := detectGoBackend(root); ok {
 		port, backend, err := startBackend(root, pkg)
 		if err != nil {
-			return "", err
+			return "", nil, err
 		}
 		apiPort, apiCmd = port, backend
 		apiEnv = append(apiEnv, "DEV_PROXY_SERVER=http://localhost:"+strconv.Itoa(apiPort))
@@ -186,7 +282,7 @@ func (r *hostRunner) Start(repoURL string) (string, error) {
 	devPort, err := freePort()
 	if err != nil {
 		stop(apiCmd)
-		return "", err
+		return "", nil, err
 	}
 	// npm needs `--` to forward port flags; pnpm/yarn do not.
 	args := []string{"run", script}
@@ -196,7 +292,7 @@ func (r *hostRunner) Start(repoURL string) (string, error) {
 	args = append(args, "--port", strconv.Itoa(devPort), "--strictPort")
 	cmd := exec.Command(pm, args...)
 	cmd.Dir = appDir
-	cmd.Env = append(os.Environ(), "PORT="+strconv.Itoa(devPort), "BROWSER=none")
+	cmd.Env = append(childEnv(), "PORT="+strconv.Itoa(devPort), "BROWSER=none")
 	cmd.Env = append(cmd.Env, apiEnv...)
 	cmd.Env = append(cmd.Env, traceEnv(r.cfg, key)...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
@@ -205,27 +301,31 @@ func (r *hostRunner) Start(repoURL string) (string, error) {
 	cmd.Stderr = logs
 	if err := cmd.Start(); err != nil {
 		stop(apiCmd)
-		return "", fmt.Errorf("start dev server (%s run %s): %w", pm, script, err)
+		return "", nil, fmt.Errorf("start dev server (%s run %s): %w", pm, script, err)
 	}
+	inst := &instance{root: root, appDir: appDir, cmd: cmd, api: apiCmd, devPort: devPort}
+	r.trackStarting(key, inst)
 
 	port, err := waitReady(devPort, logs, watch(cmd), 2*time.Minute, apiPort)
 	if err != nil {
 		stop(cmd)
 		stop(apiCmd)
-		return "", fmt.Errorf("dev server never came up: %v\n--- output ---\n%s", err, logs.String())
+		return "", nil, fmt.Errorf("dev server never came up: %v\n--- output ---\n%s", err, logs.String())
 	}
 
 	targetBase := "http://localhost:" + strconv.Itoa(port)
-	hasAuth := seedAuth(targetBase)
+	authFix := seedDemoAuth(key, targetBase)
 
-	proxyURL, err := serveProxy(key, targetBase, hasAuth)
+	proxyURL, proxyLn, err := serveProxy(key, targetBase, authFix)
 	if err != nil {
 		stop(cmd)
 		stop(apiCmd)
-		return "", err
+		return "", nil, err
 	}
-	r.byRepo[key] = &instance{root: root, appDir: appDir, cmd: cmd, api: apiCmd, devPort: port, proxyURL: proxyURL}
-	return proxyURL, nil
+	inst.devPort = port
+	inst.proxyURL = proxyURL
+	inst.proxyLn = proxyLn
+	return proxyURL, inst, nil
 }
 
 // Lookup returns the checkout root and frontend dir of a running preview.
@@ -243,14 +343,27 @@ func (r *hostRunner) Lookup(repoURL string) (root, appDir string, ok bool) {
 	return inst.root, inst.appDir, true
 }
 
-// StopAll kills every dev-server process group. Call on shutdown.
+// StopAll kills every dev-server process group, including in-flight boots.
+// Call on shutdown.
 func (r *hostRunner) StopAll() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	for key, inst := range r.starting {
+		r.stopInstanceLocked(inst)
+		delete(r.starting, key)
+	}
 	for key, inst := range r.byRepo {
-		stop(inst.cmd)
-		stop(inst.api)
+		r.stopInstanceLocked(inst)
 		delete(r.byRepo, key)
+	}
+}
+
+func (r *hostRunner) stopInstanceLocked(inst *instance) {
+	stop(inst.cmd)
+	stop(inst.api)
+	if inst.proxyLn != nil {
+		inst.proxyLn.Close()
+		inst.proxyLn = nil
 	}
 }
 
@@ -268,7 +381,7 @@ func stop(cmd *exec.Cmd) {
 // detect finds a frontend package.json under root (depth ≤ 2).
 func detect(root string) (appDir, script, pm string, err error) {
 	type candidate struct {
-		dir, script string
+		dir, script  string
 		score, depth int
 	}
 	var best *candidate
@@ -382,6 +495,7 @@ func startBackend(root, pkg string) (int, *exec.Cmd, error) {
 
 	cmd := exec.Command("go", "run", pkg, "--port", strconv.Itoa(port), "--data", data)
 	cmd.Dir = root
+	cmd.Env = childEnv()
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	logs := &boundedBuf{}
 	cmd.Stdout = logs
@@ -467,116 +581,35 @@ func freePort() (int, error) {
 	return ln.Addr().(*net.TCPAddr).Port, nil
 }
 
-/* ---------- demo auto sign-in (memos-style APIs) ---------- */
-
-const (
-	demoUser = "terra"
-	demoPass = "terra-demo-2026"
-)
-
-func signinDemo(client *http.Client, base string) (*http.Response, error) {
-	body := fmt.Sprintf(
-		`{"passwordCredentials":{"username":%q,"password":%q}}`, demoUser, demoPass)
-	return client.Post(base+"/api/v1/auth/signin", "application/json", strings.NewReader(body))
-}
-
-// refreshCookie reads memos_refresh from Set-Cookie or Grpc-Metadata-Set-Cookie.
-func refreshCookie(resp *http.Response) string {
-	for _, header := range []string{"Set-Cookie", "Grpc-Metadata-Set-Cookie"} {
-		for _, value := range resp.Header.Values(header) {
-			if strings.HasPrefix(value, "memos_refresh=") {
-				return strings.SplitN(value, ";", 2)[0]
-			}
-		}
-	}
-	return ""
-}
-
-// seedAuth creates a demo user if needed and returns whether auth is available.
-func seedAuth(baseURL string) bool {
-	base := strings.TrimRight(baseURL, "/")
-	client := &http.Client{Timeout: 5 * time.Second}
-
-	resp, err := signinDemo(client, base)
-	if err != nil {
-		return false
-	}
-	if resp.StatusCode != http.StatusOK {
-		resp.Body.Close()
-		userBody := fmt.Sprintf(
-			`{"username":%q,"password":%q,"displayName":"Terra"}`, demoUser, demoPass)
-		cr, err := client.Post(base+"/api/v1/users", "application/json", strings.NewReader(userBody))
-		if err != nil {
-			return false
-		}
-		created := cr.StatusCode == http.StatusOK
-		cr.Body.Close()
-		if resp, err = signinDemo(client, base); err != nil {
-			return false
-		}
-		if created {
-			seedMemos(client, base, resp)
-		}
-	}
-	defer resp.Body.Close()
-	return resp.StatusCode == http.StatusOK && refreshCookie(resp) != ""
-}
-
-// seedMemos posts a few public notes into a new demo instance.
-func seedMemos(client *http.Client, base string, signinResp *http.Response) {
-	var out struct {
-		AccessToken string `json:"accessToken"`
-	}
-	raw, err := io.ReadAll(signinResp.Body)
-	if err != nil || json.Unmarshal(raw, &out) != nil || out.AccessToken == "" {
-		signinResp.Body = io.NopCloser(bytes.NewReader(raw))
-		return
-	}
-	signinResp.Body = io.NopCloser(bytes.NewReader(raw))
-	notes := []string{
-		"**Welcome!** This is a live instance of `usememos/memos`, running inside Terra's map.",
-		"Everything here is real — the screens come from `web/src`, requests go through `internal/api`, and notes land in `store/memo.go`.",
-		"Try it: write a note, then ask Terra which file just saved it.",
-	}
-	for _, note := range notes {
-		body, _ := json.Marshal(map[string]string{"content": note, "visibility": "PUBLIC"})
-		req, _ := http.NewRequest("POST", base+"/api/v1/memos", bytes.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Authorization", "Bearer "+out.AccessToken)
-		if resp, err := client.Do(req); err == nil {
-			resp.Body.Close()
-		}
-	}
-}
-
 /* ---------- injecting reverse proxy ---------- */
 
-// serveProxy reverse-proxies a localhost/dev target on an ephemeral loopback port.
-func serveProxy(repoKey, targetBase string, hasAuth bool) (string, error) {
-	handler, err := newInjectProxy(repoKey, targetBase, hasAuth, "")
+// serveProxy reverse-proxies a localhost/dev target on an ephemeral loopback
+// port. The caller owns the returned listener and must close it to stop.
+func serveProxy(repoKey, targetBase string, authFix func(*http.Request)) (string, net.Listener, error) {
+	handler, err := newInjectProxy(repoKey, targetBase, authFix, "")
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	go http.Serve(ln, handler)
-	return "http://" + ln.Addr().String() + "/", nil
+	return "http://" + ln.Addr().String() + "/", ln, nil
 }
 
 // newInjectProxy reverse-proxies targetBase, injects select.js, and emits spans.
-// publicPrefix is the browser-visible path prefix for the script tag
-// (e.g. "/__live/id"); the handler itself still serves "/__terra/select.js"
-// after the live hub strips the prefix.
-func newInjectProxy(repoKey, targetBase string, hasAuth bool, publicPrefix string) (http.Handler, error) {
+// authFix, when non-nil, is a per-repo hook that may rewrite outgoing request
+// auth headers (see seedDemoAuth). publicPrefix is empty for the host loopback
+// proxy, or "/__live/{id}" for the path proxy (Vite --base matches; full paths
+// are forwarded, not stripped).
+func newInjectProxy(repoKey, targetBase string, authFix func(*http.Request), publicPrefix string) (http.Handler, error) {
 	base := strings.TrimRight(targetBase, "/")
 	target, err := url.Parse(base)
 	if err != nil || target.Scheme == "" || target.Host == "" {
 		return nil, fmt.Errorf("invalid preview target %q", targetBase)
 	}
 	inject := `<script src="` + publicPrefix + `/__terra/select.js"></script>`
-	authClient := &http.Client{Timeout: 5 * time.Second}
 	rp := httputil.NewSingleHostReverseProxy(target)
 	director := rp.Director
 	rp.Director = func(r *http.Request) {
@@ -585,21 +618,8 @@ func newInjectProxy(repoKey, targetBase string, hasAuth bool, publicPrefix strin
 		// is always allowed; the URL still targets the sibling container.
 		r.Host = "localhost"
 		r.Header.Del("Accept-Encoding")
-		// Mint a fresh refresh cookie per auth refresh (tokens rotate).
-		if hasAuth &&
-			(strings.Contains(r.URL.Path, "auth/refresh") ||
-				strings.Contains(r.URL.Path, "AuthService/RefreshToken")) &&
-			!strings.Contains(r.Header.Get("Cookie"), "memos_refresh=") {
-			if resp, err := signinDemo(authClient, base); err == nil {
-				if cookie := refreshCookie(resp); cookie != "" {
-					if prev := r.Header.Get("Cookie"); prev != "" {
-						r.Header.Set("Cookie", prev+"; "+cookie)
-					} else {
-						r.Header.Set("Cookie", cookie)
-					}
-				}
-				resp.Body.Close()
-			}
+		if authFix != nil {
+			authFix(r)
 		}
 	}
 	rp.ModifyResponse = func(resp *http.Response) error {
@@ -625,14 +645,21 @@ func newInjectProxy(repoKey, targetBase string, hasAuth bool, publicPrefix strin
 		return nil
 	}
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/__terra/select.js", func(w http.ResponseWriter, r *http.Request) {
+	serveSelect := func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")
 		w.Write(loadSelectJS())
-	})
-	mux.Handle("/", rp)
-	return traceMiddleware(repoKey, mux), nil
+	}
+	mux := http.NewServeMux()
+	if publicPrefix == "" {
+		mux.HandleFunc("/__terra/select.js", serveSelect)
+		mux.Handle("/", rp)
+	} else {
+		mux.HandleFunc(publicPrefix+"/__terra/select.js", serveSelect)
+		mux.Handle(publicPrefix+"/", rp)
+		mux.Handle(publicPrefix, rp)
+	}
+	return traceMiddleware(repoKey, publicPrefix, mux), nil
 }
 
 /* ---------- bounded output buffer ---------- */

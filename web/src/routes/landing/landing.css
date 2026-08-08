@@ -1543,52 +1543,6 @@
   padding: 8px;
 }
 
-.sh-evidence {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  border-radius: 12px;
-  background: #fff;
-  border: 1px solid var(--sh-border);
-  padding: 12px;
-  overflow: hidden;
-  user-select: none;
-}
-
-.sh-evidence__head {
-  font-size: 14px;
-  font-weight: 500;
-  margin-bottom: 10px;
-}
-
-.sh-evidence__head span {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px;
-  font-weight: 400;
-  color: var(--sh-muted-2);
-  margin-left: 6px;
-}
-
-.sh-evidence__row {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 9px 0;
-  border-top: 1px solid var(--sh-border);
-}
-
-.sh-evidence__row code {
-  display: block;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12px;
-  color: var(--color-tint);
-}
-
-.sh-evidence__row small {
-  font-size: 11px;
-  color: var(--sh-muted);
-}
-
 /* Smart command palette */
 
 .sh-cmd {
@@ -2244,10 +2198,6 @@
   background: #1a1b1e;
 }
 
-.sh-theater__panel--inline .sh-theater__files {
-  padding: 60px 20px 20px;
-}
-
 @media (prefers-reduced-motion: no-preference) {
 .sh-theater__panel {
     transition:
@@ -2313,127 +2263,9 @@
   white-space: nowrap;
 }
 
-.sh-theater__tabs {
-  display: flex;
-  gap: 6px;
-}
-
 .sh-theater__close,
 .sh-theater__expand {
   line-height: 1;
-}
-
-.sh-theater__files {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 76px 24px 24px;
-}
-
-.sh-theater__files .sh-evidence {
-  /* The landing card stretches to its grid cell; here it hugs the file list. */
-  height: auto;
-  max-width: 720px;
-  margin: 0 auto;
-  padding: 16px 18px;
-}
-
-/* ---- inspect / action segmented control ---- */
-
-.sh-seg {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 2px;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.06);
-}
-
-.sh-seg__btn {
-  border: 0;
-  cursor: pointer;
-  border-radius: 999px;
-  padding: 5px 12px;
-  font: inherit;
-  font-size: 12px;
-  line-height: 1;
-  color: var(--sh-muted);
-  background: transparent;
-}
-
-.sh-seg__btn.is-on {
-  color: #fff;
-  background: var(--color-tint);
-}
-
-/* ---- live file browser ---- */
-
-.sh-files {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-width: 860px;
-  margin: 0 auto;
-  min-height: 0;
-}
-
-.sh-files__crumb {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.sh-files__crumb code {
-  font-size: 12px;
-  color: var(--sh-muted);
-  overflow-wrap: anywhere;
-}
-
-.sh-files__status {
-  font-size: 13px;
-  color: var(--sh-muted);
-}
-
-.sh-files__list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 2px;
-}
-
-.sh-files__entry {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  border: 0;
-  cursor: pointer;
-  background: transparent;
-  border-radius: 8px;
-  padding: 7px 10px;
-  font: inherit;
-  font-size: 13px;
-  text-align: left;
-  color: inherit;
-}
-
-.sh-files__entry:hover {
-  background: rgba(0, 0, 0, 0.05);
-}
-
-.sh-files__code {
-  margin: 0;
-  padding: 14px 16px;
-  border-radius: 12px;
-  background: rgba(0, 0, 0, 0.04);
-  border: 1px solid var(--sh-border);
-  font-size: 12px;
-  line-height: 1.55;
-  /* Long lines scroll inside the block; the panel itself never sidescrolls. */
-  overflow-x: auto;
-  white-space: pre;
 }
 
 /* ---- replica ---- */
@@ -3022,12 +2854,6 @@
   transform: translate3d(0, 0, 0);
   contain: layout style;
   transition: opacity 0.18s ease;
-}
-
-.sh-theater__dock--hidden,
-.sh-theater__dock[inert] {
-  opacity: 0;
-  pointer-events: none;
 }
 
 .sh-theater__dock.is-dragging {

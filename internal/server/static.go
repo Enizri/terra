@@ -32,6 +32,10 @@ func (s *Server) static(w http.ResponseWriter, r *http.Request) {
 			http.ServeFile(w, r, full)
 			return
 		}
+		// A missing asset must 404, not fall back to index.html — the SPA
+		// fallback here turns stale asset references into module-MIME errors.
+		http.NotFound(w, r)
+		return
 	}
 	http.ServeFile(w, r, filepath.Join(s.StaticDir, "index.html"))
 }

@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Enizri/terra/internal/config"
@@ -41,6 +42,10 @@ type Server struct {
 
 	// analyzeSlots caps concurrent analyze work (Cfg.AnalyzeConcurrency).
 	analyzeSlots chan struct{}
+
+	// initOnce guards Handler's lazy field assignments: two concurrent calls
+	// would otherwise race and split jobs across two hubs.
+	initOnce sync.Once
 }
 
 // maxBodyBytes caps request bodies on JSON endpoints. Ask payloads carry a
@@ -98,28 +103,30 @@ func (s *Server) previewRunner() preview.Runner {
 }
 
 func (s *Server) Handler() http.Handler {
-	if s.Cfg == nil {
-		s.Cfg = config.FromEnv()
-	}
-	if s.Scan == nil {
-		s.Scan = scan.Scan
-	}
-	if s.Analyze == nil {
-		s.Analyze = func(ctx context.Context, res *scan.Result, model string) (*graph.Map, []string, error) {
-			return graph.Analyze(ctx, s.Cfg.AnalyzerURL, res, model)
+	s.initOnce.Do(func() {
+		if s.Cfg == nil {
+			s.Cfg = config.FromEnv()
 		}
-	}
-	if s.RunTask == nil {
-		s.RunTask = func(ctx context.Context, name string, payload any) (json.RawMessage, error) {
-			return graph.RunTask(ctx, s.Cfg.AnalyzerURL, name, payload)
+		if s.Scan == nil {
+			s.Scan = scan.Scan
 		}
-	}
-	if s.Jobs == nil {
-		s.Jobs = job.NewHub()
-	}
-	if s.analyzeSlots == nil {
-		s.analyzeSlots = make(chan struct{}, s.Cfg.AnalyzeConcurrency)
-	}
+		if s.Analyze == nil {
+			s.Analyze = func(ctx context.Context, res *scan.Result, model string) (*graph.Map, []string, error) {
+				return graph.Analyze(ctx, s.Cfg.AnalyzerURL, res, model)
+			}
+		}
+		if s.RunTask == nil {
+			s.RunTask = func(ctx context.Context, name string, payload any) (json.RawMessage, error) {
+				return graph.RunTask(ctx, s.Cfg.AnalyzerURL, name, payload)
+			}
+		}
+		if s.Jobs == nil {
+			s.Jobs = job.NewHub()
+		}
+		if s.analyzeSlots == nil {
+			s.analyzeSlots = make(chan struct{}, s.Cfg.AnalyzeConcurrency)
+		}
+	})
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", s.root)
 	mux.HandleFunc("GET /healthz", s.healthz)

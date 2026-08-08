@@ -22,10 +22,25 @@ func repo(t *testing.T, files map[string]string) string {
 	return root
 }
 
-func TestInferenceOrderPrefersDockerfile(t *testing.T) {
+// A repo that ships a Dockerfile AND a runnable manifest must boot: the
+// host-runnable evidence wins, the Dockerfile is only a fallback.
+func TestInferencePrefersHostRunnable(t *testing.T) {
 	root := repo(t, map[string]string{
 		"Dockerfile":   "FROM node:20\nEXPOSE 3000 8080/tcp\nCMD [\"node\", \"server.js\"]\n",
 		"package.json": `{"scripts":{"dev":"vite"}}`,
+	})
+	rf, err := Infer(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rf.Source != "package.json" || !rf.HostRunnable() {
+		t.Errorf("rf = %+v, want the host-runnable package.json evidence", rf)
+	}
+}
+
+func TestInferenceDockerfileFallback(t *testing.T) {
+	root := repo(t, map[string]string{
+		"Dockerfile": "FROM node:20\nEXPOSE 3000 8080/tcp\nCMD [\"node\", \"server.js\"]\n",
 	})
 	rf, err := Infer(root)
 	if err != nil {

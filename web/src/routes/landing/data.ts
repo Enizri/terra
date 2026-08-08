@@ -97,8 +97,6 @@ export const files: FileItem[] = [
 
 export type DiagramKind = "frontend" | "backend" | "data" | "service";
 
-export type DiagramFile = { path: string; why: string };
-
 export type DiagramNode = {
   id: string;
   label: string;
@@ -109,7 +107,6 @@ export type DiagramNode = {
   row: number;
   group?: string;
   tech?: string[];
-  files: DiagramFile[];
 };
 
 export type DiagramEdge = {
@@ -132,10 +129,6 @@ export const diagramNodes: DiagramNode[] = [
     col: 0,
     row: 0,
     tech: ["react", "typescript"],
-    files: [
-      { path: "web/src/pages/Home.tsx", why: "the screen people land on" },
-      { path: "web/src/components", why: "buttons, lists and dialogs" },
-    ],
   },
   {
     id: "auth",
@@ -147,10 +140,6 @@ export const diagramNodes: DiagramNode[] = [
     row: 0,
     group: "backend",
     tech: ["go"],
-    files: [
-      { path: "internal/auth/token.go", why: "issues and checks sign-ins" },
-      { path: "store/user.go", why: "the people it knows about" },
-    ],
   },
   {
     id: "api",
@@ -162,10 +151,6 @@ export const diagramNodes: DiagramNode[] = [
     row: 1,
     group: "backend",
     tech: ["go", "grpc"],
-    files: [
-      { path: "internal/api/v1/memo_service.go", why: "every request enters here" },
-      { path: "internal/api/v1/acl.go", why: "who is allowed to call what" },
-    ],
   },
   {
     id: "memos",
@@ -177,10 +162,6 @@ export const diagramNodes: DiagramNode[] = [
     row: 2,
     group: "backend",
     tech: ["go"],
-    files: [
-      { path: "store/memo.go", why: "reads and writes each note" },
-      { path: "store/db/migration", why: "how a note is shaped" },
-    ],
   },
   {
     id: "files",
@@ -192,10 +173,6 @@ export const diagramNodes: DiagramNode[] = [
     row: 3,
     group: "backend",
     tech: ["go"],
-    files: [
-      { path: "store/attachment.go", why: "stores an uploaded file" },
-      { path: "internal/api/v1/attachment_service.go", why: "upload and download" },
-    ],
   },
   {
     id: "db",
@@ -206,10 +183,6 @@ export const diagramNodes: DiagramNode[] = [
     col: 2,
     row: 0,
     tech: ["sqlite"],
-    files: [
-      { path: "store/db/sqlite/sqlite.go", why: "opens the database file" },
-      { path: "terra.db", why: "the single file holding it all" },
-    ],
   },
 ];
 

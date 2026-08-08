@@ -22,9 +22,9 @@ type Result struct {
 	PrimaryLanguages []string       `json:"primary_languages"`
 	Tree             []DirSummary   `json:"tree"`
 	Dependencies     []Manifest     `json:"dependencies"`
-	Files     []string `json:"files"` // capped at maxFiles
-	FilesNote string   `json:"files_note,omitempty"`
-	Dirs      []string `json:"dirs"` // uncapped dirs with source
+	Files            []string       `json:"files"` // capped at maxFiles
+	FilesNote        string         `json:"files_note,omitempty"`
+	Dirs             []string       `json:"dirs"` // uncapped dirs with source
 }
 
 const maxFiles = 4000

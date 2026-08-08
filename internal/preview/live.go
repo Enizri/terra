@@ -26,7 +26,7 @@ func (h *liveHub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	id, path, _ := strings.Cut(rest, "/")
+	id, _, _ := strings.Cut(rest, "/")
 	if id == "" {
 		http.NotFound(w, r)
 		return
@@ -38,23 +38,13 @@ func (h *liveHub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	r2 := r.Clone(r.Context())
-	u := *r.URL
-	if path == "" {
-		u.Path = "/"
-	} else {
-		u.Path = "/" + path
-	}
-	if !strings.HasPrefix(u.Path, "/") {
-		u.Path = "/" + u.Path
-	}
-	r2.URL = &u
-	handler.ServeHTTP(w, r2)
+	// Keep the full /__live/{id}/... path — Vite is started with matching --base.
+	handler.ServeHTTP(w, r)
 }
 
 // MountPathProxy mounts a reverse proxy at /__live/{id}/ and returns the
 // public URL under publicBase (config.PublicURL).
-func MountPathProxy(publicBase, id, targetBaseURL, repoKey string, hasAuth bool) (publicURL string, err error) {
+func MountPathProxy(publicBase, id, targetBaseURL, repoKey string, authFix func(*http.Request)) (publicURL string, err error) {
 	id = strings.Trim(id, "/")
 	if id == "" || strings.Contains(id, "/") {
 		return "", fmt.Errorf("invalid live proxy id %q", id)
@@ -63,7 +53,7 @@ func MountPathProxy(publicBase, id, targetBaseURL, repoKey string, hasAuth bool)
 		return "", fmt.Errorf("invalid preview target: %w", err)
 	}
 	prefix := "/__live/" + id
-	handler, err := newInjectProxy(repoKey, targetBaseURL, hasAuth, prefix)
+	handler, err := newInjectProxy(repoKey, targetBaseURL, authFix, prefix)
 	if err != nil {
 		return "", err
 	}

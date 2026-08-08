@@ -13,7 +13,13 @@ export function ndjsonSplitter<T>() {
     const out: T[] = [];
     for (const line of lines) {
       if (line.trim() === "") continue;
-      out.push(JSON.parse(line) as T);
+      // Drop malformed lines (e.g. a proxy error page interleaved mid-stream)
+      // instead of killing the whole stream — same policy as the SSE path.
+      try {
+        out.push(JSON.parse(line) as T);
+      } catch {
+        continue;
+      }
     }
     return out;
   };

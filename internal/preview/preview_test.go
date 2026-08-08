@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/Enizri/terra/internal/config"
+	"github.com/Enizri/terra/internal/trace"
 )
 
 func writeFile(t *testing.T, path, content string) {
@@ -163,8 +164,9 @@ func TestTerraPort(t *testing.T) {
 
 func TestTraceEnvArmsTheHook(t *testing.T) {
 	t.Setenv("NODE_OPTIONS", "")
+	t.Setenv("TERRA_TOKEN", "real-api-secret")
 	env := traceEnv(&config.Config{Addr: ":9999"}, "https://github.com/acme/notes")
-	if len(env) != 3 {
+	if len(env) != 4 {
 		t.Fatalf("env = %v", env)
 	}
 	if !strings.HasPrefix(env[0], "NODE_OPTIONS=--require ") {
@@ -181,5 +183,19 @@ func TestTraceEnvArmsTheHook(t *testing.T) {
 	}
 	if env[2] != "TERRA_TRACE_REPO=https://github.com/acme/notes" {
 		t.Errorf("trace repo = %q", env[2])
+	}
+	// The hook token must be the scoped ingest token, never the API token:
+	// it is handed to untrusted repo code.
+	if env[3] != "TERRA_TRACE_TOKEN="+trace.IngestToken() {
+		t.Errorf("trace token = %q", env[3])
+	}
+	if strings.Contains(env[3], "real-api-secret") {
+		t.Error("traceEnv leaked TERRA_TOKEN to the previewed app")
+	}
+}
+
+func TestSeedDemoAuthUnknownRepoIsNil(t *testing.T) {
+	if seedDemoAuth("https://github.com/acme/notes", "http://localhost:1") != nil {
+		t.Fatal("expected nil hook for repo without a demo-auth entry")
 	}
 }

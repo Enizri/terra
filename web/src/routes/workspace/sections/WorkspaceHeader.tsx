@@ -1,7 +1,15 @@
 import { Link } from "react-router-dom";
 import { ArrowIcon, DownloadIcon } from "../icons";
 
-export function WorkspaceHeader({ slug, busy }: { slug: string; busy: boolean }) {
+export function WorkspaceHeader({
+  slug,
+  title,
+  busy,
+}: {
+  slug: string;
+  title?: string;
+  busy: boolean;
+}) {
   return (
     <header className="sh-ws__head">
       <Link className="sh-ws__logo" to="/">
@@ -10,7 +18,7 @@ export function WorkspaceHeader({ slug, busy }: { slug: string; busy: boolean })
       </Link>
       <span className="sh-ws__crumb">
         <b>{slug}</b>
-        <em>untitled map</em>
+        <em>{title || "untitled map"}</em>
       </span>
       <div className="sh-ws__chips">
         <span className="sh-chip is-disabled">

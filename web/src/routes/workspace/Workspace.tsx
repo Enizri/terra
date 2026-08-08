@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
 import type { Component, TerraMap } from "../../shared/map/types";
 import type { LiveSelection } from "../../shared/live";
 import memosFixture from "../../data/memos.map.json";
 import { analyses, analysis } from "../../shared/api";
+import { wsCache } from "./cache";
 import { useAnalyze } from "./useAnalyze";
 import { nextSelection } from "./selection";
 import { toHistory, type HistoryEntry } from "./history";
@@ -22,9 +23,9 @@ export default function Workspace() {
   const analyze = useAnalyze();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [elements, setElements] = useState<LiveSelection[]>([]);
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [history, setHistory] = useState<HistoryEntry[]>(wsCache.history ?? []);
   /** Stored map from the rail — no pipeline re-run. */
-  const [storedMap, setStoredMap] = useState<TerraMap | null>(null);
+  const [storedMap, setStoredMap] = useState<TerraMap | null>(wsCache.storedMap);
 
   const fixture =
     import.meta.env.DEV && new URLSearchParams(search).has("fixture")
@@ -38,22 +39,48 @@ export default function Workspace() {
     setElements([]);
   }, [map]);
 
+  // A new run replaces whatever stored map is on stage. Keyed on `running`,
+  // not `analyze.map`: the latter is seeded from wsCache on remount and would
+  // wipe a stored map the user just opened (landing <-> workspace roundtrip).
   useEffect(() => {
-    if (analyze.map) setStoredMap(null);
+    if (analyze.running) {
+      setStoredMap(null);
+      wsCache.storedMap = null;
+    }
+  }, [analyze.running]);
+
+  useEffect(() => {
+    // Cached history + no fresh run: keep what's on screen, skip the refetch.
+    if (wsCache.history && !analyze.map) return;
     const ac = new AbortController();
     analyses(ac.signal)
-      .then((rows) => setHistory(toHistory(rows)))
+      .then((rows) => {
+        const h = toHistory(rows);
+        wsCache.history = h;
+        setHistory(h);
+      })
       .catch((e: Error) => {
-        if (e.name !== "AbortError") setHistory([]);
+        if (e.name === "AbortError") return;
+        wsCache.history = null;
+        setHistory([]);
       });
     return () => ac.abort();
   }, [analyze.map]);
 
+  // Last click wins: abort the previous fetch so two rapid rail clicks can't
+  // land out of order (and a late response can't set state after unmount).
+  const openAbort = useRef<AbortController | null>(null);
+  useEffect(() => () => openAbort.current?.abort(), []);
   const open = async (entry: HistoryEntry) => {
+    openAbort.current?.abort();
+    const ac = new AbortController();
+    openAbort.current = ac;
     try {
-      setStoredMap(await analysis(entry.id));
+      const m = await analysis(entry.id, ac.signal);
+      wsCache.storedMap = m;
+      setStoredMap(m);
     } catch {
-      /* leave stage as-is */
+      /* aborted or failed: leave stage as-is */
     }
   };
 
@@ -72,7 +99,7 @@ export default function Workspace() {
 
   return (
     <div className="sh-root sh-ws">
-      <WorkspaceHeader slug={slug} busy={analyze.running} />
+      <WorkspaceHeader slug={slug} title={map?.project.name} busy={analyze.running} />
       <Sidebar
         map={map}
         history={history}

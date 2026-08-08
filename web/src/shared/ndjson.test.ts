@@ -17,3 +17,8 @@ test("never emits an unterminated tail", () => {
   const feed = ndjsonSplitter<{ n: number }>();
   assert.deepEqual(feed('{"n":1}\n{"n":2'), [{ n: 1 }]);
 });
+
+test("drops malformed lines instead of throwing", () => {
+  const feed = ndjsonSplitter<{ n: number }>();
+  assert.deepEqual(feed('{"n":1}\n<html>502</html>\n{"n":2}\n'), [{ n: 1 }, { n: 2 }]);
+});

@@ -5,7 +5,10 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
+	"log"
 	"sync"
+	"time"
 
 	"github.com/Enizri/terra/internal/graph"
 )
@@ -25,6 +28,7 @@ type RunFunc func(ctx context.Context, emit func(Event))
 type Hub struct {
 	mu   sync.Mutex
 	jobs map[string]*Job
+	wg   sync.WaitGroup
 }
 
 // NewHub returns an empty hub.
@@ -44,12 +48,33 @@ func (h *Hub) Start(run RunFunc) *Job {
 	h.mu.Lock()
 	h.jobs[id] = j
 	h.mu.Unlock()
+	h.wg.Add(1)
 	go func() {
+		defer h.wg.Done()
 		defer cancel()
+		defer func() {
+			if p := recover(); p != nil {
+				log.Printf("job %s panicked: %v", id, p)
+				j.emit(Event{Stage: "error", Label: fmt.Sprintf("internal error: %v", p)})
+			}
+			j.finish()
+			// Keep finished jobs (with their full event history, map included)
+			// around briefly for reconnect replay, then drop them — the hub
+			// would otherwise grow for the process lifetime.
+			time.AfterFunc(10*time.Minute, func() {
+				h.mu.Lock()
+				delete(h.jobs, id)
+				h.mu.Unlock()
+			})
+		}()
 		run(ctx, j.emit)
-		j.finish()
 	}()
 	return j
+}
+
+// Wait blocks until every job started so far has finished. For shutdown and tests.
+func (h *Hub) Wait() {
+	h.wg.Wait()
 }
 
 // Get returns a job by id, or nil.
@@ -131,8 +156,8 @@ func (j *Job) finish() {
 
 func newID() string {
 	var b [8]byte
-	if _, err := rand.Read(b[:]); err != nil {
-		return hex.EncodeToString([]byte("fallback"))
-	}
+	// crypto/rand.Read never returns an error (it crashes the program if the
+	// source fails) — a fallback constant here would collide job IDs.
+	rand.Read(b[:])
 	return hex.EncodeToString(b[:])
 }

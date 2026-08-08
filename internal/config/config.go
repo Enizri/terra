@@ -20,7 +20,7 @@ type Config struct {
 
 	AnalyzerURL string // TERRA_ANALYZER_URL, no trailing slash
 	WebURL      string // TERRA_WEB_URL
-	PublicURL   string // TERRA_PUBLIC_URL, no trailing slash
+	PublicURL   string // TERRA_PUBLIC_URL, no trailing slash; empty follows Addr (see PublicBase)
 
 	PreviewMode    string        // TERRA_PREVIEW_MODE, lowercased ("", "host", "docker")
 	PreviewMax     int           // TERRA_PREVIEW_MAX; 0 rejects all docker previews
@@ -28,7 +28,7 @@ type Config struct {
 	PreviewImage   string        // TERRA_PREVIEW_IMAGE
 	PreviewNetwork string        // TERRA_PREVIEW_NETWORK
 	DockerBin      string        // TERRA_DOCKER
-	TraceHost      string        // TERRA_TRACE_HOST
+	TraceHost      string        // TERRA_TRACE_HOST; empty picks a default per call site
 
 	CheckoutDir     string // TERRA_CHECKOUT_DIR; empty uses the user cache dir
 	CheckoutVolume  string // TERRA_CHECKOUT_VOLUME
@@ -45,14 +45,13 @@ func FromEnv() *Config {
 		AnalyzeTimeout:     15 * time.Minute,
 		AnalyzerURL:        "http://localhost:8010",
 		WebURL:             strings.TrimSpace(os.Getenv("TERRA_WEB_URL")),
-		PublicURL:          "http://127.0.0.1:8080",
 		PreviewMode:        strings.ToLower(strings.TrimSpace(os.Getenv("TERRA_PREVIEW_MODE"))),
 		PreviewMax:         2,
 		PreviewTTL:         30 * time.Minute,
 		PreviewImage:       "node:22-bookworm",
 		PreviewNetwork:     strings.TrimSpace(os.Getenv("TERRA_PREVIEW_NETWORK")),
 		DockerBin:          "docker",
-		TraceHost:          "host.docker.internal",
+		TraceHost:          strings.TrimSpace(os.Getenv("TERRA_TRACE_HOST")),
 		CheckoutDir:        strings.TrimSpace(os.Getenv("TERRA_CHECKOUT_DIR")),
 		CheckoutVolume:     strings.TrimSpace(os.Getenv("TERRA_CHECKOUT_VOLUME")),
 		HostCheckoutDir:    strings.TrimSpace(os.Getenv("TERRA_HOST_CHECKOUT_DIR")),
@@ -90,10 +89,17 @@ func FromEnv() *Config {
 	if b := strings.TrimSpace(os.Getenv("TERRA_DOCKER")); b != "" {
 		c.DockerBin = b
 	}
-	if h := strings.TrimSpace(os.Getenv("TERRA_TRACE_HOST")); h != "" {
-		c.TraceHost = h
-	}
 	return c
+}
+
+// PublicBase is the browser-visible base URL for preview iframes. It follows
+// the real listen address (Addr, set by `terra serve`) so a non-default --addr
+// doesn't hand out iframe URLs pointing at port 8080.
+func (c *Config) PublicBase() string {
+	if c.PublicURL != "" {
+		return c.PublicURL
+	}
+	return "http://127.0.0.1:" + c.Port()
 }
 
 // Port returns the listen port from Addr (default "8080"). The preview trace

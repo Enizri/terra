@@ -1,6 +1,10 @@
 package preview
 
 import (
+	"net"
+	"net/http"
+	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -34,6 +38,88 @@ func TestDefaultRunnerDockerConstructs(t *testing.T) {
 	_, err := r.Start("https://github.com/acme/notes")
 	if err == nil || !strings.Contains(err.Error(), "capacity full") {
 		t.Fatalf("max=0 err = %v, want capacity full", err)
+	}
+}
+
+// A second Start for a repo already booting must wait for that boot and reuse
+// its instance, not race it (or block behind the runner mutex for minutes).
+func TestStartWaitsForInFlightBoot(t *testing.T) {
+	// A live "dev server" so alive(port) sees the finished instance.
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	t.Cleanup(ts.Close)
+	port, _ := strconv.Atoi(strings.TrimPrefix(ts.URL, "http://127.0.0.1:"))
+
+	key := "https://github.com/acme/notes"
+	ch := make(chan struct{})
+	r := &hostRunner{
+		byRepo: map[string]*instance{},
+		boots:  map[string]chan struct{}{key: ch},
+	}
+
+	done := make(chan string, 1)
+	go func() {
+		url, err := r.Start(key)
+		if err != nil {
+			done <- "err: " + err.Error()
+			return
+		}
+		done <- url
+	}()
+
+	select {
+	case got := <-done:
+		t.Fatalf("Start returned %q before the in-flight boot finished", got)
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	r.mu.Lock()
+	r.byRepo[key] = &instance{devPort: port, proxyURL: "http://proxy/"}
+	delete(r.boots, key)
+	r.mu.Unlock()
+	close(ch)
+
+	select {
+	case got := <-done:
+		if got != "http://proxy/" {
+			t.Fatalf("Start = %q, want the booted instance's proxy URL", got)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("Start never returned after the boot finished")
+	}
+}
+
+func TestHostStopAllKillsStarting(t *testing.T) {
+	r := &hostRunner{
+		byRepo:   map[string]*instance{},
+		starting: map[string]*instance{},
+	}
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := "https://github.com/acme/notes"
+	r.starting[key] = &instance{proxyLn: ln}
+	r.StopAll()
+	if len(r.starting) != 0 {
+		t.Fatalf("starting left %d entries after StopAll", len(r.starting))
+	}
+	// Closing twice must not panic — StopAll nils the listener.
+	if err := ln.Close(); err == nil {
+		t.Fatal("expected listener already closed by StopAll")
+	}
+}
+
+func TestDockerStopAllKillsStarting(t *testing.T) {
+	r := &dockerRunner{
+		cfg:      &config.Config{DockerBin: "/nonexistent-terra-docker"},
+		byRepo:   map[string]*dockerInstance{},
+		starting: map[string]*dockerInstance{},
+	}
+	key := "https://github.com/acme/notes"
+	r.starting[key] = &dockerInstance{containerName: "terra-preview-test", liveID: "test"}
+	r.StopAll()
+	if len(r.starting) != 0 || len(r.byRepo) != 0 {
+		t.Fatal("StopAll left starting/byRepo entries")
 	}
 }
 

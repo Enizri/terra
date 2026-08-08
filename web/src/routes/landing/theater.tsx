@@ -10,7 +10,7 @@ import {
   useStreamingAskHint,
   type LiveSelection,
 } from "../../shared/live";
-import { ask as askServer, files } from "../../shared/api";
+import { ask as askServer } from "../../shared/api";
 import { spring } from "../../shared/motion";
 import { LIVE_NODE_ID, REPO_URL, type DiagramNode } from "./data";
 
@@ -354,83 +354,6 @@ const REPLICAS: Record<string, () => ReactNode> = {
   db: () => <DashReplica {...DASH.db} />,
 };
 
-/* ---------- live file browser ---------- */
-
-type FileEntry = { name: string; path: string; dir: boolean };
-
-/** Browse the preview checkout. */
-function LiveFiles() {
-  const [dir, setDir] = useState("");
-  const [entries, setEntries] = useState<FileEntry[]>([]);
-  const [file, setFile] = useState<{ path: string; content: string } | null>(null);
-  const [status, setStatus] = useState("");
-  const abortRef = useRef<AbortController | null>(null);
-
-  const load = (path: string) => {
-    setStatus("");
-    abortRef.current?.abort();
-    const ac = new AbortController();
-    abortRef.current = ac;
-    files(REPO_URL, path, ac.signal)
-      .then((data) => {
-        if (data.starting) return setStatus("Starting the dev server… the tree opens once the checkout is ready.");
-        if (data.entries) {
-          setEntries(data.entries);
-          setDir(data.path ?? path);
-          setFile(null);
-        } else {
-          setFile({ path: data.path ?? path, content: data.content ?? "" });
-        }
-      })
-      .catch((e: Error) => {
-        if (e.name !== "AbortError") setStatus(e.message);
-      });
-  };
-
-  // The server serves paths relative to the frontend dir, so "" is the app root.
-  useEffect(() => {
-    load("");
-    return () => abortRef.current?.abort();
-  }, []);
-
-  const up = dir.split("/").slice(0, -1).join("/");
-
-  return (
-    <div className="sh-files">
-      <div className="sh-files__crumb">
-        {file ? (
-          <button className="sh-chip" onClick={() => load(dir)}>
-            ← {dir || "app root"}
-          </button>
-        ) : (
-          <button className="sh-chip" onClick={() => load(up)} disabled={!dir}>
-            ← up
-          </button>
-        )}
-        <code>{file ? file.path : dir || "/"}</code>
-      </div>
-      {status && <p className="sh-files__status">{status}</p>}
-      {file ? (
-        <pre className="sh-files__code">{file.content}</pre>
-      ) : (
-        <ul className="sh-files__list">
-          {entries.map((e) => (
-            <li key={e.path}>
-              <button className="sh-files__entry" onClick={() => load(e.path)}>
-                <span aria-hidden>{e.dir ? "▸" : "·"}</span>
-                {e.name}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
-
-/* ---------- live preview ---------- */
-
-
 /* ---------- scripted transforms ---------- */
 
 const TRANSFORMS: { match: RegExp; cls: string; reply: string }[] = [
@@ -646,9 +569,7 @@ export function TheaterPanel({
   designMode?: boolean;
   exploreReplica?: boolean;
 }) {
-  const [tab] = useState<"demo" | "files">("demo");
   const [selected, setSelected] = useState<Picked[]>([]);
-  const [picking] = useState(true);
   const selectedEls = useRef<HTMLElement[]>([]);
   const frameRef = useRef<HTMLIFrameElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
@@ -687,12 +608,11 @@ export function TheaterPanel({
   }, [live]);
 
   useEffect(() => {
-    if (!picking || tab !== "demo") return;
     const onPointerDown = (e: PointerEvent) => {
       const t = e.target as HTMLElement;
       if (
         t.closest(
-          "iframe.sh-live, .sh-replica--live, .sh-replica:not(.sh-replica--live), .sh-theater__dock, .sh-theater__chrome, .sh-theater__files",
+          "iframe.sh-live, .sh-replica--live, .sh-replica:not(.sh-replica--live), .sh-theater__dock, .sh-theater__chrome",
         )
       ) {
         return;
@@ -701,7 +621,7 @@ export function TheaterPanel({
     };
     document.addEventListener("pointerdown", onPointerDown, true);
     return () => document.removeEventListener("pointerdown", onPointerDown, true);
-  }, [picking, tab]);
+  }, []);
 
   const pick = (e: React.MouseEvent) => {
     const el = (e.target as HTMLElement).closest<HTMLElement>("[data-sel]");
@@ -738,9 +658,6 @@ export function TheaterPanel({
       selected.length > 0
         ? selected.map((s) => s.id).join(",")
         : "__none__";
-    if (!(appliedTf.current instanceof Map)) {
-      appliedTf.current = new Map();
-    }
     let used = appliedTf.current.get(selKey);
     if (!used) {
       used = new Set();
@@ -795,37 +712,17 @@ export function TheaterPanel({
       transition={spring}
     >
       <div className="sh-theater__stage">
-        {tab === "demo" ? (
-          live ? (
-            <div className="sh-replica sh-replica--live" data-node={node.id}>
-              <LiveFrame picking={picking} frameRef={frameRef} repoUrl={REPO_URL} />
-            </div>
-          ) : (
-            <div
-              className={`sh-replica${exploreReplica ? " sh-replica--explore" : ""}`}
-              data-node={node.id}
-              onClick={pick}
-            >
-              {replica ? replica() : <p>No demo for this component yet.</p>}
-            </div>
-          )
+        {live ? (
+          <div className="sh-replica sh-replica--live" data-node={node.id}>
+            <LiveFrame picking frameRef={frameRef} repoUrl={REPO_URL} />
+          </div>
         ) : (
-          <div className="sh-theater__files">
-            {live ? (
-              <LiveFiles />
-            ) : (
-            <div className="sh-evidence">
-              <div className="sh-evidence__head">
-                {node.label} <span>{node.hint}</span>
-              </div>
-              {node.files.map((f) => (
-                <div className="sh-evidence__row" key={f.path}>
-                  <code>{f.path}</code>
-                  <small>{f.why}</small>
-                </div>
-              ))}
-            </div>
-            )}
+          <div
+            className={`sh-replica${exploreReplica ? " sh-replica--explore" : ""}`}
+            data-node={node.id}
+            onClick={pick}
+          >
+            {replica ? replica() : <p>No demo for this component yet.</p>}
           </div>
         )}
       </div>
@@ -844,14 +741,12 @@ export function TheaterPanel({
         </span>
       </div>
 
-      {/* Hidden rather than unmounted on Files so the thread survives a tab peek. */}
       <div
         ref={shellRef}
-        className={`sh-theater__dock ${tab !== "demo" ? "sh-theater__dock--hidden" : ""}`}
+        className="sh-theater__dock"
         onPointerMove={onPointerMove}
         onPointerUp={endGesture}
         onPointerCancel={endGesture}
-        inert={tab !== "demo"}
       >
         <TerraChatDock
           selectionKey={selectionKey}

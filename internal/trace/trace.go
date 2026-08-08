@@ -2,11 +2,24 @@
 package trace
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"path"
 	"strings"
 	"sync"
 	"time"
 )
+
+// IngestToken is a per-process secret handed to previewed apps' trace hooks.
+// It authorizes POST /traces/ingest and nothing else, so untrusted repo code
+// never sees the real TERRA_TOKEN.
+var IngestToken = sync.OnceValue(func() string {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		panic("trace: cannot generate ingest token: " + err.Error())
+	}
+	return hex.EncodeToString(b[:])
+})
 
 // Span is one observed request against a previewed app.
 type Span struct {
@@ -57,10 +70,21 @@ type subscriber struct {
 	ch   chan Span
 }
 
+// maxRepos bounds the number of per-repo rings: any token-holder can mint new
+// repo keys via /traces/ingest, and a long-running server would leak forever.
+const maxRepos = 64
+
 // Publish records a span and fans it out. Slow subscribers drop.
 func Publish(span Span) {
 	mu.Lock()
 	defer mu.Unlock()
+	if _, ok := recent[span.Repo]; !ok && len(recent) >= maxRepos {
+		// ponytail: evict an arbitrary ring (map order); LRU if it ever matters.
+		for k := range recent {
+			delete(recent, k)
+			break
+		}
+	}
 	ring := append(recent[span.Repo], span)
 	if len(ring) > keep {
 		ring = ring[len(ring)-keep:]

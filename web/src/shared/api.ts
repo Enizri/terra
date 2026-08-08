@@ -16,14 +16,6 @@ export type AnalyzeEvent = {
   answer?: string;
 };
 
-export type FilesResponse = {
-  path?: string;
-  entries?: { name: string; path: string; dir: boolean }[];
-  content?: string;
-  /** Checkout still booting. */
-  starting?: boolean;
-};
-
 function authHeaders(extra?: Record<string, string>): HeadersInit {
   const headers: Record<string, string> = { ...extra };
   const token = getToken();
@@ -63,6 +55,14 @@ export function cancelJob(jobId: string): void {
 }
 
 async function* jobEvents(jobId: string, signal?: AbortSignal): AsyncGenerator<AnalyzeEvent> {
+  // Abort raced the enqueue POST: the listener below would never fire on an
+  // already-aborted signal, leaving the server job running.
+  if (signal?.aborted) {
+    cancelJob(jobId);
+    const err = new Error("cancelled");
+    err.name = "AbortError";
+    throw err;
+  }
   const onAbort = () => cancelJob(jobId);
   signal?.addEventListener("abort", onAbort, { once: true });
   try {
@@ -161,6 +161,23 @@ export function traces(repoUrl: string, onSpan: (span: TraceSpan) => void): () =
       // drop malformed events
     }
   };
+  // EventSource hides status codes: without this, a bad token is a silently
+  // dead pulse stream retry-looping in the background. Probe once on error so
+  // a 401 opens the unlock panel and stops the retries.
+  let probed = false;
+  es.onerror = () => {
+    if (probed) return;
+    probed = true;
+    fetch(tracesURL(repoUrl, getToken()), { headers: authHeaders() })
+      .then((res) => {
+        res.body?.cancel();
+        if (res.status === 401) {
+          notifyUnauthorized();
+          es.close();
+        }
+      })
+      .catch(() => {});
+  };
   return () => es.close();
 }
 
@@ -181,11 +198,4 @@ export async function analyses(signal?: AbortSignal): Promise<AnalysisSummary[]>
 export async function analysis(id: number, signal?: AbortSignal): Promise<TerraMap> {
   const res = await fetch(`/analyses/${id}`, { headers: authHeaders(), signal });
   return json<TerraMap>(res, "analysis");
-}
-
-/** List a directory or read a file in the preview checkout. */
-export async function files(repoUrl: string, path: string, signal?: AbortSignal): Promise<FilesResponse> {
-  const query = `repo_url=${encodeURIComponent(repoUrl)}&path=${encodeURIComponent(path)}`;
-  const res = await fetch(`/files?${query}`, { headers: authHeaders(), signal });
-  return json<FilesResponse>(res, "files");
 }
