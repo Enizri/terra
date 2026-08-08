@@ -63,8 +63,7 @@ func TestScanStreamsTarballWithoutGit(t *testing.T) {
 
 func TestCheckoutDirUsesOverride(t *testing.T) {
 	base := t.TempDir()
-	t.Setenv("TERRA_CHECKOUT_DIR", base)
-	dir, err := CheckoutDir("https://github.com/acme/notes")
+	dir, err := CheckoutDir(base, "https://github.com/acme/notes")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +113,7 @@ func TestCheckoutExtractsTarballSafely(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home) // os.UserCacheDir derives from HOME on darwin/linux
 
-	dir, err := Checkout("github.com/o/r")
+	dir, err := Checkout("", "github.com/o/r")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,7 +136,7 @@ func TestCheckoutExtractsTarballSafely(t *testing.T) {
 
 	// Second call reuses without hitting the network: point at dead servers.
 	apiBase, codeloadBase = "http://127.0.0.1:1", "http://127.0.0.1:1"
-	dir2, err := Checkout("github.com/o/r")
+	dir2, err := Checkout("", "github.com/o/r")
 	if err != nil || dir2 != dir {
 		t.Errorf("reuse: dir=%q err=%v, want cached %q", dir2, err, dir)
 	}

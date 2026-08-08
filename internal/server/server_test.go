@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Enizri/terra/internal/config"
 	"github.com/Enizri/terra/internal/graph"
 	"github.com/Enizri/terra/internal/preview"
 	"github.com/Enizri/terra/internal/scan"
@@ -508,12 +509,12 @@ func TestSnippetFallsBackToExistingCheckout(t *testing.T) {
 	t.Setenv("XDG_CACHE_HOME", filepath.Join(home, "cache"))
 
 	const repo = "github.com/usememos/memos"
-	r := preview.Host()
-	if got := snippet(r, repo, "main.go", 0); got != "" {
+	r := preview.Host(config.FromEnv())
+	if got := snippet(r, "", repo, "main.go", 0); got != "" {
 		t.Errorf("no preview and no checkout: snippet = %q, want empty", got)
 	}
 
-	dir, err := scan.CheckoutDir(repo)
+	dir, err := scan.CheckoutDir("", repo)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -523,13 +524,13 @@ func TestSnippetFallsBackToExistingCheckout(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if got := snippet(r, repo, "main.go", 0); !strings.Contains(got, "package main") {
+	if got := snippet(r, "", repo, "main.go", 0); !strings.Contains(got, "package main") {
 		t.Errorf("existing checkout: snippet = %q, want the file's contents", got)
 	}
-	if got := snippet(r, repo, "../outside.go", 0); got != "" {
+	if got := snippet(r, "", repo, "../outside.go", 0); got != "" {
 		t.Errorf("traversal: snippet = %q, want empty", got)
 	}
-	if got := snippet(r, "not a repo url", "main.go", 0); got != "" {
+	if got := snippet(r, "", "not a repo url", "main.go", 0); got != "" {
 		t.Errorf("bad url: snippet = %q, want empty", got)
 	}
 }
