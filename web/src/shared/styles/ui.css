@@ -662,11 +662,13 @@
   border-radius: 10px;
 }
 
+/* Keep thread + prompt left-aligned with the dock origin — don't float a
+   centered 720px column in the middle of the expanded panel. */
 .sh-terra-chat--full .sh-terra-chat__body,
 .sh-terra-chat--full .sh-terra-chat__prompt {
   width: 100%;
-  max-width: 720px;
-  margin-inline: auto;
+  max-width: none;
+  margin-inline: 0;
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -929,9 +931,23 @@
   cursor: default;
 }
 
-.sh-terra-chat__body:has(.sh-terra-chat__hints) .sh-terra-chat__thread {
+/* First pick only: chips lead, thread stays short. Once messages exist,
+   the thread flexes and remaining chips use --compact. */
+.sh-terra-chat__body:has(.sh-terra-chat__hints):not(:has(.sh-terra-chat__msg)) .sh-terra-chat__thread {
   flex: 0 1 auto;
   max-height: 120px;
+}
+
+.sh-terra-chat__hints--compact {
+  max-height: 88px;
+  overflow-y: auto;
+  gap: 4px;
+  padding-top: 0;
+}
+
+.sh-terra-chat__hints--compact .sh-terra-chat__hint {
+  padding: 6px 10px;
+  font-size: 11px;
 }
 
 .sh-terra-chat__prompt {

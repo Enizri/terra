@@ -748,7 +748,7 @@
 }
 
 /* Keep-alive panes: stack in the frame; inactive stays mounted (visibility
-   only) so Ask's iframe/preview isn't torn down on tab switch. */
+   only) so tab switches stay instant. */
 
 .sh-ops__pane {
   position: absolute;
@@ -814,9 +814,206 @@
   color: rgba(255, 255, 255, 0.5);
 }
 
-/* Ask tab embeds the web-node theater (real frontend + Terra chat). It's a
-   permanent screen here, not a popover — no close/fullscreen chrome, and the
-   frame's own rounding clips the panel. Leave room for the floating tabs. */
+/* Monitor demo — hardcoded activity feed (marketing only). */
+
+.sh-monitor {
+  flex: 1;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 24px 24px;
+  color: rgba(255, 255, 255, 0.92);
+  overflow: hidden;
+}
+
+.sh-monitor__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.sh-monitor__head b {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.sh-monitor__head em {
+  margin-left: auto;
+  font-style: normal;
+  font-family: "SF Mono", ui-monospace, Menlo, monospace;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.sh-monitor__live {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #34d399;
+  box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.55);
+  animation: sh-monitor-ping 1.6s ease-out infinite;
+}
+
+@keyframes sh-monitor-ping {
+  0% {
+    box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.55);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(52, 211, 153, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(52, 211, 153, 0);
+  }
+}
+
+.sh-monitor__body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(140px, 0.32fr) 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 720px) {
+  .sh-monitor__body {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sh-monitor__nodes {
+  list-style: none;
+  margin: 0;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+}
+
+.sh-monitor__node {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.55);
+  transition: background 0.25s ease, color 0.25s ease;
+}
+
+.sh-monitor__node.is-hot {
+  background: rgba(52, 211, 153, 0.12);
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.sh-monitor__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.25);
+  flex-shrink: 0;
+}
+
+.sh-monitor__node.is-hot .sh-monitor__dot {
+  background: #34d399;
+}
+
+.sh-monitor__feed {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.sh-monitor__feed-label {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.sh-monitor__feed ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.sh-monitor__row {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1.4fr) 36px minmax(0, 0.7fr) 44px;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid transparent;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.sh-monitor__row.is-pulse {
+  background: rgba(99, 102, 241, 0.14);
+  border-color: rgba(99, 102, 241, 0.28);
+}
+
+.sh-monitor__method,
+.sh-monitor__path {
+  font-family: "SF Mono", ui-monospace, Menlo, monospace;
+  font-size: 11px;
+}
+
+.sh-monitor__method {
+  color: #a5b4fc;
+}
+
+.sh-monitor__path {
+  color: rgba(255, 255, 255, 0.78);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sh-monitor__status {
+  font-family: "SF Mono", ui-monospace, Menlo, monospace;
+  font-size: 11px;
+  color: #6ee7b7;
+}
+
+.sh-monitor__comp {
+  color: rgba(255, 255, 255, 0.5);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sh-monitor__ms {
+  text-align: right;
+  font-family: "SF Mono", ui-monospace, Menlo, monospace;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sh-monitor__live {
+    animation: none;
+  }
+}
+
+/* Ask / Implement tabs embed the theater (static Memos + Terra chat). Permanent
+   screen here, not a popover — no close/fullscreen chrome. */
 
 .sh-ops__state .sh-theater__panel--inline {
   border-radius: 0;
@@ -2292,6 +2489,75 @@
   color: #e6e7ea;
 }
 
+/* Home demo: rail + feed only (no explore sidebar). */
+.sh-replica .rp-shell--home {
+  grid-template-columns: 64px minmax(0, 1fr);
+}
+
+.sh-replica .rp-home {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 20px 28px 96px;
+  background: #1a1b1e;
+}
+
+.sh-replica .rp-home__title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.sh-replica .rp-home__title b {
+  font-size: 18px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.sh-replica .rp-home__title span {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.sh-replica .rp-home__composer {
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  gap: 12px;
+  align-items: start;
+  padding: 14px;
+  border-radius: 14px;
+  background: #222327;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.sh-replica .rp-home__composer textarea {
+  width: 100%;
+  min-height: 64px;
+  resize: none;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #e6e7ea;
+  font: inherit;
+  line-height: 1.45;
+}
+
+.sh-replica .rp-home__composer textarea::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.sh-replica .rp-home__composer .rp-btn {
+  align-self: end;
+}
+
+.sh-replica .rp-home__feed {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 /* Dark Memos icon rail — matches the live app sidebar. */
 
 .sh-replica .rp-rail {
@@ -2563,7 +2829,11 @@
 }
 
 @media (max-width: 900px) {
-.sh-replica .rp-shell {
+.sh-replica .rp-shell:not(.rp-shell--home) {
+    grid-template-columns: 56px minmax(0, 1fr);
+  }
+
+.sh-replica .rp-shell--home {
     grid-template-columns: 56px minmax(0, 1fr);
   }
 
@@ -2825,7 +3095,8 @@
   cursor: pointer;
 }
 
-.sh-replica [data-sel]:hover {
+/* Pointer-tracked hover (one element) — not CSS :hover, which lights ancestors. */
+.sh-replica [data-sel].is-hover {
   outline: 2px solid var(--yellow);
   outline-offset: 3px;
 }
@@ -2838,7 +3109,7 @@
   box-shadow: 0 0 0 6px rgba(255, 197, 61, 0.22);
 }
 
-.sh-replica [data-sel].is-selected:hover {
+.sh-replica [data-sel].is-selected.is-hover {
   outline: 2px solid var(--yellow);
   outline-offset: 3px;
 }

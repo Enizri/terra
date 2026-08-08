@@ -101,57 +101,128 @@ const EXPLORE_TAGS = [
   ["ux", 3],
 ] as const;
 
-/** Clickable Memos explore replica. */
+/** Shared Memos icon rail — `active` marks Home vs Explore. */
+function MemosRail({ active }: { active: "home" | "explore" }) {
+  return (
+    <nav className="rp-rail" aria-label="Memos">
+      <div className="rp-rail__top">
+        <span className="rp-rail__logo" data-sel="logo" data-sel-label="Memos logo">
+          <img src="/images/memos/logo.webp" alt="" width={36} height={36} draggable={false} />
+        </span>
+        <span
+          className={`rp-rail__item${active === "home" ? " is-active" : ""}`}
+          data-sel="nav-home"
+          data-sel-label="Memos nav"
+          title="Memos"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" aria-hidden>
+            <path d="m16 6 4 14" />
+            <path d="M12 6v14" />
+            <path d="M8 8v12" />
+            <path d="M4 4v16" />
+          </svg>
+        </span>
+        <span
+          className={`rp-rail__item${active === "explore" ? " is-active" : ""}`}
+          data-sel="nav-explore"
+          data-sel-label="Explore nav"
+          title="Explore"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" aria-hidden>
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 3a14.5 14.5 0 0 0 0 18" />
+            <path d="M12 3a14.5 14.5 0 0 1 0 18" />
+            <path d="M3 12h18" />
+          </svg>
+        </span>
+        <span className="rp-rail__item" data-sel="nav-attachments" data-sel-label="Attachments nav" title="Attachments">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" aria-hidden>
+            <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+          </svg>
+        </span>
+        <span className="rp-rail__item" data-sel="nav-inbox" data-sel-label="Inbox nav" title="Inbox">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" aria-hidden>
+            <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+            <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+          </svg>
+        </span>
+      </div>
+      <span className="rp-rail__item rp-rail__user" data-sel="nav-user" data-sel-label="User menu" title="Account">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" aria-hidden>
+          <circle cx="12" cy="8" r="4" />
+          <path d="M4 20a8 8 0 0 1 16 0" />
+        </svg>
+      </span>
+    </nav>
+  );
+}
+
+/** Clickable Memos home replica — composer + personal feed (Ask demo). */
+export function MemosHomeReplica() {
+  const [notes, setNotes] = useState(SEED_NOTES);
+  const [draft, setDraft] = useState("");
+  const post = () => {
+    const text = draft.trim();
+    if (!text) return;
+    setNotes([{ text, tags: ["new"], when: "just now" }, ...notes]);
+    setDraft("");
+  };
+  return (
+    <div className="rp-shell rp-shell--home">
+      <MemosRail active="home" />
+      <main className="rp-home">
+        <header className="rp-home__title" data-sel="home-title" data-sel-label="Home title">
+          <b>Memos</b>
+          <span>Your notes</span>
+        </header>
+        <div className="rp-home__composer" data-sel="composer" data-sel-label="Composer">
+          <span className="rp-avatar" data-sel="avatar" data-sel-label="Avatar" />
+          <textarea
+            placeholder="Any thoughts…"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) post();
+            }}
+          />
+          <button className="rp-btn" type="button" data-sel="post-btn" data-sel-label="Post button" onClick={post}>
+            Post
+          </button>
+        </div>
+        <div className="rp-home__feed">
+          {notes.map((n, i) => (
+            <article className="rp-memo" data-sel={`note-${i}`} data-sel-label="Memo card" key={`${n.text}-${i}`}>
+              <header>
+                <span className="rp-avatar" />
+                <div>
+                  <b>you</b>
+                  <time>{n.when}</time>
+                </div>
+                <span className="rp-memo__vis">Private</span>
+              </header>
+              <p>{n.text}</p>
+              <footer>
+                {n.tags.map((t) => (
+                  <span className="rp-tag" key={t}>
+                    #{t}
+                  </span>
+                ))}
+              </footer>
+            </article>
+          ))}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+/** Clickable Memos explore replica (Implement demo). */
 export function MemosExploreReplica() {
   return (
     <div className="rp-shell">
-      <nav className="rp-rail" data-sel="nav-rail" data-sel-label="Navigation rail" aria-label="Memos">
-        <div className="rp-rail__top">
-          <span className="rp-rail__logo" data-sel="logo" data-sel-label="Memos logo">
-            <img src="/images/memos/logo.webp" alt="" width={36} height={36} draggable={false} />
-          </span>
-          <span className="rp-rail__item" data-sel="nav-home" data-sel-label="Memos nav" title="Memos">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" aria-hidden>
-              <path d="m16 6 4 14" />
-              <path d="M12 6v14" />
-              <path d="M8 8v12" />
-              <path d="M4 4v16" />
-            </svg>
-          </span>
-          <span
-            className="rp-rail__item is-active"
-            data-sel="nav-explore"
-            data-sel-label="Explore nav"
-            title="Explore"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" aria-hidden>
-              <circle cx="12" cy="12" r="9" />
-              <path d="M12 3a14.5 14.5 0 0 0 0 18" />
-              <path d="M12 3a14.5 14.5 0 0 1 0 18" />
-              <path d="M3 12h18" />
-            </svg>
-          </span>
-          <span className="rp-rail__item" data-sel="nav-attachments" data-sel-label="Attachments nav" title="Attachments">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" aria-hidden>
-              <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
-            </svg>
-          </span>
-          <span className="rp-rail__item" data-sel="nav-inbox" data-sel-label="Inbox nav" title="Inbox">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" aria-hidden>
-              <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
-              <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
-            </svg>
-          </span>
-        </div>
-        <span className="rp-rail__item rp-rail__user" data-sel="nav-user" data-sel-label="User menu" title="Account">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" aria-hidden>
-            <circle cx="12" cy="8" r="4" />
-            <path d="M4 20a8 8 0 0 1 16 0" />
-          </svg>
-        </span>
-      </nav>
+      <MemosRail active="explore" />
 
-      <aside className="rp-explorer" data-sel="explorer" data-sel-label="Explorer sidebar">
+      <aside className="rp-explorer">
         <label className="rp-explorer__search" data-sel="search" data-sel-label="Search">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden>
             <circle cx="11" cy="11" r="7" />
@@ -160,16 +231,16 @@ export function MemosExploreReplica() {
           <input placeholder="Search memos…" readOnly tabIndex={-1} />
         </label>
 
-        <div className="rp-explorer__stats" data-sel="stats" data-sel-label="Statistics">
-          <div className="rp-explorer__stat">
+        <div className="rp-explorer__stats">
+          <div className="rp-explorer__stat" data-sel="stat-memos" data-sel-label="Memos count">
             <b>128</b>
             <span>memos</span>
           </div>
-          <div className="rp-explorer__stat">
+          <div className="rp-explorer__stat" data-sel="stat-tags" data-sel-label="Tags count">
             <b>14</b>
             <span>tags</span>
           </div>
-          <div className="rp-explorer__stat">
+          <div className="rp-explorer__stat" data-sel="stat-days" data-sel-label="Days count">
             <b>6</b>
             <span>days</span>
           </div>
@@ -181,11 +252,11 @@ export function MemosExploreReplica() {
           ))}
         </div>
 
-        <div className="rp-explorer__section" data-sel="tags" data-sel-label="Tags">
+        <div className="rp-explorer__section">
           <span className="rp-explorer__label">Tags</span>
           <ul>
             {EXPLORE_TAGS.map(([tag, count]) => (
-              <li key={tag}>
+              <li key={tag} data-sel={`tag-${tag}`} data-sel-label={`Tag ${tag}`}>
                 <span>#{tag}</span>
                 <em>{count}</em>
               </li>
@@ -194,7 +265,7 @@ export function MemosExploreReplica() {
         </div>
       </aside>
 
-      <main className="rp-feed" data-sel="feed" data-sel-label="Explore feed">
+      <main className="rp-feed">
         {EXPLORE_NOTES.map((n, i) => (
           <article className="rp-memo" data-sel={`memo-${i}`} data-sel-label="Memo card" key={n.text}>
             <header>
@@ -372,13 +443,31 @@ type ChatMessage = { role: "user" | "terra"; text: string; error?: boolean };
 
 type ChatMode = "compact" | "sheet" | "full";
 
-const ASK_HINTS = [
+/** Marketing Ask chips (Power of Terra — canned, no backend). */
+export const ASK_HINTS = [
   "Explain this selection",
   "Where is this defined?",
   "What depends on this?",
   "How does this talk to the store?",
   "Show the evidence",
 ] as const;
+
+/** Hardcoded Ask replies keyed by chip text — marketing demo only. */
+const DEMO_ASK_REPLIES: Record<(typeof ASK_HINTS)[number], string> = {
+  "Explain this selection":
+    "This is part of Memos' explore surface — the UI people use to browse notes. On the map it sits under Web App and talks to the API for every list and search.",
+  "Where is this defined?":
+    "Defined in the frontend tree (web/src). Terra ties the selection to that path so you can jump from the map straight into the files that own this UI.",
+  "What depends on this?":
+    "Explore depends on the Request Handler (API) for memo lists and tags. Upstream, Sign-in gates who can see private notes before this screen loads.",
+  "How does this talk to the store?":
+    "It never touches the database directly — the Web App calls the API, Notes writes memos, and Storage (terra.db / SQLite) persists them. The map edge is web → api → memos → db.",
+  "Show the evidence":
+    "Evidence lives on the map edges: memo_service routes, store/memo.go, and the explore feed components. Each claim links back to those files — not a guessed summary.",
+};
+
+const DEMO_ASK_FALLBACK =
+  "On the Memos map this UI belongs to Web App. It reaches Storage only through the API and Notes layers — pick another question for a tighter answer.";
 
 /** One-shot Implement design chips (scripted preview transforms). */
 export const IMPLEMENT_HINTS = [
@@ -511,15 +600,21 @@ function TerraChatDock({
               </div>
             )}
           </div>
-          {selectionKey && options.length > 0 && (
-            <div className="sh-terra-chat__hints" data-no-drag>
-              <p className="sh-terra-chat__hints-label">{optionsLabel}</p>
+          {selectionKey && options.length > 0 && !thinking && (
+            <div
+              className={`sh-terra-chat__hints${
+                messages.length > 0 ? " sh-terra-chat__hints--compact" : ""
+              }`}
+              data-no-drag
+            >
+              {messages.length === 0 && (
+                <p className="sh-terra-chat__hints-label">{optionsLabel}</p>
+              )}
               {options.map((h) => (
                 <button
                   key={h}
                   type="button"
                   className="sh-terra-chat__hint"
-                  disabled={thinking}
                   onClick={() => sendOption(h)}
                 >
                   {h}
@@ -560,28 +655,66 @@ export function TheaterPanel({
   className = "",
   chatHints,
   designMode = false,
-  exploreReplica = false,
+  /** Marketing Power tabs: static Memos UI, no LiveFrame. */
+  demoReplica,
 }: {
   node: DiagramNode;
   onClose: () => void;
   className?: string;
   chatHints?: readonly string[];
   designMode?: boolean;
-  exploreReplica?: boolean;
+  demoReplica?: "home" | "explore";
 }) {
   const [selected, setSelected] = useState<Picked[]>([]);
   const selectedEls = useRef<HTMLElement[]>([]);
+  const hoverEl = useRef<HTMLElement | null>(null);
   const frameRef = useRef<HTMLIFrameElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
+  const stageRef = useRef<HTMLDivElement | null>(null);
   const appliedTf = useRef(new Map<string, Set<string>>());
   const { shellRef, onHeadPointerDown, onPointerMove, endGesture } = useFloatingDrag(panelRef);
-  const live = node.id === LIVE_NODE_ID && !exploreReplica;
+  const live = node.id === LIVE_NODE_ID && !demoReplica;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      hoverEl.current?.classList.remove("is-hover");
+      hoverEl.current = null;
+    };
   }, [onClose]);
+
+  const clearHover = () => {
+    hoverEl.current?.classList.remove("is-hover");
+    hoverEl.current = null;
+  };
+
+  const setHover = (el: HTMLElement | null) => {
+    if (el === hoverEl.current) return;
+    hoverEl.current?.classList.remove("is-hover");
+    hoverEl.current = el;
+    el?.classList.add("is-hover");
+  };
+
+  /** Deepest [data-sel] under the pointer (ignores nested ancestors). */
+  const hitSelectable = (clientX: number, clientY: number): HTMLElement | null => {
+    const root = stageRef.current;
+    if (!root) return null;
+    const stack = document.elementsFromPoint(clientX, clientY);
+    for (const node of stack) {
+      if (!(node instanceof HTMLElement)) continue;
+      if (!root.contains(node)) continue;
+      if (node.classList.contains("sh-replica") || node === root) continue;
+      const hit = node.closest<HTMLElement>("[data-sel]");
+      if (hit && root.contains(hit)) return hit;
+    }
+    return null;
+  };
+
+  const onReplicaPointerMove = (e: React.PointerEvent) => {
+    setHover(hitSelectable(e.clientX, e.clientY));
+  };
 
   const clearSelection = () => {
     for (const el of selectedEls.current) el.classList.remove("is-selected");
@@ -624,7 +757,7 @@ export function TheaterPanel({
   }, []);
 
   const pick = (e: React.MouseEvent) => {
-    const el = (e.target as HTMLElement).closest<HTMLElement>("[data-sel]");
+    const el = hitSelectable(e.clientX, e.clientY);
     if (!el) {
       clearSelection();
       return;
@@ -681,10 +814,20 @@ export function TheaterPanel({
     return tf.reply;
   };
 
+  const demoAskReply = (q: string) => {
+    const hit = ASK_HINTS.find((h) => h === q);
+    return hit ? DEMO_ASK_REPLIES[hit] : DEMO_ASK_FALLBACK;
+  };
+
   const ask = async (q: string) => {
     if (designMode) {
-      await new Promise((done) => setTimeout(done, 700));
+      await new Promise((done) => setTimeout(done, 1100));
       return applyDesignTransform(q);
+    }
+    // Marketing Power Ask: static home replica + canned answers (no /preview or /ask).
+    if (demoReplica) {
+      await new Promise((done) => setTimeout(done, 2200));
+      return demoAskReply(q);
     }
     if (live) {
       const sels = selected.map((s) => s.sel).filter(Boolean) as LiveSelection[];
@@ -698,9 +841,12 @@ export function TheaterPanel({
   const crumb =
     selected.length > 0 ? `${node.label} › ${selected.map((s) => s.label).join(", ")}` : null;
 
-  const replica = exploreReplica
-    ? () => <MemosExploreReplica />
-    : REPLICAS[node.id];
+  const replica =
+    demoReplica === "home"
+      ? () => <MemosHomeReplica />
+      : demoReplica === "explore"
+        ? () => <MemosExploreReplica />
+        : REPLICAS[node.id];
 
   return (
     <motion.div
@@ -711,16 +857,18 @@ export function TheaterPanel({
       exit={{ opacity: 0, scale: 0.99 }}
       transition={spring}
     >
-      <div className="sh-theater__stage">
+      <div className="sh-theater__stage" ref={stageRef}>
         {live ? (
           <div className="sh-replica sh-replica--live" data-node={node.id}>
             <LiveFrame picking frameRef={frameRef} repoUrl={REPO_URL} />
           </div>
         ) : (
           <div
-            className={`sh-replica${exploreReplica ? " sh-replica--explore" : ""}`}
+            className={`sh-replica${demoReplica ? " sh-replica--explore" : ""}`}
             data-node={node.id}
             onClick={pick}
+            onPointerMove={onReplicaPointerMove}
+            onPointerLeave={clearHover}
           >
             {replica ? replica() : <p>No demo for this component yet.</p>}
           </div>
@@ -730,13 +878,11 @@ export function TheaterPanel({
       <div className="sh-theater__chrome">
         <span className="sh-chip sh-theater__label">
           <span className="sh-chip__mark" />
-          {exploreReplica ? "Memos" : node.label}
+          {demoReplica ? "Memos" : node.label}
           <span className="sh-theater__hint">
-            {exploreReplica
+            {designMode
               ? "Click a piece of UI, then redesign it"
-              : designMode
-                ? "Click a piece of UI, then redesign it"
-                : "Click a piece of UI, then pick a question"}
+              : "Click a piece of UI, then pick a question"}
           </span>
         </span>
       </div>
