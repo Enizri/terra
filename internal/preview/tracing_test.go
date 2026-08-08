@@ -139,10 +139,10 @@ func TestTraceMiddlewareAllowsWebSocketUpgradeViaProxy(t *testing.T) {
 		Method: http.MethodGet,
 		URL:    u,
 		Header: http.Header{
-			"Connection":           {"Upgrade"},
-			"Upgrade":              {"websocket"},
+			"Connection":            {"Upgrade"},
+			"Upgrade":               {"websocket"},
 			"Sec-WebSocket-Version": {"13"},
-			"Sec-WebSocket-Key":    {"dGhlIHNhbXBsZSBub25jZQ=="},
+			"Sec-WebSocket-Key":     {"dGhlIHNhbXBsZSBub25jZQ=="},
 		},
 		Proto:      "HTTP/1.1",
 		ProtoMajor: 1,

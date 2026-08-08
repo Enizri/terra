@@ -381,7 +381,7 @@ func stop(cmd *exec.Cmd) {
 // detect finds a frontend package.json under root (depth ≤ 2).
 func detect(root string) (appDir, script, pm string, err error) {
 	type candidate struct {
-		dir, script string
+		dir, script  string
 		score, depth int
 	}
 	var best *candidate
