@@ -33,6 +33,12 @@ func testServer(t *testing.T) (*Server, *httptest.Server) {
 				Stats:         scan.Stats{SourceFiles: 3},
 			}, nil
 		},
+		// Empty commit disables cache-before-tarball; per-test Resolve stubs
+		// supply a real SHA when they need the fast path.
+		Resolve: func(url string) (string, string, string, error) {
+			canonical, name, err := scan.NormalizeURL(url)
+			return canonical, name, "", err
+		},
 		Analyze: func(ctx context.Context, res *scan.Result, model string) (*graph.Map, []string, error) {
 			return &graph.Map{
 				Project: graph.Project{Name: "Notes", RepositoryURL: res.RepositoryURL},
@@ -183,12 +189,100 @@ func TestAnalyzeStreamsStages(t *testing.T) {
 		}
 		stages = append(stages, last.Stage)
 	}
-	want := []string{"clone", "scan", "analyze", "store", "done"}
+	want := []string{"fetch", "scan", "analyze", "store", "done"}
 	if strings.Join(stages, ",") != strings.Join(want, ",") {
 		t.Fatalf("stages = %v, want %v", stages, want)
 	}
 	if last.Map == nil || last.Map.Project.Name != "Notes" {
 		t.Errorf("done event carried no map: %+v", last.Map)
+	}
+}
+
+func TestAnalyzeStreamsStructuralMapOnScan(t *testing.T) {
+	s, ts := testServer(t)
+	s.Scan = func(url string) (*scan.Result, error) {
+		return &scan.Result{
+			RepositoryURL:    url,
+			Name:             "notes",
+			Commit:           "abc",
+			ScannedAt:        time.Now().UTC(),
+			PrimaryLanguages: []string{"TypeScript", "Go"},
+			Stats:            scan.Stats{SourceFiles: 10, TopLevelDirs: []string{"web", "api"}},
+			Tree: []scan.DirSummary{
+				{Path: "web", Files: 6, Languages: []string{"TypeScript"}},
+				{Path: "api", Files: 4, Languages: []string{"Go"}},
+			},
+			Files: []string{"web/app.ts", "api/main.go"},
+			Dependencies: []scan.Manifest{
+				{Manifest: "web/package.json", Ecosystem: "npm"},
+				{Manifest: "go.mod", Ecosystem: "go"},
+			},
+		}, nil
+	}
+
+	req, _ := http.NewRequest("POST", ts.URL+"/analyze",
+		strings.NewReader(`{"repo_url":"https://github.com/acme/notes"}`))
+	req.Header.Set("Accept", "application/x-ndjson")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	var scanEv struct {
+		Stage string     `json:"stage"`
+		Map   *graph.Map `json:"map"`
+	}
+	dec := json.NewDecoder(resp.Body)
+	for dec.More() {
+		var ev struct {
+			Stage string     `json:"stage"`
+			Map   *graph.Map `json:"map"`
+		}
+		if err := dec.Decode(&ev); err != nil {
+			t.Fatal(err)
+		}
+		if ev.Stage == "scan" {
+			scanEv = ev
+		}
+	}
+	if scanEv.Map == nil || scanEv.Map.Project.Kind != "structural" {
+		t.Fatalf("scan map = %+v, want structural provisional map", scanEv.Map)
+	}
+	if len(scanEv.Map.Components) != 2 {
+		t.Fatalf("structural components = %d, want 2 top-level dirs", len(scanEv.Map.Components))
+	}
+}
+
+func TestAnalyzeJobCacheHitSkipsScan(t *testing.T) {
+	s, ts := testServer(t)
+	const sha = "aaa111"
+	s.Scan = func(url string) (*scan.Result, error) {
+		return &scan.Result{RepositoryURL: url, Name: "notes", Commit: sha,
+			ScannedAt: time.Now().UTC()}, nil
+	}
+	s.Resolve = func(url string) (string, string, string, error) {
+		canonical, name, err := scan.NormalizeURL(url)
+		return canonical, name, sha, err
+	}
+	postAnalyze(t, ts, `{"repo_url":"https://github.com/acme/notes"}`) // warm store
+
+	scanCalls := 0
+	s.Scan = func(url string) (*scan.Result, error) {
+		scanCalls++
+		return nil, fmt.Errorf("scan must not run on a resolve+commit cache hit")
+	}
+	s.Analyze = func(ctx context.Context, res *scan.Result, model string) (*graph.Map, []string, error) {
+		t.Error("analyzer must not run on a cache hit")
+		return nil, nil, fmt.Errorf("unreachable")
+	}
+
+	stage, _ := lastJobEvent(t, ts, startAnalyzeJobHTTP(t, ts))
+	if stage != "done" {
+		t.Fatalf("stage = %q, want done", stage)
+	}
+	if scanCalls != 0 {
+		t.Fatalf("Scan called %d times; commit cache hit must skip the tarball", scanCalls)
 	}
 }
 

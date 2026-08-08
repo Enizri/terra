@@ -1,4 +1,12 @@
-import { useEffect, useRef, useState, type ReactNode, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+  type ReactNode,
+  type Ref,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { createPortal } from "react-dom";
 import { motion } from "motion/react";
 import { MAX_SELECTIONS } from "../../shared/limits";
@@ -175,41 +183,43 @@ export function MemosHomeReplica() {
           <b>Memos</b>
           <span>Your notes</span>
         </header>
-        <div className="rp-home__composer" data-sel="composer" data-sel-label="Composer">
-          <span className="rp-avatar" data-sel="avatar" data-sel-label="Avatar" />
-          <textarea
-            placeholder="Any thoughts…"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) post();
-            }}
-          />
-          <button className="rp-btn" type="button" data-sel="post-btn" data-sel-label="Post button" onClick={post}>
-            Post
-          </button>
-        </div>
-        <div className="rp-home__feed">
-          {notes.map((n, i) => (
-            <article className="rp-memo" data-sel={`note-${i}`} data-sel-label="Memo card" key={`${n.text}-${i}`}>
-              <header>
-                <span className="rp-avatar" />
-                <div>
-                  <b>you</b>
-                  <time>{n.when}</time>
-                </div>
-                <span className="rp-memo__vis">Private</span>
-              </header>
-              <p>{n.text}</p>
-              <footer>
-                {n.tags.map((t) => (
-                  <span className="rp-tag" key={t}>
-                    #{t}
-                  </span>
-                ))}
-              </footer>
-            </article>
-          ))}
+        <div className="rp-home__board" data-sel="board" data-sel-label="Notes board">
+          <div className="rp-home__composer" data-sel="composer" data-sel-label="Composer">
+            <span className="rp-avatar" data-sel="avatar" data-sel-label="Avatar" />
+            <textarea
+              placeholder="Any thoughts…"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) post();
+              }}
+            />
+            <button className="rp-btn" type="button" data-sel="post-btn" data-sel-label="Post button" onClick={post}>
+              Post
+            </button>
+          </div>
+          <div className="rp-home__feed">
+            {notes.map((n, i) => (
+              <article className="rp-memo" data-sel={`note-${i}`} data-sel-label="Memo card" key={`${n.text}-${i}`}>
+                <header>
+                  <span className="rp-avatar" />
+                  <div>
+                    <b>you</b>
+                    <time>{n.when}</time>
+                  </div>
+                  <span className="rp-memo__vis">Private</span>
+                </header>
+                <p>{n.text}</p>
+                <footer>
+                  {n.tags.map((t) => (
+                    <span className="rp-tag" key={t}>
+                      #{t}
+                    </span>
+                  ))}
+                </footer>
+              </article>
+            ))}
+          </div>
         </div>
       </main>
     </div>
@@ -439,9 +449,18 @@ const DEFAULT_TF = { cls: "tf-polish", reply: "Tidied spacing, softened the shad
 
 /* ---------- terra chat dock ---------- */
 
-type ChatMessage = { role: "user" | "terra"; text: string; error?: boolean };
+export type ChatMessage = { role: "user" | "terra"; text: string; error?: boolean };
 
 type ChatMode = "compact" | "sheet" | "full";
+
+/** Imperative chat controls for the scripted hero film. */
+export type ChatScriptHandle = {
+  postUser(text: string): void;
+  postTerra(text: string): void;
+  setThinking(on: boolean): void;
+  /** Typewriter text shown in the read-only prompt row; "" clears. */
+  setPromptText(text: string): void;
+};
 
 /** Marketing Ask chips (Power of Terra — canned, no backend). */
 export const ASK_HINTS = [
@@ -480,13 +499,18 @@ export const IMPLEMENT_HINTS = [
 
 
 /** Floating dock: one-shot chips after selection. */
-function TerraChatDock({
+export function TerraChatDock({
   selectionKey,
   crumb,
   onAsk,
   onHeadPointerDown,
   hints = ASK_HINTS,
   designMode = false,
+  scripted = false,
+  scriptRef,
+  initialMessages,
+  wsSkin = false,
+  greeting,
 }: {
   selectionKey: string | null;
   crumb: string | null;
@@ -494,21 +518,37 @@ function TerraChatDock({
   onHeadPointerDown?: (e: ReactPointerEvent<HTMLElement>) => void;
   hints?: readonly string[];
   designMode?: boolean;
+  /** Scripted hero film: no chips, prompt text driven via `scriptRef`. */
+  scripted?: boolean;
+  scriptRef?: Ref<ChatScriptHandle>;
+  initialMessages?: ChatMessage[];
+  /** Workspace column look: light skin, brand head, always open. */
+  wsSkin?: boolean;
+  /** Opening Terra turn shown while the thread is empty (workspace dock). */
+  greeting?: string;
 }) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages ?? []);
   const [thinking, setThinking] = useState(false);
-  const [mode, setMode] = useState<ChatMode>("compact");
+  const [mode, setMode] = useState<ChatMode>(wsSkin ? "sheet" : "compact");
   const [usedBySel, setUsedBySel] = useState<Record<string, string[]>>({});
+  const [scriptPrompt, setScriptPrompt] = useState("");
   const threadRef = useRef<HTMLDivElement | null>(null);
   const open = mode !== "compact";
   const usedForSel = selectionKey ? usedBySel[selectionKey] ?? [] : [];
-  const options = selectionKey ? hints.filter((h) => !usedForSel.includes(h)) : [];
+  const options = selectionKey && !scripted ? hints.filter((h) => !usedForSel.includes(h)) : [];
   const optionsLabel = designMode ? "Design this component" : "Ask about this component";
   const exhaustedMsg = designMode
     ? "Every design tweak for this component is already applied. Pick another element."
     : "You've asked every question for this component. Pick another element.";
-  const streaming = !selectionKey && !thinking && hints.length > 0;
+  const streaming = !scripted && !selectionKey && !thinking && hints.length > 0;
   const askHint = useStreamingAskHint(!streaming, hints);
+
+  useImperativeHandle(scriptRef, () => ({
+    postUser: (text: string) => setMessages((m) => [...m, { role: "user", text }]),
+    postTerra: (text: string) => setMessages((m) => [...m, { role: "terra", text }]),
+    setThinking,
+    setPromptText: setScriptPrompt,
+  }));
 
   useEffect(() => {
     if (selectionKey) {
@@ -549,56 +589,100 @@ function TerraChatDock({
     <div
       className={`sh-terra-chat ${open ? "sh-terra-chat--open" : ""} ${
         mode === "full" ? "sh-terra-chat--full" : ""
-      }`}
+      }${wsSkin ? " sh-terra-chat--ws" : ""}`}
     >
       <div className="sh-terra-chat__head" onPointerDown={onHeadPointerDown}>
-        <span className="sh-terra-chat__lights" aria-hidden>
-          <i />
-          <i />
-          <i />
-        </span>
-        <b className="sh-terra-chat__name">Terra</b>
-        {open && (
-          <span className="sh-terra-chat__tools" data-no-drag>
-            <button
-              className="sh-terra-chat__ctl"
-              onClick={() => setMode(mode === "full" ? "sheet" : "full")}
-              aria-label={mode === "full" ? "Exit chat fullscreen" : "Expand chat to fullscreen"}
-              title={mode === "full" ? "Exit fullscreen" : "Fullscreen chat"}
-            >
-              {mode === "full" ? "⤡" : "⤢"}
-            </button>
-            <button className="sh-terra-chat__ctl" onClick={() => setMode("compact")} aria-label="Collapse chat">
-              ⌄
-            </button>
+        {wsSkin ? (
+          <span className="sh-ws-chat__brand">
+            <span className="sh-terra-mark sh-ws-chat__mark" aria-hidden />
+            <b className="sh-terra-chat__name">Terra</b>
           </span>
+        ) : (
+          <>
+            <span className="sh-terra-chat__lights" aria-hidden>
+              <i />
+              <i />
+              <i />
+            </span>
+            <b className="sh-terra-chat__name">Terra</b>
+            {open && (
+              <span className="sh-terra-chat__tools" data-no-drag>
+                <button
+                  className="sh-terra-chat__ctl"
+                  onClick={() => setMode(mode === "full" ? "sheet" : "full")}
+                  aria-label={mode === "full" ? "Exit chat fullscreen" : "Expand chat to fullscreen"}
+                  title={mode === "full" ? "Exit fullscreen" : "Fullscreen chat"}
+                >
+                  {mode === "full" ? "⤡" : "⤢"}
+                </button>
+                <button className="sh-terra-chat__ctl" onClick={() => setMode("compact")} aria-label="Collapse chat">
+                  ⌄
+                </button>
+              </span>
+            )}
+          </>
         )}
       </div>
 
       {/* No exit animation — a lingering body would stretch the collapsed dock. */}
       {open && (
         <div className="sh-terra-chat__body">
-          {crumb && <span className="sh-terra-chat__crumb">{crumb}</span>}
+          {crumb &&
+            (wsSkin ? (
+              /* Workspace dock shows selections as droppable chips. */
+              <div className="sh-ws__crumbs">
+                <button type="button" className="sh-terra-chat__crumb">
+                  {crumb} ×
+                </button>
+              </div>
+            ) : (
+              <span className="sh-terra-chat__crumb">{crumb}</span>
+            ))}
           <div className="sh-terra-chat__thread" ref={threadRef}>
-            {selectionKey && options.length === 0 && (
+            {!scripted && selectionKey && options.length === 0 && (
               <p className="sh-terra-chat__msg sh-terra-chat__msg--terra">{exhaustedMsg}</p>
             )}
-            {messages.map((m, i) => (
-              <p
-                className={`sh-terra-chat__msg sh-terra-chat__msg--${m.role} ${
-                  m.error ? "sh-terra-chat__msg--error" : ""
-                }`}
-                key={i}
-              >
-                {m.text}
-              </p>
-            ))}
-            {thinking && (
-              <div className="sh-terra-chat__thinking" aria-live="polite">
-                <span className="sh-terra-chat__thinking-mark" aria-hidden />
-                <span className="sh-terra-chat__thinking-label">Terra is thinking</span>
+            {wsSkin && greeting && messages.length === 0 && (
+              <div className="sh-terra-chat__msg sh-terra-chat__msg--terra sh-ws-turn">
+                <p className="sh-ws-md">{greeting}</p>
               </div>
             )}
+            {messages.map((m, i) =>
+              wsSkin && m.role === "terra" ? (
+                <div
+                  className={`sh-terra-chat__msg sh-terra-chat__msg--terra sh-ws-turn${
+                    m.error ? " sh-terra-chat__msg--error" : ""
+                  }`}
+                  key={i}
+                >
+                  <p className="sh-ws-md">{m.text}</p>
+                </div>
+              ) : (
+                <p
+                  className={`sh-terra-chat__msg sh-terra-chat__msg--${m.role} ${
+                    m.error ? "sh-terra-chat__msg--error" : ""
+                  }`}
+                  key={i}
+                >
+                  {m.text}
+                </p>
+              ),
+            )}
+            {thinking &&
+              (wsSkin ? (
+                /* Workspace thinking row — spinning mark, no dark shimmer. */
+                <div className="sh-ws-think" aria-live="polite">
+                  <span className="sh-ws-think__toggle">
+                    <span className="sh-terra-mark sh-terra-mark--spin sh-ws-think__mark" aria-hidden />
+                    <span className="sh-ws-think__label">Thinking</span>
+                  </span>
+                </div>
+              ) : (
+                <div className="sh-terra-chat__thinking" aria-live="polite">
+                  <span className="sh-terra-chat__thinking-mark" aria-hidden />
+                  <span className="sh-terra-chat__thinking-label">Terra is thinking</span>
+                </div>
+              ))}
           </div>
           {selectionKey && options.length > 0 && !thinking && (
             <div
@@ -626,8 +710,29 @@ function TerraChatDock({
       )}
 
       {/* Read-only prompt — free typing off; idle streams suggestion animation. */}
+      {wsSkin ? (
+        /* Workspace ask row — the film types into the real input. */
+        <form className="sh-terra-chat__prompt sh-ws__ask" onSubmit={(e) => e.preventDefault()}>
+          <input
+            className="sh-ws__ask-input"
+            value={scriptPrompt}
+            placeholder={selectionKey ? "Ask about this selection" : "Ask about this repo"}
+            aria-label="Ask Terra about this repository"
+            readOnly
+          />
+        </form>
+      ) : (
       <div className="sh-terra-chat__prompt" data-no-drag aria-live="polite">
-        {streaming ? (
+        {scripted ? (
+          scriptPrompt ? (
+            <span className="sh-terra-chat__stream">
+              {scriptPrompt}
+              <i className="sh-terra-chat__caret" />
+            </span>
+          ) : (
+            "Ask Terra about this component"
+          )
+        ) : streaming ? (
           <span className="sh-terra-chat__stream">
             {askHint.text}
             <i className="sh-terra-chat__caret" />
@@ -642,11 +747,23 @@ function TerraChatDock({
           designMode ? "Select a component to redesign" : "Select a component to ask about"
         )}
       </div>
+      )}
     </div>
   );
 }
 
 /* ---------- theater panel ---------- */
+
+/** Imperative panel controls for the scripted hero film. */
+export type TheaterScriptHandle = {
+  /** Element for a `data-sel` key inside the replica stage. */
+  getSelEl(key: string): HTMLElement | null;
+  hoverSel(key: string | null): void;
+  selectSel(key: string): void;
+  /** Runs the existing transform table; returns Terra's reply line. */
+  applyTransform(query: string): string;
+  chat: ChatScriptHandle | null;
+};
 
 /** Inline theater panel (inspect mode). */
 export function TheaterPanel({
@@ -657,6 +774,10 @@ export function TheaterPanel({
   designMode = false,
   /** Marketing Power tabs: static Memos UI, no LiveFrame. */
   demoReplica,
+  scripted = false,
+  scriptRef,
+  initialMessages,
+  hideDock = false,
 }: {
   node: DiagramNode;
   onClose: () => void;
@@ -664,6 +785,12 @@ export function TheaterPanel({
   chatHints?: readonly string[];
   designMode?: boolean;
   demoReplica?: "home" | "explore";
+  /** Scripted hero film: page-level listeners off, controls via `scriptRef`. */
+  scripted?: boolean;
+  scriptRef?: Ref<TheaterScriptHandle>;
+  initialMessages?: ChatMessage[];
+  /** Chat lives elsewhere (workspace dock column) — skip the floating dock. */
+  hideDock?: boolean;
 }) {
   const [selected, setSelected] = useState<Picked[]>([]);
   const selectedEls = useRef<HTMLElement[]>([]);
@@ -672,18 +799,19 @@ export function TheaterPanel({
   const panelRef = useRef<HTMLDivElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const appliedTf = useRef(new Map<string, Set<string>>());
+  const chatScriptRef = useRef<ChatScriptHandle | null>(null);
   const { shellRef, onHeadPointerDown, onPointerMove, endGesture } = useFloatingDrag(panelRef);
   const live = node.id === LIVE_NODE_ID && !demoReplica;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
+    if (!scripted) window.addEventListener("keydown", onKey);
     return () => {
-      window.removeEventListener("keydown", onKey);
+      if (!scripted) window.removeEventListener("keydown", onKey);
       hoverEl.current?.classList.remove("is-hover");
       hoverEl.current = null;
     };
-  }, [onClose]);
+  }, [onClose, scripted]);
 
   const clearHover = () => {
     hoverEl.current?.classList.remove("is-hover");
@@ -741,6 +869,7 @@ export function TheaterPanel({
   }, [live]);
 
   useEffect(() => {
+    if (scripted) return;
     const onPointerDown = (e: PointerEvent) => {
       const t = e.target as HTMLElement;
       if (
@@ -754,10 +883,9 @@ export function TheaterPanel({
     };
     document.addEventListener("pointerdown", onPointerDown, true);
     return () => document.removeEventListener("pointerdown", onPointerDown, true);
-  }, []);
+  }, [scripted]);
 
-  const pick = (e: React.MouseEvent) => {
-    const el = hitSelectable(e.clientX, e.clientY);
+  const pickEl = (el: HTMLElement | null) => {
     if (!el) {
       clearSelection();
       return;
@@ -785,12 +913,14 @@ export function TheaterPanel({
     });
   };
 
+  const pick = (e: React.MouseEvent) => pickEl(hitSelectable(e.clientX, e.clientY));
+
   const applyDesignTransform = (q: string) => {
     const tf = TRANSFORMS.find((t) => t.match.test(q)) ?? DEFAULT_TF;
-    const selKey =
-      selected.length > 0
-        ? selected.map((s) => s.id).join(",")
-        : "__none__";
+    // Key off the raw elements, not `selected` state: the scripted film calls
+    // select + transform in one tick, before the state commit lands.
+    const pickedIds = selectedEls.current.map((el) => el.dataset.sel!);
+    const selKey = pickedIds.length > 0 ? pickedIds.join(",") : "__none__";
     let used = appliedTf.current.get(selKey);
     if (!used) {
       used = new Set();
@@ -813,6 +943,20 @@ export function TheaterPanel({
     );
     return tf.reply;
   };
+
+  const getSelEl = (key: string) =>
+    stageRef.current?.querySelector<HTMLElement>(`[data-sel="${key}"]`) ?? null;
+
+  // Recreated every render so the closures never go stale.
+  useImperativeHandle(scriptRef, () => ({
+    getSelEl,
+    hoverSel: (key: string | null) => setHover(key ? getSelEl(key) : null),
+    selectSel: (key: string) => pickEl(getSelEl(key)),
+    applyTransform: applyDesignTransform,
+    get chat() {
+      return chatScriptRef.current;
+    },
+  }));
 
   const demoAskReply = (q: string) => {
     const hit = ASK_HINTS.find((h) => h === q);
@@ -880,29 +1024,36 @@ export function TheaterPanel({
           <span className="sh-chip__mark" />
           {demoReplica ? "Memos" : node.label}
           <span className="sh-theater__hint">
-            {designMode
-              ? "Click a piece of UI, then redesign it"
-              : "Click a piece of UI, then pick a question"}
+            {scripted
+              ? "Terra picks a component and redesigns it"
+              : designMode
+                ? "Click a piece of UI, then redesign it"
+                : "Click a piece of UI, then pick a question"}
           </span>
         </span>
       </div>
 
-      <div
-        ref={shellRef}
-        className="sh-theater__dock"
-        onPointerMove={onPointerMove}
-        onPointerUp={endGesture}
-        onPointerCancel={endGesture}
-      >
-        <TerraChatDock
-          selectionKey={selectionKey}
-          crumb={crumb}
-          onAsk={ask}
-          onHeadPointerDown={onHeadPointerDown}
-          hints={chatHints ?? (designMode ? IMPLEMENT_HINTS : ASK_HINTS)}
-          designMode={designMode}
-        />
-      </div>
+      {!hideDock && (
+        <div
+          ref={shellRef}
+          className="sh-theater__dock"
+          onPointerMove={onPointerMove}
+          onPointerUp={endGesture}
+          onPointerCancel={endGesture}
+        >
+          <TerraChatDock
+            selectionKey={selectionKey}
+            crumb={crumb}
+            onAsk={ask}
+            onHeadPointerDown={onHeadPointerDown}
+            hints={chatHints ?? (designMode ? IMPLEMENT_HINTS : ASK_HINTS)}
+            designMode={designMode}
+            scripted={scripted}
+            scriptRef={chatScriptRef}
+            initialMessages={initialMessages}
+          />
+        </div>
+      )}
     </motion.div>
   );
 }

@@ -25,6 +25,7 @@ export function AgentDock({
   map,
   selected,
   elements,
+  askReady = true,
   onDropComponent,
   onDropElement,
 }: {
@@ -32,6 +33,8 @@ export function AgentDock({
   /** Selected cards, oldest first; last is the subject. */
   selected: Component[];
   elements: LiveSelection[];
+  /** False while a structural/partial map is still upgrading. */
+  askReady?: boolean;
   onDropComponent: (id: string) => void;
   onDropElement: (el: LiveSelection) => void;
 }) {
@@ -80,17 +83,18 @@ export function AgentDock({
   const hasSelection = crumbs.length > 0;
 
   const send = (q: string) => {
-    if (!q.trim() || thinking) return;
+    if (!q.trim() || thinking || !askReady) return;
     setUsed((prev) => new Set(prev).add(q));
     ask(q, primary, selections);
   };
 
   // Power theater style: stream suggestions in the prompt while idle (no
   // selection). Chips appear only after a card/element is picked.
-  const streamHints = map && !hasSelection
-    ? map.suggested_questions.filter((q) => !used.has(q))
-    : [];
-  const streaming = Boolean(map) && !thinking && draft.length === 0 && streamHints.length > 0;
+  const streamHints =
+    map && askReady && !hasSelection
+      ? map.suggested_questions.filter((q) => !used.has(q))
+      : [];
+  const streaming = Boolean(map) && askReady && !thinking && draft.length === 0 && streamHints.length > 0;
   const askHint = useStreamingAskHint(!streaming, streamHints);
 
   const submit = (e: FormEvent) => {
@@ -110,7 +114,7 @@ export function AgentDock({
   };
 
   // One-shot chips only after a selection — same gate as the Power dock.
-  const chips = map && hasSelection
+  const chips = map && askReady && hasSelection
     ? SELECTION_HINTS.filter((q) => !used.has(q))
     : [];
 
@@ -149,9 +153,11 @@ export function AgentDock({
             {messages.length === 0 && (
               <div className="sh-terra-chat__msg sh-terra-chat__msg--terra sh-ws-turn">
                 <p className="sh-ws-md">
-                  {map
-                    ? `${map.project.name} is mapped. Click any box for its purpose, tech and files — shift-click to ask about several at once.`
-                    : "Drop a repo and I'll answer questions about it — what talks to what, where a change lands, why a part exists."}
+                  {!map
+                    ? "Drop a repo and I'll answer questions about it — what talks to what, where a change lands, why a part exists."
+                    : !askReady
+                      ? `${map.project.name} structure is up — Terra is still reading the architecture. Browse the map; ask unlocks when the full pass finishes.`
+                      : `${map.project.name} is mapped. Click any box for its purpose, tech and files — shift-click to ask about several at once.`}
                 </p>
               </div>
             )}
@@ -167,7 +173,7 @@ export function AgentDock({
                   className="sh-terra-chat__hint"
                   key={q}
                   type="button"
-                  disabled={thinking}
+                  disabled={thinking || !askReady}
                   onClick={() => send(q)}
                 >
                   {q}
@@ -196,12 +202,14 @@ export function AgentDock({
                 ? ""
                 : !map
                   ? "Map a repo first"
-                  : hasSelection
-                    ? "Ask about this selection"
-                    : "Ask about this repo"
+                  : !askReady
+                    ? "Finishing the architecture map…"
+                    : hasSelection
+                      ? "Ask about this selection"
+                      : "Ask about this repo"
             }
             aria-label="Ask Terra about this repository"
-            disabled={!map || thinking}
+            disabled={!map || !askReady || thinking}
           />
         </form>
       </div>

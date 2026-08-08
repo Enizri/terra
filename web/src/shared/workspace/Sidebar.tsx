@@ -1,8 +1,10 @@
 import { useMemo, useState, type ReactNode } from "react";
-import type { TerraMap } from "../../../shared/map/types";
-import { buildFileTree, countLeaves, type FileNode } from "../../../shared/fileTree";
-import type { HistoryEntry } from "../history";
-import { ChevronIcon } from "../icons";
+import type { TerraMap } from "../map/types";
+import { buildFileTree, countLeaves, type FileNode } from "../fileTree";
+import { ChevronIcon } from "./icons";
+
+/** One stored analysis in the rail — canonical home so shared/ needs no route import. */
+export type HistoryEntry = { id: number; repoUrl: string; name: string; scannedAt: string };
 
 /** One rail section: the header is the toggle, the body is what it hides. */
 function RailSection({

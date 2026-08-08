@@ -8,13 +8,13 @@ import { wsCache } from "./cache";
 import { useAnalyze } from "./useAnalyze";
 import { nextSelection } from "./selection";
 import { toHistory, type HistoryEntry } from "./history";
-import { WorkspaceHeader } from "./sections/WorkspaceHeader";
-import { Sidebar } from "./sections/Sidebar";
+import { WorkspaceHeader } from "../../shared/workspace/WorkspaceHeader";
+import { Sidebar } from "../../shared/workspace/Sidebar";
 import { DropStage } from "./sections/Stage";
 import { AgentDock } from "./sections/AgentDock";
 import "../../shared/styles/tokens.css";
 import "../../shared/styles/ui.css";
-import "./workspace.css";
+import "../../shared/workspace/workspace.css";
 
 /** Workspace: analysis run, selection, and the mapped tab. */
 export default function Workspace() {
@@ -118,6 +118,7 @@ export default function Workspace() {
         map={map}
         selected={selected}
         elements={elements}
+        askReady={!!map && !analyze.partial}
         onDropComponent={(id) => setSelectedIds((prev) => prev.filter((x) => x !== id))}
         onDropElement={(el) => setElements((prev) => prev.filter((x) => x !== el))}
       />

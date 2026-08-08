@@ -10,7 +10,7 @@ export { tracesURL };
 export type Selection = Record<string, unknown>;
 
 export type AnalyzeEvent = {
-  stage: "clone" | "scan" | "analyze" | "store" | "ask" | "done" | "error";
+  stage: "fetch" | "clone" | "scan" | "analyze" | "store" | "ask" | "done" | "error";
   label?: string;
   map?: TerraMap;
   answer?: string;

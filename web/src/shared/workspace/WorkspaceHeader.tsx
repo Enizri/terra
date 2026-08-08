@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { ArrowIcon, DownloadIcon } from "../icons";
+import { ArrowIcon, DownloadIcon } from "./icons";
 
 export function WorkspaceHeader({
   slug,

@@ -428,6 +428,33 @@
   gap: 16px;
 }
 
+/* Compact status strip while a structural map is already on stage. */
+.sh-ws__mapping-bar {
+  position: absolute;
+  left: 50%;
+  bottom: 72px;
+  transform: translateX(-50%);
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px 8px 14px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--sh-bg, #0b0d10) 88%, transparent);
+  border: 1px solid color-mix(in srgb, currentColor 14%, transparent);
+  backdrop-filter: blur(8px);
+  max-width: min(560px, calc(100% - 32px));
+}
+
+.sh-ws__mapping-bar .sh-ws__status {
+  margin: 0;
+  gap: 10px;
+}
+
+.sh-ws__mapping-bar .sh-ws__stop {
+  flex-shrink: 0;
+}
+
 .sh-ws__stop {
   border: 1px solid currentColor;
   border-radius: 999px;
@@ -458,6 +485,7 @@
 
 /* Centering suits the drop zone and the status line; the map wants the room. */
 .sh-ws__stage.is-map {
+  position: relative;
   align-items: stretch;
   justify-content: flex-start;
   gap: 14px;

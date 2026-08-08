@@ -36,7 +36,9 @@ type Server struct {
 	// Jobs is nil until Handler creates a hub.
 	Jobs *job.Hub
 	// Optional stubs for tests; nil uses production implementations.
-	Scan    func(url string) (*scan.Result, error)
+	Scan func(url string) (*scan.Result, error)
+	// Resolve returns canonical URL, short name, and HEAD SHA without a tarball.
+	Resolve func(url string) (canonical, name, commit string, err error)
 	Analyze func(ctx context.Context, res *scan.Result, model string) (*graph.Map, []string, error)
 	RunTask func(ctx context.Context, name string, payload any) (json.RawMessage, error)
 
@@ -109,6 +111,9 @@ func (s *Server) Handler() http.Handler {
 		}
 		if s.Scan == nil {
 			s.Scan = scan.Scan
+		}
+		if s.Resolve == nil {
+			s.Resolve = scan.ResolveHead
 		}
 		if s.Analyze == nil {
 			s.Analyze = func(ctx context.Context, res *scan.Result, model string) (*graph.Map, []string, error) {
@@ -220,6 +225,14 @@ func (s *Server) analyze(w http.ResponseWriter, r *http.Request) {
 	}
 	defer s.releaseAnalyze()
 
+	// Commit lookup before tarball: repeat visits skip the download.
+	if canonical, _, sha, err := s.Resolve(req.RepoURL); err == nil {
+		if repoMap := s.cachedAt(canonical, sha); repoMap != nil {
+			writeJSON(w, repoMap)
+			return
+		}
+	}
+
 	res, err := s.Scan(req.RepoURL)
 	if err != nil {
 		httpError(w, http.StatusBadRequest, err.Error())
@@ -305,21 +318,36 @@ func (s *Server) startAnalyzeJob(repoURL, model string, done func()) *job.Job {
 		defer done() // release the analyze slot on every exit, panic included
 		ctx, cancel := context.WithTimeout(jobCtx, timeout)
 		defer cancel()
-		emit(job.Event{Stage: "clone", Label: "Cloning " + repoURL})
+		emit(job.Event{Stage: "fetch", Label: "Fetching " + repoURL})
 		if err := ctx.Err(); err != nil {
 			emit(job.Event{Stage: "error", Label: stopLabel(ctx, timeout)})
 			return
 		}
+
+		// Resolve HEAD first so a commit-keyed cache hit never downloads the tree.
+		canonical, _, sha, err := s.Resolve(repoURL)
+		if err != nil {
+			emit(job.Event{Stage: "error", Label: err.Error()})
+			return
+		}
+		if repoMap := s.cachedAt(canonical, sha); repoMap != nil {
+			emit(job.Event{Stage: "done", Map: repoMap})
+			return
+		}
+
 		res, err := s.Scan(repoURL)
 		if err != nil {
 			emit(job.Event{Stage: "error", Label: err.Error()})
 			return
 		}
+		structural := graph.FromScan(res)
 		emit(job.Event{
 			Stage: "scan",
 			Label: fmt.Sprintf("Read %d files across %d languages",
 				res.Stats.SourceFiles, len(res.Languages)),
+			Map: structural,
 		})
+		// Belt-and-suspenders: Scan may see a newer commit than Resolve raced.
 		if repoMap := s.cached(res); repoMap != nil {
 			emit(job.Event{Stage: "done", Map: repoMap})
 			return
@@ -335,6 +363,7 @@ func (s *Server) startAnalyzeJob(repoURL, model string, done func()) *job.Job {
 				emit(job.Event{Stage: "error", Label: stopLabel(ctx, timeout)})
 				return
 			}
+			// Keep the structural map on the client; surface the failure as an event.
 			emit(job.Event{Stage: "error", Label: err.Error()})
 			return
 		}
@@ -726,11 +755,16 @@ func snippet(r preview.Runner, checkoutBase, repoURL, file string, line int) str
 
 // cached returns the stored map when HEAD matches the last analysis commit.
 func (s *Server) cached(res *scan.Result) *graph.Map {
-	if s.DB == "" || res.Commit == "" {
+	return s.cachedAt(res.RepositoryURL, res.Commit)
+}
+
+// cachedAt returns the stored map when repoURL's saved commit equals commit.
+func (s *Server) cachedAt(repoURL, commit string) *graph.Map {
+	if s.DB == "" || repoURL == "" || commit == "" {
 		return nil
 	}
-	commit, repoMap, err := store.Find(s.DB, res.RepositoryURL)
-	if err != nil || commit != res.Commit {
+	stored, repoMap, err := store.Find(s.DB, repoURL)
+	if err != nil || stored != commit {
 		return nil
 	}
 	return repoMap
