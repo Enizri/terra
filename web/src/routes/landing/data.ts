@@ -247,3 +247,15 @@ export const copy = {
   // ≤ ~18 chars/line; .sh-final capped at 36rem.
   final: ["The map your team", "can actually read."],
 };
+
+/** Fake live spans for the Power of Terra Monitor tab (marketing only). */
+export const MONITOR_DEMO_SPANS = [
+  { method: "GET", path: "/api/v1/memos", status: "200", component: "Notes", ms: "18ms" },
+  { method: "POST", path: "/api/v1/auth/signin", status: "200", component: "Sign-in", ms: "42ms" },
+  { method: "GET", path: "/api/v1/memos:search", status: "200", component: "Web App", ms: "31ms" },
+  { method: "POST", path: "/api/v1/memos", status: "201", component: "Notes", ms: "27ms" },
+  { method: "GET", path: "/api/v1/attachments", status: "200", component: "Uploads", ms: "22ms" },
+  { method: "DELETE", path: "/api/v1/memos/42", status: "204", component: "Notes", ms: "15ms" },
+  { method: "GET", path: "/api/v1/users/me", status: "200", component: "Sign-in", ms: "12ms" },
+  { method: "POST", path: "/api/v1/attachments", status: "201", component: "Uploads", ms: "88ms" },
+] as const;

@@ -1,20 +1,19 @@
 import { motion, useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { inView, rise, stagger } from "../../../shared/motion";
-import { copy, diagramNodes } from "../data";
-import { IMPLEMENT_HINTS, TheaterPanel } from "../theater";
+import { copy, diagramNodes, MONITOR_DEMO_SPANS } from "../data";
+import { ASK_HINTS, IMPLEMENT_HINTS, TheaterPanel } from "../theater";
 import { PENCIL_INK, RepoMapDiagram, RepoWindowHeader, WindowChrome } from "../primitives";
 
-/** Preview + Terra chat for Ask / Implement ops tabs. */
+/** Instant marketing preview + Terra chat (Ask / Implement — no live iframe). */
 function OpsPreview({
   chatHints,
   designMode = false,
-  exploreReplica = false,
+  demoReplica,
 }: {
   chatHints?: readonly string[];
   designMode?: boolean;
-  /** Implement: clickable Memos explore UI (not the live Ask iframe). */
-  exploreReplica?: boolean;
+  demoReplica: "home" | "explore";
 }) {
   const web = diagramNodes.find((n) => n.id === "web")!;
   return (
@@ -24,8 +23,63 @@ function OpsPreview({
       className="sh-theater__panel--inline"
       chatHints={chatHints}
       designMode={designMode}
-      exploreReplica={exploreReplica}
+      demoReplica={demoReplica}
     />
+  );
+}
+
+/** Hardcoded live-traffic mock for Monitor (no /traces). */
+function MonitorDemo() {
+  const reduced = useReducedMotion();
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (reduced) return;
+    const id = setInterval(() => setTick((n) => n + 1), 1200);
+    return () => clearInterval(id);
+  }, [reduced]);
+
+  const visible = MONITOR_DEMO_SPANS.slice(0, Math.min(6, 3 + (tick % 4)));
+  const pulseIdx = tick % visible.length;
+  const hot = diagramNodes[tick % diagramNodes.length];
+
+  return (
+    <div className="sh-monitor">
+      <header className="sh-monitor__head">
+        <span className="sh-monitor__live" aria-hidden />
+        <b>Live on the map</b>
+        <em>usememos/memos</em>
+      </header>
+      <div className="sh-monitor__body">
+        <ul className="sh-monitor__nodes" aria-label="Active components">
+          {diagramNodes.map((n) => (
+            <li
+              key={n.id}
+              className={`sh-monitor__node${hot.id === n.id ? " is-hot" : ""}`}
+            >
+              <span className="sh-monitor__dot" aria-hidden />
+              {n.label}
+            </li>
+          ))}
+        </ul>
+        <div className="sh-monitor__feed" aria-live="polite">
+          <span className="sh-monitor__feed-label">Recent calls</span>
+          <ul>
+            {visible.map((span, i) => (
+              <li
+                key={`${span.method}-${span.path}-${i}`}
+                className={`sh-monitor__row${i === pulseIdx ? " is-pulse" : ""}`}
+              >
+                <code className="sh-monitor__method">{span.method}</code>
+                <code className="sh-monitor__path">{span.path}</code>
+                <span className="sh-monitor__status">{span.status}</span>
+                <span className="sh-monitor__comp">{span.component}</span>
+                <span className="sh-monitor__ms">{span.ms}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -54,8 +108,7 @@ function OpsStage({
         key={id}
         className={`sh-ops__pane${active === id ? " is-active" : ""}`}
         aria-hidden={active !== id}
-        // Keep the live iframe in the tree when inactive — unmounting it
-        // re-hits /preview and shows "Starting the dev server…" again.
+        // Keep panes mounted when inactive so tab switches stay instant.
         inert={active !== id ? true : undefined}
       >
         {node}
@@ -66,21 +119,13 @@ function OpsStage({
     <motion.div className="sh-ops" variants={rise}>
       <div className="sh-ops__frame">
         <div className="sh-ops__state">
-          {pane("ask", <OpsPreview />)}
+          {pane("ask", <OpsPreview chatHints={ASK_HINTS} demoReplica="home" />)}
           {pane(
             "implement",
-            <OpsPreview chatHints={IMPLEMENT_HINTS} designMode exploreReplica />,
+            <OpsPreview chatHints={IMPLEMENT_HINTS} designMode demoReplica="explore" />,
           )}
           {pane("map", <RepoMapDiagram hoverOnly showHeader={false} />)}
-          {pane(
-            "monitor",
-            <div className="sh-opstate sh-opstate--soon">
-              <p>
-                {copy.ops.find((o) => o.id === "monitor")?.caption}
-              </p>
-              <span className="sh-opstate__pill">Demo coming soon</span>
-            </div>,
-          )}
+          {pane("monitor", <MonitorDemo />)}
         </div>
       </div>
       {caption && op && (
@@ -132,8 +177,7 @@ function TryItNote() {
 export function PowerSection() {
   const [active, setActive] = useState<OpsTabId>("ask");
   // Keep-alive: once a tab has been opened, leave its tree mounted. Starts
-  // empty — the ask pane boots a real dev-server preview (POST /preview), so
-  // don't spend that on visitors who never scroll here.
+  // empty so we don't pay for Ask/Implement replicas until the section is near.
   const [mounted, setMounted] = useState<ReadonlySet<OpsTabId>>(() => new Set<OpsTabId>());
   const sectionRef = useRef<HTMLElement | null>(null);
 
