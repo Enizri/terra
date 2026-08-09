@@ -21,6 +21,7 @@ import (
 	"github.com/Enizri/terra/internal/job"
 	"github.com/Enizri/terra/internal/llmlocal"
 	"github.com/Enizri/terra/internal/preview"
+	"github.com/Enizri/terra/internal/recommend"
 	"github.com/Enizri/terra/internal/scan"
 	"github.com/Enizri/terra/internal/store"
 	"github.com/Enizri/terra/internal/trace"
@@ -351,6 +352,14 @@ func (s *Server) selectModel(w http.ResponseWriter, modelID, apiKey, fallbackMod
 	if entry.RequiresAPIKey && strings.TrimSpace(apiKey) == "" {
 		httpError(w, http.StatusBadRequest,
 			fmt.Sprintf("%s needs a %s API key", entry.DisplayName, entry.Provider))
+		return modelSelection{}, false
+	}
+	// Same rule the ModelGate renders: a local model that will OOM or crawl
+	// on this host must not start ensure_model just because the client
+	// bypassed the disabled button.
+	if ok, hint := recommend.Eligible(*entry, catalog.DetectHost()); !ok {
+		httpError(w, http.StatusBadRequest,
+			fmt.Sprintf("%s cannot run here: %s", entry.DisplayName, hint))
 		return modelSelection{}, false
 	}
 	return resolveModel(s.Cfg, entry, strings.TrimSpace(apiKey)), true

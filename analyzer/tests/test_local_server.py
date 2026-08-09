@@ -201,11 +201,47 @@ def test_model_id_must_name_a_gguf_file():
         local._split_model_id("Qwen/Qwen2.5-0.5B-Instruct")
 
 
+def test_n_gpu_layers_defaults_to_laptop_sweet_spot(monkeypatch):
+    monkeypatch.delenv("TERRA_N_GPU_LAYERS", raising=False)
+    assert local.n_gpu_layers_for("mps") == local._DEFAULT_GPU_LAYERS
+    assert local.n_gpu_layers_for("cuda") == local._DEFAULT_GPU_LAYERS
+    assert local.n_gpu_layers_for("cpu") == 0
+
+
+def test_n_gpu_layers_env_overrides_default(monkeypatch):
+    monkeypatch.setenv("TERRA_N_GPU_LAYERS", "-1")
+    assert local.n_gpu_layers_for("mps") == -1
+    monkeypatch.setenv("TERRA_N_GPU_LAYERS", "0")
+    assert local.n_gpu_layers_for("cuda") == 0
+
+
 def test_load_model_installs_its_weights(monkeypatch):
     _fake_backends(monkeypatch)
     assert local.load_model(GOOD, gen=local.state.load_gen) is True
     assert local.state.model_id == GOOD
     assert local.state.loaded is True
+
+
+def test_load_model_uses_partial_gpu_offload_on_metal(monkeypatch):
+    seen = {}
+
+    def capture(repo, filename, **_kw):
+        return f"/fake/{repo}/{filename}"
+
+    class FakeLlama:
+        def __init__(self, model_path, **kw):
+            seen.update(kw)
+            self.model_path = model_path
+
+    monkeypatch.setitem(sys.modules, "huggingface_hub",
+                        types.SimpleNamespace(hf_hub_download=capture))
+    monkeypatch.setitem(sys.modules, "llama_cpp", types.SimpleNamespace(Llama=FakeLlama))
+    monkeypatch.setattr(local, "pick_device", lambda _requested="": "mps")
+    monkeypatch.delenv("TERRA_N_GPU_LAYERS", raising=False)
+
+    assert local.load_model(GOOD, gen=local.state.load_gen) is True
+    assert seen["n_gpu_layers"] == local._DEFAULT_GPU_LAYERS
+    assert seen["n_gpu_layers"] != -1
 
 
 def test_load_model_gives_up_when_cancelled_during_the_download(monkeypatch):
