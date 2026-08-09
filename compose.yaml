@@ -39,6 +39,11 @@ services:
       # (Docker Desktop cannot remount API-container paths from the socket).
       TERRA_CHECKOUT_VOLUME: terra-data
       TERRA_PUBLIC_URL: http://127.0.0.1:8080
+      # Pinned for the same reason as the llm service: /host/capabilities is
+      # computed here but gates models that load over there, and that sidecar
+      # has no GPU backend. Inheriting a developer's TERRA_DEVICE=mps would
+      # offer local models the container cannot actually run well.
+      TERRA_DEVICE: cpu
       TERRA_TRACE_HOST: host.docker.internal
       TERRA_PREVIEW_NETWORK: terra-net
       TERRA_ADDR: 0.0.0.0:8080

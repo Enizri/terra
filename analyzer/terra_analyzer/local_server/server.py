@@ -30,6 +30,14 @@ MAX_OUTPUT_TOKENS = 4096
 # the host pays for beyond the file: roughly 1.4 GB on a 7B.
 N_CTX = int(os.environ.get("TERRA_N_CTX") or 24576)
 
+# Threads for inference. llama.cpp otherwise takes every core it can see —
+# n_threads_batch defaults to the full count — which pins the whole machine
+# while a map is generated and leaves nothing for the editor the developer is
+# sitting in. Half the cores costs some tokens/sec and keeps the box usable.
+N_THREADS = int(os.environ.get("TERRA_N_THREADS") or 0) or max(
+    1, (os.cpu_count() or 4) // 2
+)
+
 
 class _State:
     model_id: str = ""
@@ -50,6 +58,13 @@ state = _State()
 
 # Serializes state transitions between request handlers and the loader thread.
 state_lock = threading.Lock()
+
+# One generation at a time. A Llama handle is not safe to call concurrently,
+# and FastAPI runs sync endpoints in a threadpool — two analyze attempts
+# overlapping would share one model's context. Serializing also stops a client
+# that gave up (the analyzer times out at TERRA_LLM_TIMEOUT) from leaving
+# several generations racing for the same cores.
+infer_lock = threading.Lock()
 
 
 def state_name() -> str:
@@ -116,6 +131,8 @@ def load_model(model_id: str = "", device: str = "", gen: int | None = None) -> 
         model_path=path,
         n_ctx=N_CTX,
         n_gpu_layers=-1 if device in ("mps", "metal", "cuda") else 0,
+        n_threads=N_THREADS,
+        n_threads_batch=N_THREADS,
         verbose=False,
     )
 
@@ -208,11 +225,15 @@ def generate_chat(req: ChatCompletionRequest) -> tuple[str, str]:
     max_new = min(req.max_tokens or MAX_OUTPUT_TOKENS, MAX_OUTPUT_TOKENS)
     # The chat template ships inside the GGUF, so llama.cpp formats the turns
     # itself — there is no separate tokenizer to keep in step with the weights.
-    out = state.model.create_chat_completion(
-        messages=msgs,
-        temperature=req.temperature or 0.0,
-        max_tokens=max_new,
-    )
+    with infer_lock:
+        model = state.model
+        if model is None:  # swapped out while this request waited its turn
+            raise HTTPException(status_code=503, detail="model not loaded")
+        out = model.create_chat_completion(
+            messages=msgs,
+            temperature=req.temperature or 0.0,
+            max_tokens=max_new,
+        )
     choice = out["choices"][0]
     content = (choice["message"].get("content") or "").strip()
     return content, choice.get("finish_reason") or "stop"
