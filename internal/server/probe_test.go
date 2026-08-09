@@ -207,9 +207,7 @@ func TestProbeCacheHoldsNoSecrets(t *testing.T) {
 }
 
 // Compile-time reminder that the analyze seam keeps its routing options.
-var _ = func(ctx context.Context, res *scan.Result, opts graph.LLMOpts) (*graph.Map, []string, error) {
-	return nil, nil, nil
-}
+var _ func(context.Context, *scan.Result, graph.LLMOpts) (*graph.Map, []string, error) = (Server{}).Analyze
 
 func TestProbeRecommendationFollowsTheHost(t *testing.T) {
 	s, ts := testServer(t)

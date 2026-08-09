@@ -47,6 +47,14 @@ func testServer(t *testing.T) (*Server, *httptest.Server) {
 					Importance: "critical", Type: "frontend", Files: []string{"web/"}}},
 			}, nil, nil
 		},
+		// Deterministic host: skip DetectHost so tests never shell out to
+		// nvidia-smi / claim the developer's MPS GPU.
+		Host: func() catalog.Capabilities {
+			return catalog.Capabilities{RAMGB: 16, Device: "cpu"}
+		},
+		RepoMeta: func(string) (string, int64, error) {
+			return "", 0, fmt.Errorf("skip")
+		},
 	}
 	ts := httptest.NewServer(s.Handler())
 	t.Cleanup(ts.Close)
@@ -817,6 +825,9 @@ func TestTracesStreamsSpansAsSSE(t *testing.T) {
 			t.Fatal(err)
 		}
 		paths = append(paths, span.Path)
+	}
+	if err := sc.Err(); err != nil {
+		t.Fatal(err)
 	}
 	if len(paths) != 2 || paths[0] != "/api/old" || paths[1] != "/api/live" {
 		t.Errorf("paths = %v, want history then live", paths)
