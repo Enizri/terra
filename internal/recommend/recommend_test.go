@@ -124,11 +124,18 @@ func TestRecommendPrefersACapableLocalForAMediumRepoOnCPU(t *testing.T) {
 	}
 }
 
-// The floor must not push a machine that can only run 0.5B onto a paid remote.
-func TestRecommendStillPicksTheSmallestLocalWhenNothingElseFits(t *testing.T) {
-	rec := Recommend(catalog.All(), catalog.Capabilities{RAMGB: 4, Device: "cpu"}, Signals{SourceFiles: 20})
-	if rec.ModelID != "local-qwen2.5-0.5b" {
-		t.Errorf("a 4 GB box picked %s, want the only local it can run", rec.ModelID)
+// The floor must not push a small machine onto a paid remote. Quantized
+// weights put three fast-tier locals inside 4 GB, so what matters is that one
+// of them wins, not which.
+func TestRecommendStillPicksALocalOnASmallMachine(t *testing.T) {
+	caps := catalog.Capabilities{RAMGB: 4, Device: "cpu"}
+	rec := Recommend(catalog.All(), caps, Signals{SourceFiles: 20})
+	entry := catalog.Find(rec.ModelID)
+	if entry == nil || entry.Kind != catalog.KindLocal {
+		t.Fatalf("a 4 GB box picked %s, want a local", rec.ModelID)
+	}
+	if ok, why := Eligible(*entry, caps); !ok {
+		t.Errorf("recommended %s on 4 GB, which is not eligible: %s", rec.ModelID, why)
 	}
 }
 
@@ -166,9 +173,11 @@ func TestFromScan(t *testing.T) {
 // capable the host — a workstation that could run 7B locally was still told to
 // go and buy an API key.
 func TestRecommendOffersALocalForABigRepoOnACapableMachine(t *testing.T) {
-	// 32 GB is deliberately absent: a 7B fp16 checkpoint peaks at roughly
-	// twice its weights during load, so 32 GB thrashes rather than runs.
+	// A Q4_K_M 7B is ~4.7 GB mmapped plus its KV cache, so 16 GB is plenty —
+	// this used to need 48 GB as an fp16 checkpoint.
 	for _, caps := range []catalog.Capabilities{
+		{RAMGB: 16, Device: "mps"},
+		{RAMGB: 32, Device: "mps"},
 		{RAMGB: 64, Device: "mps"},
 		{RAMGB: 128, Device: "cuda"},
 	} {
@@ -196,10 +205,8 @@ func TestRecommendStillGoesRemoteWhenNoLocalCanDoTheJob(t *testing.T) {
 		name string
 		caps catalog.Capabilities
 	}{
-		{"8GB cannot hold a quality model", catalog.Capabilities{RAMGB: 8, Device: "cpu"}},
-		{"16GB is under the 7B floor", catalog.Capabilities{RAMGB: 16, Device: "mps"}},
+		{"8GB is under the quantized 7B floor", catalog.Capabilities{RAMGB: 8, Device: "mps"}},
 		{"CPU-only inference is too slow", catalog.Capabilities{RAMGB: 32, Device: "cpu"}},
-		{"32GB is under the 7B load peak", catalog.Capabilities{RAMGB: 32, Device: "mps"}},
 	} {
 		rec := Recommend(catalog.All(), tc.caps, big)
 		entry := catalog.Find(rec.ModelID)

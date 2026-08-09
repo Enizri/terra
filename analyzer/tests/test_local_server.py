@@ -73,6 +73,9 @@ from fastapi import HTTPException
 from terra_analyzer.local_server import server as local
 
 
+SMALL = "Qwen/Qwen2.5-0.5B-Instruct-GGUF/qwen2.5-0.5b-instruct-q4_k_m.gguf"
+
+
 def _reset_state():
     local.state.model_id = ""
     local.state.loaded = False
@@ -80,7 +83,6 @@ def _reset_state():
     local.state.load_error = ""
     local.state.load_gen = 0
     local.state.model = None
-    local.state.tokenizer = None
 
 
 @pytest.fixture(autouse=True)
@@ -103,7 +105,7 @@ def test_load_spawns_a_worker_and_reports_ready(monkeypatch):
         done.set()
 
     monkeypatch.setattr(local, "load_model", fake_load)
-    out = local.admin_load(local.LoadRequest(model_id="Qwen/Qwen2.5-0.5B-Instruct"))
+    out = local.admin_load(local.LoadRequest(model_id=SMALL))
     assert out["state"] == "loading"
     assert done.wait(2)
     # The worker's finally clears `loading`; give the thread a beat to land.
@@ -113,13 +115,13 @@ def test_load_spawns_a_worker_and_reports_ready(monkeypatch):
         threading.Event().wait(0.01)
     status = local.admin_status()
     assert status["state"] == "ready"
-    assert status["model_id"] == "Qwen/Qwen2.5-0.5B-Instruct"
+    assert status["model_id"] == SMALL
 
 
 def test_load_is_a_noop_when_the_model_is_already_serving():
-    local.state.model_id = "Qwen/Qwen2.5-0.5B-Instruct"
+    local.state.model_id = SMALL
     local.state.loaded = True
-    out = local.admin_load(local.LoadRequest(model_id="Qwen/Qwen2.5-0.5B-Instruct"))
+    out = local.admin_load(local.LoadRequest(model_id=SMALL))
     assert out["state"] == "ready"
 
 
@@ -163,55 +165,59 @@ def test_chat_refuses_to_serve_while_loading():
 
 # --- load generation: cancel and supersede -------------------------------
 #
-# from_pretrained cannot be interrupted, so "cancel" means the result is
+# hf_hub_download cannot be interrupted, so "cancel" means the result is
 # discarded rather than the download stopped. These pin that contract.
 
 import sys
 import types
 
 
-def _fake_backends(monkeypatch, on_tokenizer=None, on_model=None):
-    """Lets load_model run without torch or transformers installed."""
-    def weights(model_id):
-        return types.SimpleNamespace(name=model_id, to=lambda _d: None, eval=lambda: None)
+def _fake_backends(monkeypatch, on_download=None, on_load=None):
+    """Lets load_model run without llama_cpp or huggingface_hub installed."""
+    def fake_download(repo, filename, **_kw):
+        if on_download:
+            on_download()
+        return f"/fake/{repo}/{filename}"
 
-    class FakeTokenizer:
-        @staticmethod
-        def from_pretrained(model_id, **_kw):
-            if on_tokenizer:
-                on_tokenizer()
-            return weights(model_id)
+    class FakeLlama:
+        def __init__(self, model_path, **_kw):
+            if on_load:
+                on_load()
+            self.model_path = model_path
 
-    class FakeModel:
-        @staticmethod
-        def from_pretrained(model_id, **_kw):
-            if on_model:
-                on_model()
-            return weights(model_id)
-
-    monkeypatch.setitem(sys.modules, "torch", types.SimpleNamespace(float16="f16", float32="f32"))
-    monkeypatch.setitem(sys.modules, "transformers", types.SimpleNamespace(
-        AutoTokenizer=FakeTokenizer, AutoModelForCausalLM=FakeModel))
+    monkeypatch.setitem(sys.modules, "huggingface_hub",
+                        types.SimpleNamespace(hf_hub_download=fake_download))
+    monkeypatch.setitem(sys.modules, "llama_cpp", types.SimpleNamespace(Llama=FakeLlama))
     monkeypatch.setattr(local, "pick_device", lambda _requested="": "cpu")
+
+
+GOOD = "Qwen/Good-GGUF/good-q4_k_m.gguf"
+ABANDONED = "Qwen/Abandoned-GGUF/abandoned-q4_k_m.gguf"
+
+
+def test_model_id_must_name_a_gguf_file():
+    assert local._split_model_id(GOOD) == ("Qwen/Good-GGUF", "good-q4_k_m.gguf")
+    with pytest.raises(RuntimeError):
+        local._split_model_id("Qwen/Qwen2.5-0.5B-Instruct")
 
 
 def test_load_model_installs_its_weights(monkeypatch):
     _fake_backends(monkeypatch)
-    assert local.load_model("Qwen/Good", gen=local.state.load_gen) is True
-    assert local.state.model_id == "Qwen/Good"
+    assert local.load_model(GOOD, gen=local.state.load_gen) is True
+    assert local.state.model_id == GOOD
     assert local.state.loaded is True
 
 
-def test_load_model_gives_up_when_cancelled_during_the_tokenizer(monkeypatch):
-    _fake_backends(monkeypatch, on_tokenizer=lambda: local.admin_cancel())
-    assert local.load_model("Qwen/Abandoned", gen=local.state.load_gen) is False
+def test_load_model_gives_up_when_cancelled_during_the_download(monkeypatch):
+    _fake_backends(monkeypatch, on_download=lambda: local.admin_cancel())
+    assert local.load_model(ABANDONED, gen=local.state.load_gen) is False
     assert local.state.loaded is False
     assert local.state.model_id == ""
 
 
 def test_load_model_discards_weights_a_cancel_superseded(monkeypatch):
-    _fake_backends(monkeypatch, on_model=lambda: local.admin_cancel())
-    assert local.load_model("Qwen/Abandoned", gen=local.state.load_gen) is False
+    _fake_backends(monkeypatch, on_load=lambda: local.admin_cancel())
+    assert local.load_model(ABANDONED, gen=local.state.load_gen) is False
     assert local.state.loaded is False
     assert local.state.model_id == ""
 
@@ -259,7 +265,6 @@ def test_cancelling_a_switch_leaves_the_resident_model_serving(monkeypatch):
     local.state.model_id = "Qwen/Resident"
     local.state.loaded = True
     local.state.model = object()
-    local.state.tokenizer = object()
 
     local.admin_load(local.LoadRequest(model_id="Qwen/Big"))
     assert local.admin_status()["state"] == "loading"

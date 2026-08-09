@@ -42,7 +42,7 @@ export type ProbeRepo = {
 
 /** Mirror of recommend.Eligible: remote entries always run, local ones need
  * the RAM. An unknown host (0 GB) only clears the small weights, and a
- * CPU-only host never clears the quality tier (float32 load, no accelerator). */
+ * CPU-only host never clears the quality tier (tokens/sec, not memory). */
 export function eligibility(
   entry: CatalogEntry,
   caps: HostCapabilities | null,
@@ -54,7 +54,7 @@ export function eligibility(
     return { eligible: false, hint: `needs ~${need} GB RAM (this machine has ${have} GB)` };
   }
   if (caps?.device === "cpu" && entry.tier === "quality") {
-    return { eligible: false, hint: "too large to run on CPU only — needs a GPU or Apple Silicon" };
+    return { eligible: false, hint: "too slow without a GPU or Apple Silicon — pick a smaller local model or a hosted one" };
   }
   if (have === 0 && need > 8) {
     return { eligible: false, hint: `needs ~${need} GB RAM (host memory unknown)` };

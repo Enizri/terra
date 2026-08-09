@@ -23,7 +23,7 @@ venv-local: venv
 	$(VENV)/bin/pip install -q -e 'analyzer[dev,local]'
 
 run-llm:
-	cd analyzer && HF_HUB_ENABLE_HF_TRANSFER=1 .venv/bin/uvicorn terra_analyzer.local_server.server:app --port 8020
+	cd analyzer && HF_XET_HIGH_PERFORMANCE=1 .venv/bin/uvicorn terra_analyzer.local_server.server:app --port 8020
 
 run-analyzer:
 	cd analyzer && TERRA_LLM_URL=$${TERRA_LLM_URL:-http://localhost:8020/v1} \

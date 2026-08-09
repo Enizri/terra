@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import os
+import platform
+import sys
 import threading
 import time
 import uuid
@@ -13,14 +15,25 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
-DEFAULT_MODEL = "Qwen/Qwen2.5-0.5B-Instruct"
+# Model ids are "<hf-repo>/<file>.gguf" — the repo alone is not enough, since
+# some repos publish only a sharded quant and others publish several. Mirrors
+# catalog.Entry.HFID on the Go side, which is also what /v1 requests carry.
+DEFAULT_MODEL = "Qwen/Qwen2.5-0.5B-Instruct-GGUF/qwen2.5-0.5b-instruct-q4_k_m.gguf"
 MAX_OUTPUT_TOKENS = 4096
+
+# Context window. llama.cpp defaults to 512 and raises on overflow rather
+# than truncating, so this has to clear the worst case end to end. Measured
+# against the prompt budgets in prompts/architecture.py: 8.1k tokens for a
+# maxed-out prompt, and a strict retry re-sends the rejected answer (up to
+# MAX_OUTPUT_TOKENS) plus a correction before asking for another one —
+# 8.1k + 4k + 4k ≈ 16.5k. The KV cache at this size, not the weights, is what
+# the host pays for beyond the file: roughly 1.4 GB on a 7B.
+N_CTX = int(os.environ.get("TERRA_N_CTX") or 24576)
 
 
 class _State:
     model_id: str = ""
     device: str = "cpu"
-    tokenizer: Any = None
     model: Any = None
     loaded: bool = False
     # Set while a background load_model is running; the chat endpoints refuse
@@ -50,57 +63,67 @@ def state_name() -> str:
 
 
 def pick_device(requested: str = "") -> str:
+    """Where llama.cpp should put the layers. No torch involved — the GGUF
+    backend detects its own accelerator, so this only decides whether to
+    offload at all."""
     requested = (requested or os.environ.get("TERRA_DEVICE") or "auto").lower()
     if requested != "auto":
         return requested
-    try:
-        import torch
-    except ImportError as e:
-        raise RuntimeError(
-            "torch is required for the local HF server; "
-            "install with: pip install -e '.[local]'"
-        ) from e
-    if torch.backends.mps.is_available():
+    if sys.platform == "darwin" and platform.machine() == "arm64":
+        # "mps" is what Go's detectDevice reports and what TERRA_DEVICE is set
+        # to across the stack; llama.cpp's own name for it is Metal.
         return "mps"
-    if torch.cuda.is_available():
-        return "cuda"
     return "cpu"
 
 
+def _split_model_id(model_id: str) -> tuple[str, str]:
+    """"org/repo/file.gguf" -> ("org/repo", "file.gguf")."""
+    repo, _, filename = model_id.rpartition("/")
+    if not filename.endswith(".gguf") or not repo:
+        raise RuntimeError(
+            f'model id "{model_id}" must be "<hf-repo>/<file>.gguf"'
+        )
+    return repo, filename
+
+
 def load_model(model_id: str = "", device: str = "", gen: int | None = None) -> bool:
-    """Loads weights and installs them as the served model. Returns False when
-    gen went stale (cancelled or superseded) — nothing is installed then."""
+    """Downloads a GGUF quant and installs it as the served model. Returns
+    False when gen went stale (cancelled or superseded) — nothing is
+    installed then."""
     try:
-        import torch
-        from transformers import AutoModelForCausalLM, AutoTokenizer
+        from huggingface_hub import hf_hub_download
+        from llama_cpp import Llama
     except ImportError as e:
         raise RuntimeError(
-            "transformers and torch are required for the local HF server; "
-            "install with: pip install -e '.[local]'"
+            "llama-cpp-python and huggingface_hub are required for the local "
+            "server; install with: pip install -e '.[local]'"
         ) from e
 
     model_id = model_id or os.environ.get("TERRA_MODEL") or DEFAULT_MODEL
+    repo, filename = _split_model_id(model_id)
     device = pick_device(device)
-    dtype = torch.float16 if device in ("cuda", "mps") else torch.float32
 
-    tokenizer = AutoTokenizer.from_pretrained(model_id)
+    # Download and load are separate on purpose: the download is the long
+    # part, and finishing it is what makes a cancel worth checking for.
+    path = hf_hub_download(repo, filename)
     if gen is not None and gen != state.load_gen:
-        # Cancelled while fetching the tokenizer: skip the expensive part.
         return False
-    # dtype= (not torch_dtype=, deprecated). No trust_remote_code: every
-    # catalog local is a native architecture, so it buys nothing and would run
-    # hub code. Loading straight onto mps (device_map=) segfaults on torch
-    # 2.13 — the CPU load then .to() below is the only path that works.
-    model = AutoModelForCausalLM.from_pretrained(model_id, dtype=dtype)
-    model.to(device)
-    model.eval()
+
+    # A quantized GGUF is mmapped, so nothing here allocates a second copy of
+    # the weights the way a safetensors load did. n_gpu_layers=-1 offloads
+    # every layer; on CPU llama.cpp runs the same file without one.
+    model = Llama(
+        model_path=path,
+        n_ctx=N_CTX,
+        n_gpu_layers=-1 if device in ("mps", "metal", "cuda") else 0,
+        verbose=False,
+    )
 
     with state_lock:
         if gen is not None and gen != state.load_gen:
             return False
         state.model_id = model_id
         state.device = device
-        state.tokenizer = tokenizer
         state.model = model
         state.loaded = True
         state.load_error = ""
@@ -112,7 +135,6 @@ async def lifespan(_app: FastAPI):
     load_model()
     yield
     state.model = None
-    state.tokenizer = None
     state.loaded = False
 
 
@@ -148,7 +170,7 @@ class ChatCompletionRequest(BaseModel):
 def _ensure_loaded() -> None:
     if state.loading:
         raise HTTPException(status_code=503, detail=f"loading {state.loading}")
-    if not state.loaded or state.model is None or state.tokenizer is None:
+    if not state.loaded or state.model is None:
         raise HTTPException(status_code=503, detail=state.load_error or "model not loaded")
 
 
@@ -174,38 +196,19 @@ def _messages_for_generate(req: ChatCompletionRequest) -> list[dict[str, str]]:
 
 def generate_chat(req: ChatCompletionRequest) -> tuple[str, str]:
     """Returns (content, finish_reason)."""
-    import torch
-
     _ensure_loaded()
-    tokenizer = state.tokenizer
-    model = state.model
-    device = state.device
-
     msgs = _messages_for_generate(req)
-    prompt = tokenizer.apply_chat_template(
-        msgs, tokenize=False, add_generation_prompt=True
-    )
-    inputs = tokenizer(prompt, return_tensors="pt")
-    inputs = {k: v.to(device) for k, v in inputs.items()}
-    prompt_len = inputs["input_ids"].shape[-1]
-
     max_new = min(req.max_tokens or MAX_OUTPUT_TOKENS, MAX_OUTPUT_TOKENS)
-    do_sample = req.temperature is not None and req.temperature > 0
-    gen_kwargs: dict[str, Any] = {
-        "max_new_tokens": max_new,
-        "do_sample": do_sample,
-        "pad_token_id": tokenizer.eos_token_id,
-    }
-    if do_sample:
-        gen_kwargs["temperature"] = max(req.temperature, 1e-5)
-
-    with torch.no_grad():
-        out = model.generate(**inputs, **gen_kwargs)
-
-    new_tokens = out[0][prompt_len:]
-    content = tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
-    finish = "length" if len(new_tokens) >= max_new else "stop"
-    return content, finish
+    # The chat template ships inside the GGUF, so llama.cpp formats the turns
+    # itself — there is no separate tokenizer to keep in step with the weights.
+    out = state.model.create_chat_completion(
+        messages=msgs,
+        temperature=req.temperature or 0.0,
+        max_tokens=max_new,
+    )
+    choice = out["choices"][0]
+    content = (choice["message"].get("content") or "").strip()
+    return content, choice.get("finish_reason") or "stop"
 
 
 @app.get("/")

@@ -84,11 +84,12 @@ func Eligible(entry catalog.Entry, caps catalog.Capabilities) (bool, string) {
 	if caps.RAMGB > 0 && caps.RAMGB < entry.MinRAMGB {
 		return false, fmt.Sprintf("needs ~%d GB RAM (this machine has %d GB)", entry.MinRAMGB, caps.RAMGB)
 	}
-	// CPU-only hosts load in float32 — twice the weights, and no accelerator
-	// to make up for it. A quality-tier local there does not run slowly, it
-	// pins the machine and OOMs, so block it rather than merely rank it down.
+	// A quantized 7B fits in RAM on a CPU-only host — it just generates at a
+	// handful of tokens a second, and a repo map is thousands of tokens. That
+	// is a wait nobody sits through, so keep it out of the picker entirely
+	// rather than let someone pick it and conclude Terra is broken.
 	if caps.Device == "cpu" && tierRank[entry.Tier] > 1 {
-		return false, "too large to run on CPU only — needs a GPU or Apple Silicon"
+		return false, "too slow without a GPU or Apple Silicon — pick a smaller local model or a hosted one"
 	}
 	if caps.RAMGB == 0 {
 		// Unknown host: only clear the smallest weights rather than promising
@@ -118,14 +119,15 @@ func score(entry catalog.Entry, caps catalog.Capabilities, want string) float64 
 		// Download cost — a first run pays for every gigabyte.
 		s -= entry.SizeGB * 0.25
 		// Nothing else rewards capability within a tier, so the smallest
-		// weights would always win. Sub-1.5 GB locals stay selectable and
-		// eligible — just never the default.
-		if entry.SizeGB < 1.5 {
+		// weights would always win. The 0.5B stays selectable and eligible —
+		// just never the default. (Threshold is in Q4_K_M gigabytes: the
+		// next model up is 1.1 GB.)
+		if entry.SizeGB < 0.7 {
 			s -= 4
 		}
-		// Headroom is no longer scored here: MinRAMGB is now the measured
-		// peak (~2x weights), so Eligible already rejects anything that would
-		// not fit — this penalty could only ever demote, never block.
+		// Headroom is not scored here: MinRAMGB already covers the mmapped
+		// weights plus the KV cache, so Eligible rejects what will not fit —
+		// a penalty could only ever demote, never block.
 		if caps.Device == "cpu" && tierRank[entry.Tier] > 0 {
 			s -= 2
 		}

@@ -19,11 +19,11 @@ User (CLI / HTTP)
         |
         | OpenAI-compatible POST /v1/chat/completions
         v
-   Local HF server (:8020/v1)   — or any OpenAI-compatible endpoint
-   Transformers + torch
+   Local GGUF server (:8020/v1)  — or any OpenAI-compatible endpoint
+   llama.cpp (llama-cpp-python)
         |
         v
-   Qwen/Qwen2.5-0.5B-Instruct (HF cache)
+   Qwen2.5 0.5B Instruct Q4_K_M (HF cache)
 ```
 
 Go and Python never import each other — they talk over HTTP. The analyzer
@@ -36,7 +36,10 @@ to add for a new product under this repo.
 ## Quickstart
 
 ```sh
-# once (adds torch + transformers for local serving)
+# once (compiles llama-cpp-python for local GGUF serving; needs cmake and a
+# C++ compiler — the published wheels are corrupt). ~1 min.
+# The Compose `llm` image compiles it too and has not been built end to end
+# yet; `make up-llm` may need a first run with a healthy Docker daemon.
 make venv-local
 
 # one terminal: llm (:8020) + analyzer (:8010) + api (:8080) + web (vite)
@@ -133,7 +136,8 @@ Supports `package.json` frontends only; runfile/Go-only repos need `make dev`
 | `TERRA_ANALYZE_TIMEOUT` | Go | `15m` | Wall-clock cap for one analyze job |
 | `TERRA_RATE_LIMIT` | Go | `2` | Per-IP requests/sec on jobs/preview/ask (0 disables) |
 | `TERRA_ANALYZE_CONCURRENCY` | Go | `4` | Max analyze jobs in flight; extra requests get 429 |
-| `TERRA_MODEL` | analyzer + local LLM | `Qwen/Qwen2.5-0.5B-Instruct` | Hugging Face model id or path |
+| `TERRA_MODEL` | analyzer + local LLM | `Qwen/Qwen2.5-0.5B-Instruct-GGUF/qwen2.5-0.5b-instruct-q4_k_m.gguf` | GGUF quant as `<hf-repo>/<file>.gguf` |
+| `TERRA_N_CTX` | local LLM | `24576` | Context window; must clear the largest prompt plus 4096 output tokens |
 | `TERRA_TOKEN` | Go | _(empty)_ | Shared secret; empty leaves API open (local-only) |
 | `TERRA_PREVIEW_MODE` | Go | _(empty)_ = host | `docker` for Compose sibling previews |
 | `TERRA_CHECKOUT_DIR` | Go | user cache | Shared checkout root (Compose: `/data/checkouts`) |
@@ -163,7 +167,7 @@ POST /jobs/analyze {repo_url, probe_id, model_id, api_key?}
   `internal/catalog`: local Hugging Face weights and curated remote
   OpenAI-compatible endpoints. IDs are provisional; the shape is not.
 - **Host fit** — `GET /host/capabilities` (open) reports this machine's RAM and
-  torch device. Local models that cannot fit stay visible but disabled.
+  accelerator. Local models that cannot fit stay visible but disabled.
 - **Local models** load on the Terra sidecar during analyze: the API calls
   `POST /admin/load {model_id}` and polls `GET /admin/status` until the weights
   are ready, streaming `ensure_model` events. No `.env` edit, no restart.

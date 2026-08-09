@@ -70,7 +70,7 @@ services:
       # For hosted providers, set TERRA_LLM_URL (and TERRA_LLM_API_KEY) in .env.
       TERRA_LLM_URL: ${TERRA_LLM_URL:-http://llm:8020/v1}
       TERRA_LLM_API_KEY: ${TERRA_LLM_API_KEY:-}
-      TERRA_MODEL: ${TERRA_MODEL:-Qwen/Qwen2.5-0.5B-Instruct}
+      TERRA_MODEL: ${TERRA_MODEL:-Qwen/Qwen2.5-0.5B-Instruct-GGUF/qwen2.5-0.5b-instruct-q4_k_m.gguf}
     # Not published to the host — only reachable as http://analyzer:8010 on the Compose network.
     healthcheck:
       test:
@@ -95,12 +95,12 @@ services:
       - path: .env
         required: false
     environment:
-      TERRA_MODEL: ${TERRA_MODEL:-Qwen/Qwen2.5-0.5B-Instruct}
+      TERRA_MODEL: ${TERRA_MODEL:-Qwen/Qwen2.5-0.5B-Instruct-GGUF/qwen2.5-0.5b-instruct-q4_k_m.gguf}
       TERRA_DEVICE: ${TERRA_DEVICE:-cpu}
       # Weights outlive the container. Without this, any exit (OOM on a big
       # checkpoint, a rebuild) throws the cache away and re-downloads it.
       HF_HOME: /hf
-      HF_HUB_ENABLE_HF_TRANSFER: "1"
+      HF_XET_HIGH_PERFORMANCE: "1"
     volumes:
       - hf-cache:/hf
     # Not published to the host — analyzer uses http://llm:8020/v1.

@@ -18,7 +18,9 @@ type Entry struct {
 	Tier        string `json:"tier"` // "fast" | "balanced" | "quality"
 	Blurb       string `json:"blurb"`
 
-	// Local weights.
+	// Local weights: "<hf-repo>/<file>.gguf". The filename is part of the id
+	// because a repo can publish several quants, or only a sharded one, and
+	// the sidecar must download exactly the bytes this entry promises.
 	HFID     string  `json:"hf_id,omitempty"`
 	MinRAMGB int     `json:"min_ram_gb,omitempty"`
 	SizeGB   float64 `json:"size_gb,omitempty"`
@@ -31,42 +33,51 @@ type Entry struct {
 }
 
 // entries is the shipped catalog. Local ids are all ungated on the Hub so
-// `ensure_model` can download them without an HF token.
+// `ensure_model` can download them without an HF token, and all point at
+// Q4_K_M GGUF quants: mmapped, roughly a third the bytes of the fp16
+// checkpoint, and no second copy in RAM while loading.
 var entries = []Entry{
 	{
 		ID: "local-qwen2.5-0.5b", Kind: KindLocal, DisplayName: "Qwen2.5 0.5B Instruct",
 		Tier: "fast", Blurb: "Smallest local model — fine for tiny repos and smoke tests.",
-		HFID: "Qwen/Qwen2.5-0.5B-Instruct", MinRAMGB: 4, SizeGB: 1.0,
+		HFID:     "Qwen/Qwen2.5-0.5B-Instruct-GGUF/qwen2.5-0.5b-instruct-q4_k_m.gguf",
+		MinRAMGB: 4, SizeGB: 0.5,
 	},
 	{
 		ID: "local-qwen2.5-1.5b", Kind: KindLocal, DisplayName: "Qwen2.5 1.5B Instruct",
 		Tier: "fast", Blurb: "Quick maps of small repos on a laptop.",
-		HFID: "Qwen/Qwen2.5-1.5B-Instruct", MinRAMGB: 8, SizeGB: 3.1,
+		HFID:     "Qwen/Qwen2.5-1.5B-Instruct-GGUF/qwen2.5-1.5b-instruct-q4_k_m.gguf",
+		MinRAMGB: 4, SizeGB: 1.1,
 	},
 	{
 		ID: "local-smollm2-1.7b", Kind: KindLocal, DisplayName: "SmolLM2 1.7B Instruct",
 		Tier: "fast", Blurb: "Compact alternative when Qwen is unavailable.",
-		HFID: "HuggingFaceTB/SmolLM2-1.7B-Instruct", MinRAMGB: 8, SizeGB: 3.4,
+		HFID:     "HuggingFaceTB/SmolLM2-1.7B-Instruct-GGUF/smollm2-1.7b-instruct-q4_k_m.gguf",
+		MinRAMGB: 4, SizeGB: 1.1,
 	},
 	{
 		ID: "local-qwen2.5-3b", Kind: KindLocal, DisplayName: "Qwen2.5 3B Instruct",
 		Tier: "balanced", Blurb: "Good middle ground for medium repos.",
-		HFID: "Qwen/Qwen2.5-3B-Instruct", MinRAMGB: 16, SizeGB: 6.2,
+		HFID:     "Qwen/Qwen2.5-3B-Instruct-GGUF/qwen2.5-3b-instruct-q4_k_m.gguf",
+		MinRAMGB: 8, SizeGB: 2.1,
 	},
 	{
 		ID: "local-qwen2.5-coder-3b", Kind: KindLocal, DisplayName: "Qwen2.5 Coder 3B",
 		Tier: "balanced", Blurb: "Code-tuned; reads source layout well at 3B.",
-		HFID: "Qwen/Qwen2.5-Coder-3B-Instruct", MinRAMGB: 16, SizeGB: 6.2,
+		HFID:     "Qwen/Qwen2.5-Coder-3B-Instruct-GGUF/qwen2.5-coder-3b-instruct-q4_k_m.gguf",
+		MinRAMGB: 8, SizeGB: 2.1,
 	},
 	{
 		ID: "local-qwen2.5-7b", Kind: KindLocal, DisplayName: "Qwen2.5 7B Instruct",
-		Tier: "quality", Blurb: "Best local judgement — needs a big machine.",
-		HFID: "Qwen/Qwen2.5-7B-Instruct", MinRAMGB: 48, SizeGB: 15.2,
+		Tier: "quality", Blurb: "Best local judgement; ~4.7 GB quantized.",
+		HFID:     "bartowski/Qwen2.5-7B-Instruct-GGUF/Qwen2.5-7B-Instruct-Q4_K_M.gguf",
+		MinRAMGB: 12, SizeGB: 4.7,
 	},
 	{
 		ID: "local-qwen2.5-coder-7b", Kind: KindLocal, DisplayName: "Qwen2.5 Coder 7B",
-		Tier: "quality", Blurb: "Code-tuned 7B for large, layered codebases.",
-		HFID: "Qwen/Qwen2.5-Coder-7B-Instruct", MinRAMGB: 48, SizeGB: 15.2,
+		Tier: "quality", Blurb: "Code-tuned 7B for large, layered codebases; ~4.7 GB quantized.",
+		HFID:     "Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/qwen2.5-coder-7b-instruct-q4_k_m.gguf",
+		MinRAMGB: 12, SizeGB: 4.7,
 	},
 
 	{

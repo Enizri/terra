@@ -1,13 +1,19 @@
-# Optional local Hugging Face OpenAI-compatible server (compose profile: llm).
-# Large image (torch + transformers); not started by default.
+# Optional local GGUF OpenAI-compatible server (compose profile: llm).
+# Not started by default. llama-cpp-python has no usable prebuilt wheel, so
+# the image compiles it — build deps go in, and the toolchain stays because
+# stripping it would need a second stage for little gain on an opt-in image.
 FROM python:3.12-slim-bookworm
 WORKDIR /app
+RUN apt-get update \
+	&& apt-get install -y --no-install-recommends build-essential cmake \
+	&& rm -rf /var/lib/apt/lists/*
 COPY analyzer/pyproject.toml ./analyzer/
 COPY analyzer/terra_analyzer/ ./analyzer/terra_analyzer/
 RUN pip install --no-cache-dir './analyzer[local]'
-ENV HF_HUB_ENABLE_HF_TRANSFER=1
+# hf_transfer is retired upstream; Xet is what huggingface_hub uses now.
+ENV HF_XET_HIGH_PERFORMANCE=1
 EXPOSE 8020
-# Model download + load can take several minutes on first start.
+# Model download + load can take a few minutes on first start.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=600s --retries=3 \
 	CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8020/healthz')"
 CMD ["uvicorn", "terra_analyzer.local_server.server:app", "--host", "0.0.0.0", "--port", "8020"]

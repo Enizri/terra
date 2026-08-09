@@ -19,11 +19,15 @@ import (
 // leakKey is deliberately distinctive so a substring search cannot miss it.
 const leakKey = "sk-test-LEAK-0000"
 
+// The weights id these tests route on. Read from the catalog rather than
+// written out: it is a GGUF repo-and-file path that changes with the quant.
+var localHFID = catalog.Find("local-qwen2.5-1.5b").HFID
+
 func TestResolveModel(t *testing.T) {
 	cfg := &config.Config{LocalLLMURL: "http://localhost:8020"}
 
 	local := resolveModel(cfg, catalog.Find("local-qwen2.5-1.5b"), "")
-	if !local.Local || local.HFID != "Qwen/Qwen2.5-1.5B-Instruct" {
+	if !local.Local || local.HFID != localHFID {
 		t.Errorf("local selection = %+v", local)
 	}
 	if local.Opts.BaseURL != "http://localhost:8020" || local.Opts.Model != local.HFID {
@@ -136,7 +140,7 @@ func TestLocalModelRunsEnsureModelFirst(t *testing.T) {
 	events := runJob(t, ts, "/jobs/analyze",
 		`{"repo_url":"https://github.com/acme/notes","model_id":"local-qwen2.5-1.5b"}`)
 
-	want := []string{"ensure:Qwen/Qwen2.5-1.5B-Instruct", "analyze:Qwen/Qwen2.5-1.5B-Instruct"}
+	want := []string{"ensure:" + localHFID, "analyze:" + localHFID}
 	if strings.Join(order, ",") != strings.Join(want, ",") {
 		t.Errorf("order = %v, want %v", order, want)
 	}
@@ -257,7 +261,7 @@ func TestAskLoadsALocalModelBeforeAnswering(t *testing.T) {
 	events := runJob(t, ts, "/jobs/ask",
 		`{"repo_url":"https://github.com/acme/notes","question":"what?","model_id":"local-qwen2.5-1.5b"}`)
 
-	if want := "ensure:Qwen/Qwen2.5-1.5B-Instruct,qa"; strings.Join(order, ",") != want {
+	if want := "ensure:" + localHFID + ",qa"; strings.Join(order, ",") != want {
 		t.Errorf("order = %v, want %s", order, want)
 	}
 	if !strings.Contains(strings.Join(stages(events), ","), "ensure_model") {
@@ -320,7 +324,7 @@ func TestAskRoutesALocalModel(t *testing.T) {
 	runJob(t, ts, "/jobs/ask",
 		`{"repo_url":"https://github.com/acme/notes","question":"what?","model_id":"local-qwen2.5-1.5b"}`)
 
-	if payload["model"] != "Qwen/Qwen2.5-1.5B-Instruct" {
+	if payload["model"] != localHFID {
 		t.Errorf("model = %v", payload["model"])
 	}
 	base, _ := payload["base_url"].(string)

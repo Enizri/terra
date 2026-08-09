@@ -13,12 +13,11 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest"]
 local = [
-    "torch",
-    "transformers>=5.14",  # dtype= (torch_dtype= is deprecated); the version actually run here
-    "accelerate",
-    # Multipart hub downloads (HF_HUB_ENABLE_HF_TRANSFER=1); a 15 GB
-    # checkpoint on one stream is most of a first run's wall time.
-    "hf_transfer",
+    # GGUF via llama.cpp: mmapped quantized weights, no torch. There is no
+    # usable prebuilt wheel (the published ones fail CRC), so this compiles
+    # from source — cmake and a C++ compiler have to be present.
+    "llama-cpp-python>=0.3.34",
+    "huggingface_hub",
 ]
 
 [build-system]
