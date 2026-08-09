@@ -83,15 +83,15 @@ def load_model(model_id: str = "", device: str = "", gen: int | None = None) -> 
     device = pick_device(device)
     dtype = torch.float16 if device in ("cuda", "mps") else torch.float32
 
-    tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained(model_id)
     if gen is not None and gen != state.load_gen:
         # Cancelled while fetching the tokenizer: skip the expensive part.
         return False
-    model = AutoModelForCausalLM.from_pretrained(
-        model_id,
-        torch_dtype=dtype,
-        trust_remote_code=True,
-    )
+    # dtype= (not torch_dtype=, deprecated). No trust_remote_code: every
+    # catalog local is a native architecture, so it buys nothing and would run
+    # hub code. Loading straight onto mps (device_map=) segfaults on torch
+    # 2.13 — the CPU load then .to() below is the only path that works.
+    model = AutoModelForCausalLM.from_pretrained(model_id, dtype=dtype)
     model.to(device)
     model.eval()
 

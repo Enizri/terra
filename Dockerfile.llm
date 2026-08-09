@@ -5,6 +5,7 @@ WORKDIR /app
 COPY analyzer/pyproject.toml ./analyzer/
 COPY analyzer/terra_analyzer/ ./analyzer/terra_analyzer/
 RUN pip install --no-cache-dir './analyzer[local]'
+ENV HF_HUB_ENABLE_HF_TRANSFER=1
 EXPOSE 8020
 # Model download + load can take several minutes on first start.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=600s --retries=3 \

@@ -97,6 +97,12 @@ services:
     environment:
       TERRA_MODEL: ${TERRA_MODEL:-Qwen/Qwen2.5-0.5B-Instruct}
       TERRA_DEVICE: ${TERRA_DEVICE:-cpu}
+      # Weights outlive the container. Without this, any exit (OOM on a big
+      # checkpoint, a rebuild) throws the cache away and re-downloads it.
+      HF_HOME: /hf
+      HF_HUB_ENABLE_HF_TRANSFER: "1"
+    volumes:
+      - hf-cache:/hf
     # Not published to the host — analyzer uses http://llm:8020/v1.
     healthcheck:
       test:
@@ -115,3 +121,5 @@ services:
 volumes:
   terra-data:
     name: terra-data
+  hf-cache:
+    name: terra-hf-cache

@@ -84,6 +84,12 @@ func Eligible(entry catalog.Entry, caps catalog.Capabilities) (bool, string) {
 	if caps.RAMGB > 0 && caps.RAMGB < entry.MinRAMGB {
 		return false, fmt.Sprintf("needs ~%d GB RAM (this machine has %d GB)", entry.MinRAMGB, caps.RAMGB)
 	}
+	// CPU-only hosts load in float32 — twice the weights, and no accelerator
+	// to make up for it. A quality-tier local there does not run slowly, it
+	// pins the machine and OOMs, so block it rather than merely rank it down.
+	if caps.Device == "cpu" && tierRank[entry.Tier] > 1 {
+		return false, "too large to run on CPU only — needs a GPU or Apple Silicon"
+	}
 	if caps.RAMGB == 0 {
 		// Unknown host: only clear the smallest weights rather than promising
 		// a 7B download that may OOM.
@@ -117,13 +123,9 @@ func score(entry catalog.Entry, caps catalog.Capabilities, want string) float64 
 		if entry.SizeGB < 1.5 {
 			s -= 4
 		}
-		// Headroom: inference wants roughly twice the weights in RAM for
-		// activations, KV cache and the rest of the machine. MinRAMGB is the
-		// eligibility floor — "can it run" — so comfort is measured against
-		// the weights themselves, not against that floor doubled.
-		if caps.RAMGB > 0 && entry.SizeGB*2 > float64(caps.RAMGB) {
-			s -= 2
-		}
+		// Headroom is no longer scored here: MinRAMGB is now the measured
+		// peak (~2x weights), so Eligible already rejects anything that would
+		// not fit — this penalty could only ever demote, never block.
 		if caps.Device == "cpu" && tierRank[entry.Tier] > 0 {
 			s -= 2
 		}
@@ -131,8 +133,8 @@ func score(entry catalog.Entry, caps catalog.Capabilities, want string) float64 
 		// A BYOK key modal, a provider account and a per-run bill are real
 		// friction. No bonus for big repos: a machine that can comfortably
 		// run the matching local model should be offered it, and the local
-		// candidates already lose their own points to download size, thin
-		// headroom and CPU-only inference when they cannot.
+		// candidates already lose their own points to download size and
+		// CPU-only inference when they cannot.
 		s -= 3
 	}
 	return s

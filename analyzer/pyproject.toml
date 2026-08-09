@@ -14,8 +14,11 @@ dependencies = [
 dev = ["pytest"]
 local = [
     "torch",
-    "transformers>=4.40",
+    "transformers>=5.14",  # dtype= (torch_dtype= is deprecated); the version actually run here
     "accelerate",
+    # Multipart hub downloads (HF_HUB_ENABLE_HF_TRANSFER=1); a 15 GB
+    # checkpoint on one stream is most of a first run's wall time.
+    "hf_transfer",
 ]
 
 [build-system]

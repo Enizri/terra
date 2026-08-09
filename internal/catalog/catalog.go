@@ -61,12 +61,12 @@ var entries = []Entry{
 	{
 		ID: "local-qwen2.5-7b", Kind: KindLocal, DisplayName: "Qwen2.5 7B Instruct",
 		Tier: "quality", Blurb: "Best local judgement — needs a big machine.",
-		HFID: "Qwen/Qwen2.5-7B-Instruct", MinRAMGB: 32, SizeGB: 15.2,
+		HFID: "Qwen/Qwen2.5-7B-Instruct", MinRAMGB: 48, SizeGB: 15.2,
 	},
 	{
 		ID: "local-qwen2.5-coder-7b", Kind: KindLocal, DisplayName: "Qwen2.5 Coder 7B",
 		Tier: "quality", Blurb: "Code-tuned 7B for large, layered codebases.",
-		HFID: "Qwen/Qwen2.5-Coder-7B-Instruct", MinRAMGB: 32, SizeGB: 15.2,
+		HFID: "Qwen/Qwen2.5-Coder-7B-Instruct", MinRAMGB: 48, SizeGB: 15.2,
 	},
 
 	{

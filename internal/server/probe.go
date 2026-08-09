@@ -103,6 +103,20 @@ func (s *Server) startProbeJob(repoURL string) *job.Job {
 		defer cancel()
 		emit(job.Event{Stage: "fetch", Label: "Fetching " + repoURL})
 
+		// RepoMeta does not depend on the resolved SHA, so it rides alongside
+		// the resolve instead of costing its own round trip. Buffered so a
+		// cache hit below can abandon it without blocking the goroutine.
+		type meta struct {
+			language string
+			sizeKB   int64
+			err      error
+		}
+		metaCh := make(chan meta, 1)
+		go func() {
+			language, sizeKB, err := s.RepoMeta(repoURL)
+			metaCh <- meta{language, sizeKB, err}
+		}()
+
 		canonical, _, sha, err := s.Resolve(repoURL)
 		if err != nil {
 			emit(job.Event{Stage: "error", Label: err.Error()})
@@ -118,11 +132,13 @@ func (s *Server) startProbeJob(repoURL string) *job.Job {
 
 		// Provisional pick from GitHub metadata while the tarball downloads.
 		// Best-effort: a rate limit here must not fail the probe.
+		// Received here, not before the cache check above: a stored map needs
+		// no model, and a recommend event would open the gate on it.
 		sig := recommend.Signals{}
-		if language, sizeKB, err := s.RepoMeta(repoURL); err == nil {
-			sig.SizeKB = sizeKB
-			if language != "" {
-				sig.Languages = []string{language}
+		if m := <-metaCh; m.err == nil {
+			sig.SizeKB = m.sizeKB
+			if m.language != "" {
+				sig.Languages = []string{m.language}
 			}
 			provisional := recommend.Recommend(entries, caps, sig)
 			emit(job.Event{

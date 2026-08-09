@@ -166,8 +166,9 @@ func TestFromScan(t *testing.T) {
 // capable the host — a workstation that could run 7B locally was still told to
 // go and buy an API key.
 func TestRecommendOffersALocalForABigRepoOnACapableMachine(t *testing.T) {
+	// 32 GB is deliberately absent: a 7B fp16 checkpoint peaks at roughly
+	// twice its weights during load, so 32 GB thrashes rather than runs.
 	for _, caps := range []catalog.Capabilities{
-		{RAMGB: 32, Device: "mps"},
 		{RAMGB: 64, Device: "mps"},
 		{RAMGB: 128, Device: "cuda"},
 	} {
@@ -198,6 +199,7 @@ func TestRecommendStillGoesRemoteWhenNoLocalCanDoTheJob(t *testing.T) {
 		{"8GB cannot hold a quality model", catalog.Capabilities{RAMGB: 8, Device: "cpu"}},
 		{"16GB is under the 7B floor", catalog.Capabilities{RAMGB: 16, Device: "mps"}},
 		{"CPU-only inference is too slow", catalog.Capabilities{RAMGB: 32, Device: "cpu"}},
+		{"32GB is under the 7B load peak", catalog.Capabilities{RAMGB: 32, Device: "mps"}},
 	} {
 		rec := Recommend(catalog.All(), tc.caps, big)
 		entry := catalog.Find(rec.ModelID)
