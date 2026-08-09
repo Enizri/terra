@@ -38,8 +38,6 @@ to add for a new product under this repo.
 ```sh
 # once (compiles llama-cpp-python for local GGUF serving; needs cmake and a
 # C++ compiler — the published wheels are corrupt). ~1 min.
-# The Compose `llm` image compiles it too and has not been built end to end
-# yet; `make up-llm` may need a first run with a healthy Docker daemon.
 make venv-local
 
 # one terminal: llm (:8020) + analyzer (:8010) + api (:8080) + web (vite)

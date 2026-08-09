@@ -132,7 +132,14 @@ def load_model(model_id: str = "", device: str = "", gen: int | None = None) -> 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    load_model()
+    # A boot-time load failure must not kill the process. Under Compose's
+    # restart policy an unusable TERRA_MODEL would otherwise crash-loop
+    # forever, where a live server reports the error on /admin/status and can
+    # be pointed at a working model with /admin/load.
+    try:
+        load_model()
+    except Exception as e:  # noqa: BLE001 — the message is the whole payload
+        state.load_error = f"loading {os.environ.get('TERRA_MODEL') or DEFAULT_MODEL} failed: {e}"
     yield
     state.model = None
     state.loaded = False

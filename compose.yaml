@@ -96,7 +96,10 @@ services:
         required: false
     environment:
       TERRA_MODEL: ${TERRA_MODEL:-Qwen/Qwen2.5-0.5B-Instruct-GGUF/qwen2.5-0.5b-instruct-q4_k_m.gguf}
-      TERRA_DEVICE: ${TERRA_DEVICE:-cpu}
+      # Pinned, not inherited: this image builds llama.cpp without a GPU
+      # backend, so a host's TERRA_DEVICE=mps would only make /admin/status
+      # claim an accelerator the container does not have.
+      TERRA_DEVICE: cpu
       # Weights outlive the container. Without this, any exit (OOM on a big
       # checkpoint, a rebuild) throws the cache away and re-downloads it.
       HF_HOME: /hf
