@@ -33,7 +33,13 @@ class QATask:
         if payload.get("map"):
             parts.append("Architecture map:\n" + json.dumps(payload["map"]))
 
-        cfg = Config()
+        # Same per-request routing as /analyze: the workspace reuses the model
+        # the user picked for this session, falling back to TERRA_LLM_* env.
+        cfg = Config(
+            model=str(payload.get("model") or ""),
+            base_url=str(payload.get("base_url") or ""),
+            api_key=str(payload.get("api_key") or ""),
+        )
         preflight(cfg)
         msgs = [
             {"role": "system", "content": QA_SYSTEM},

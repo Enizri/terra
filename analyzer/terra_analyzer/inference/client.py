@@ -1,6 +1,7 @@
 """OpenAI-compatible Chat Completions client."""
 
 import json
+from urllib.parse import urlparse
 
 import httpx
 
@@ -12,14 +13,30 @@ class LLMError(Exception):
     """Surfaces to Go as a 502 detail."""
 
 
+def _is_local(cfg: Config) -> bool:
+    """Whether the request goes to this host's own sidecar. The same hostname
+    check app.py's lifespan makes, plus the Compose `llm` service; base_url is
+    always normalized to /v1, so parsing it is reliable."""
+    return urlparse(cfg.base_url).hostname in ("localhost", "127.0.0.1", "llm")
+
+
 def preflight(cfg: Config) -> None:
-    """Fail if the model server is unreachable or missing TERRA_MODEL."""
-    hint = (
-        f"start the local HF server with `make run-llm`, or set TERRA_LLM_URL "
-        f"to an OpenAI-compatible /v1 endpoint"
-    )
+    """Fail if the model server is unreachable or not serving cfg.model."""
+    # These reach the browser verbatim, so they must name the place the
+    # request actually went — telling a hosted-provider user to run
+    # `make run-llm` is worse than saying nothing.
+    if _is_local(cfg):
+        hint = (
+            "start the local HF server with `make run-llm`, or set TERRA_LLM_URL "
+            "to an OpenAI-compatible /v1 endpoint"
+        )
+    else:
+        hint = (
+            "the provider is unreachable, or the API key or model is not valid "
+            "for it — re-enter the key, or choose another model"
+        )
     try:
-        resp = cfg.client.get(cfg.base_url + "/models")
+        resp = cfg.client.get(cfg.base_url + "/models", headers=cfg.auth_headers())
     except httpx.HTTPError as e:
         raise LLMError(f"cannot reach a model server at {cfg.base_url}: {e}\n{hint}") from e
 
@@ -41,9 +58,12 @@ def preflight(cfg: Config) -> None:
     if not have:
         # Some servers omit enumeration; try chat and fail there if needed.
         return
+    if _is_local(cfg):
+        fix = "set TERRA_MODEL to one of those ids, or pass --model to terra"
+    else:
+        fix = "choose another model"
     raise LLMError(
-        f'the server at {cfg.base_url} is serving {", ".join(have)}, not "{cfg.model}"\n'
-        f"set TERRA_MODEL to one of those ids, or pass --model to terra"
+        f'the server at {cfg.base_url} is serving {", ".join(have)}, not "{cfg.model}"\n{fix}'
     )
 
 
@@ -97,7 +117,9 @@ def _provider_error(cfg: Config, resp: httpx.Response) -> LLMError:
 
 def _post(cfg: Config, body: dict) -> httpx.Response:
     try:
-        return cfg.client.post(cfg.base_url + "/chat/completions", json=body)
+        return cfg.client.post(
+            cfg.base_url + "/chat/completions", json=body, headers=cfg.auth_headers()
+        )
     except httpx.ReadTimeout as e:
         raise LLMError(
             f"llm timed out after {cfg.read_timeout:.0f}s waiting for {cfg.model} at "

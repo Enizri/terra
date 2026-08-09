@@ -176,6 +176,65 @@ func TestListOnEmptyDatabase(t *testing.T) {
 	}
 }
 
+func TestDelete(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "terra.db")
+	res, m := fixtures()
+	if err := Save(path, res, m); err != nil {
+		t.Fatal(err)
+	}
+	other, otherMap := fixtures()
+	other.RepositoryURL = "https://github.com/usememos/other"
+	other.ScannedAt = other.ScannedAt.Add(time.Hour)
+	if err := Save(path, other, otherMap); err != nil {
+		t.Fatal(err)
+	}
+
+	list, err := List(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 2 {
+		t.Fatalf("list = %d rows, want 2", len(list))
+	}
+	target := list[1].ID
+	if list[1].RepoURL != res.RepositoryURL {
+		t.Fatalf("list[1] = %+v, want memos row", list[1])
+	}
+
+	ok, err := Delete(path, target)
+	if err != nil || !ok {
+		t.Fatalf("Delete = %v, %v; want true, nil", ok, err)
+	}
+	list, err = List(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 1 || list[0].RepoURL != other.RepositoryURL {
+		t.Fatalf("after delete list = %+v", list)
+	}
+
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if n := count(t, db, "projects"); n != 1 {
+		t.Errorf("projects = %d, want 1", n)
+	}
+	if n := count(t, db, "components"); n != 2 {
+		t.Errorf("components = %d, want 2", n)
+	}
+
+	ok, err = Delete(path, target)
+	if err != nil || ok {
+		t.Errorf("Delete again = %v, %v; want false, nil", ok, err)
+	}
+	ok, err = Delete(path, 999)
+	if err != nil || ok {
+		t.Errorf("Delete(999) = %v, %v; want false, nil", ok, err)
+	}
+}
+
 func TestSaveSecondRepositoryKeepsTheFirst(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "terra.db")
 	res, m := fixtures()

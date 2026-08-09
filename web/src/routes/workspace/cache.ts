@@ -8,4 +8,7 @@ export const wsCache: {
   map: TerraMap | null;
   storedMap: TerraMap | null;
   history: HistoryEntry[] | null;
-} = { map: null, storedMap: null, history: null };
+  /** The model this session analyzed with, so Ask reuses it. The key lives
+   * here only for the tab's lifetime; localStorage is the durable copy. */
+  selectedModel: { modelId: string; apiKey?: string } | null;
+} = { map: null, storedMap: null, history: null, selectedModel: null };

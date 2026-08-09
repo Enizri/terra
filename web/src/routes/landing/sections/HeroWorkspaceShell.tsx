@@ -119,6 +119,7 @@ export function HeroWorkspaceShell({
             history={[]}
             onSelect={noop}
             onOpen={noop}
+            onRemove={noop}
             busy={phase === "scan"}
           />
           <main className={`sh-ws__stage${phase === "map" ? " is-map" : ""}`}>

@@ -3,7 +3,7 @@ import json
 import httpx
 import pytest
 
-from terra_analyzer.inference.client import chat
+from terra_analyzer.inference.client import chat, preflight
 from terra_analyzer.inference.config import Config
 from terra_analyzer.llm import LLMError, generate
 from terra_analyzer.models import Draft
@@ -279,7 +279,77 @@ def test_preflight_accepts_empty_model_list(scan, good_draft_dict):
     assert draft.components
 
 
+# The preflight hint reaches the browser verbatim, so it has to name the
+# place the request actually went.
+def test_preflight_hint_for_a_local_sidecar_says_how_to_start_it():
+    cfg = Config(base_url="http://localhost:8020", model="m",
+                 client=mock_client(lambda request: httpx.Response(500, text="boom")))
+    with pytest.raises(LLMError, match="make run-llm"):
+        preflight(cfg)
+
+
+def test_preflight_hint_for_a_remote_provider_never_mentions_the_local_server():
+    cfg = Config(base_url="https://api.openai.com/v1", model="m",
+                 client=mock_client(lambda request: httpx.Response(401, text="bad key")))
+    with pytest.raises(LLMError) as excinfo:
+        preflight(cfg)
+    message = str(excinfo.value)
+    assert "make run-llm" not in message
+    assert "TERRA_LLM_URL" not in message
+    assert "API key" in message
+
+
+def test_preflight_wrong_model_on_a_remote_points_at_the_picker():
+    def handle(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"data": [{"id": "other-model"}]})
+
+    cfg = Config(base_url="https://api.openai.com/v1", model="gpt-5.4-mini",
+                 client=mock_client(handle))
+    with pytest.raises(LLMError) as excinfo:
+        preflight(cfg)
+    message = str(excinfo.value)
+    assert "TERRA_MODEL" not in message
+    assert "--model" not in message
+    assert "choose another model" in message
+
+
 def test_schema_covers_draft_fields():
     assert set(DRAFT_SCHEMA["required"]) == set(Draft.model_fields)
     comp_props = DRAFT_SCHEMA["properties"]["components"]["items"]["properties"]
     assert {"id", "parent_id", "name", "purpose", "importance", "type", "tech", "files"} <= set(comp_props)
+
+
+def test_per_request_api_key_becomes_bearer_header(scan, good_draft_dict, monkeypatch):
+    """An injected client (the routing path) must still get Authorization."""
+    monkeypatch.delenv("TERRA_LLM_API_KEY", raising=False)
+    seen: list[str | None] = []
+
+    inner = openai_handler(draft_json(good_draft_dict))
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request.headers.get("authorization"))
+        return inner(request)
+
+    generate(scan, base_url="http://llm/v1", client=mock_client(handler), api_key="sk-per-request")
+    # /models preflight and /chat/completions both carry the key.
+    assert seen and all(value == "Bearer sk-per-request" for value in seen)
+
+
+def test_env_api_key_still_applies_without_a_per_request_key(monkeypatch):
+    monkeypatch.setenv("TERRA_LLM_API_KEY", "sk-from-env")
+    cfg = Config(base_url="http://llm/v1", model="m", client=mock_client(lambda r: httpx.Response(200)))
+    assert cfg.api_key_set
+    assert cfg.auth_headers() == {"Authorization": "Bearer sk-from-env"}
+
+
+def test_per_request_key_overrides_the_env_key(monkeypatch):
+    monkeypatch.setenv("TERRA_LLM_API_KEY", "sk-from-env")
+    cfg = Config(base_url="http://llm/v1", model="m", api_key="sk-per-request",
+                 client=mock_client(lambda r: httpx.Response(200)))
+    assert cfg.auth_headers() == {"Authorization": "Bearer sk-per-request"}
+
+
+def test_no_key_sends_no_authorization_header(monkeypatch):
+    monkeypatch.delenv("TERRA_LLM_API_KEY", raising=False)
+    cfg = Config(base_url="http://llm/v1", model="m", client=mock_client(lambda r: httpx.Response(200)))
+    assert cfg.auth_headers() == {}

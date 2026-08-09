@@ -57,14 +57,29 @@ var skipDirs = map[string]bool{
 
 // Scan analyzes a GitHub repo from its codeload tarball (no local clone).
 func Scan(rawURL string) (*Result, error) {
+	owner, repo, err := ownerRepo(rawURL)
+	if err != nil {
+		return nil, err
+	}
+	sha, err := ResolveCommit(owner, repo)
+	if err != nil {
+		return nil, err
+	}
+	return ScanAt(rawURL, sha)
+}
+
+// ScanAt analyzes a GitHub repo at a known commit SHA (skips HEAD resolve).
+func ScanAt(rawURL, sha string) (*Result, error) {
 	url, name, err := NormalizeURL(rawURL)
 	if err != nil {
 		return nil, err
 	}
-	owner, repo, _ := ownerRepo(rawURL)
-	sha, err := ResolveCommit(owner, repo)
+	owner, repo, err := ownerRepo(rawURL)
 	if err != nil {
 		return nil, err
+	}
+	if sha == "" {
+		return nil, fmt.Errorf("scan %s/%s: empty commit SHA", owner, repo)
 	}
 	body, err := fetchTarball(owner, repo, sha)
 	if err != nil {
@@ -226,6 +241,29 @@ func (c *collector) finish() {
 	sort.Strings(res.Dirs)
 	sort.Strings(c.allFiles)
 	res.Files, res.FilesNote = SamplePaths(c.allFiles, maxFiles)
+
+	// A flat repo leaves these nil, which marshals to null. The analyzer's
+	// Pydantic list fields only fall back to their default when a key is
+	// absent, so a null rejects the whole request.
+	res.Stats.TopLevelDirs = orEmpty(res.Stats.TopLevelDirs)
+	res.PrimaryLanguages = orEmpty(res.PrimaryLanguages)
+	res.Dirs = orEmpty(res.Dirs)
+	if res.Languages == nil {
+		res.Languages = []LanguageStat{}
+	}
+	if res.Tree == nil {
+		res.Tree = []DirSummary{}
+	}
+	if res.Dependencies == nil {
+		res.Dependencies = []Manifest{}
+	}
+}
+
+func orEmpty(s []string) []string {
+	if s == nil {
+		return []string{}
+	}
+	return s
 }
 
 // SamplePaths returns all paths, or a per-directory sample when over maxFiles.

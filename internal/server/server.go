@@ -15,9 +15,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Enizri/terra/internal/catalog"
 	"github.com/Enizri/terra/internal/config"
 	"github.com/Enizri/terra/internal/graph"
 	"github.com/Enizri/terra/internal/job"
+	"github.com/Enizri/terra/internal/llmlocal"
 	"github.com/Enizri/terra/internal/preview"
 	"github.com/Enizri/terra/internal/scan"
 	"github.com/Enizri/terra/internal/store"
@@ -36,14 +38,30 @@ type Server struct {
 	// Jobs is nil until Handler creates a hub.
 	Jobs *job.Hub
 	// Optional stubs for tests; nil uses production implementations.
-	Scan func(url string) (*scan.Result, error)
+	// commit is the already-resolved HEAD SHA; empty means Scan must resolve it.
+	Scan func(url, commit string) (*scan.Result, error)
 	// Resolve returns canonical URL, short name, and HEAD SHA without a tarball.
 	Resolve func(url string) (canonical, name, commit string, err error)
-	Analyze func(ctx context.Context, res *scan.Result, model string) (*graph.Map, []string, error)
+	Analyze func(ctx context.Context, res *scan.Result, opts graph.LLMOpts) (*graph.Map, []string, error)
 	RunTask func(ctx context.Context, name string, payload any) (json.RawMessage, error)
+
+	// Host reports what this machine can run locally; nil detects it once.
+	Host func() catalog.Capabilities
+
+	// RepoMeta reads cheap GitHub metadata for the provisional recommendation;
+	// nil uses scan.RepoMeta. Failure is never fatal to a probe.
+	RepoMeta func(url string) (language string, sizeKB int64, err error)
+
+	// EnsureModel makes the local sidecar serve hfID before analyze runs,
+	// emitting ensure_model progress. nil skips the step entirely.
+	EnsureModel func(ctx context.Context, hfID string, emit func(job.Event)) error
 
 	// analyzeSlots caps concurrent analyze work (Cfg.AnalyzeConcurrency).
 	analyzeSlots chan struct{}
+
+	// probes caches probe scans for the analyze that follows the model gate.
+	probeMu sync.Mutex
+	probes  map[string]probeEntry
 
 	// initOnce guards Handler's lazy field assignments: two concurrent calls
 	// would otherwise race and split jobs across two hubs.
@@ -110,14 +128,32 @@ func (s *Server) Handler() http.Handler {
 			s.Cfg = config.FromEnv()
 		}
 		if s.Scan == nil {
-			s.Scan = scan.Scan
+			s.Scan = func(url, commit string) (*scan.Result, error) {
+				if commit != "" {
+					return scan.ScanAt(url, commit)
+				}
+				return scan.Scan(url)
+			}
 		}
 		if s.Resolve == nil {
 			s.Resolve = scan.ResolveHead
 		}
 		if s.Analyze == nil {
-			s.Analyze = func(ctx context.Context, res *scan.Result, model string) (*graph.Map, []string, error) {
-				return graph.Analyze(ctx, s.Cfg.AnalyzerURL, res, model)
+			s.Analyze = func(ctx context.Context, res *scan.Result, opts graph.LLMOpts) (*graph.Map, []string, error) {
+				return graph.Analyze(ctx, s.Cfg.AnalyzerURL, res, opts)
+			}
+		}
+		if s.Host == nil {
+			// Detected once per process: it shells out to sysctl/nvidia-smi
+			// and the answer cannot change while the server runs.
+			s.Host = sync.OnceValue(catalog.DetectHost)
+		}
+		if s.RepoMeta == nil {
+			s.RepoMeta = scan.RepoMeta
+		}
+		if s.EnsureModel == nil {
+			s.EnsureModel = func(ctx context.Context, hfID string, emit func(job.Event)) error {
+				return llmlocal.EnsureModel(ctx, s.Cfg.LocalLLMURL, hfID, emit)
 			}
 		}
 		if s.RunTask == nil {
@@ -135,13 +171,17 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", s.root)
 	mux.HandleFunc("GET /healthz", s.healthz)
+	mux.HandleFunc("GET /models", s.models)
+	mux.HandleFunc("GET /host/capabilities", s.hostCapabilities)
 	mux.HandleFunc("POST /analyze", s.analyze)
+	mux.HandleFunc("POST /jobs/probe", s.enqueueProbe)
 	mux.HandleFunc("POST /jobs/analyze", s.enqueueAnalyze)
 	mux.HandleFunc("POST /jobs/ask", s.enqueueAsk)
 	mux.HandleFunc("GET /jobs/{id}/events", s.jobEvents)
 	mux.HandleFunc("POST /jobs/{id}/cancel", s.cancelJob)
 	mux.HandleFunc("GET /analyses", s.list)
 	mux.HandleFunc("GET /analyses/{id}", s.get)
+	mux.HandleFunc("DELETE /analyses/{id}", s.deleteAnalysis)
 	mux.HandleFunc("POST /preview", s.preview)
 	mux.HandleFunc("POST /ask", s.ask)
 	mux.HandleFunc("GET /files", s.files)
@@ -165,6 +205,16 @@ func (s *Server) Handler() http.Handler {
 
 func (s *Server) healthz(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]string{"service": "terra", "status": "ok"})
+}
+
+// models returns the static model catalog. Left ungated (see requiresToken):
+// it is a constant shipped with the binary, same risk class as /healthz.
+func (s *Server) models(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, map[string]any{"models": catalog.All()})
+}
+
+func (s *Server) hostCapabilities(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, s.Host())
 }
 
 // root serves the SPA index when StaticDir is set; otherwise redirects to
@@ -226,14 +276,16 @@ func (s *Server) analyze(w http.ResponseWriter, r *http.Request) {
 	defer s.releaseAnalyze()
 
 	// Commit lookup before tarball: repeat visits skip the download.
-	if canonical, _, sha, err := s.Resolve(req.RepoURL); err == nil {
+	var sha string
+	if canonical, _, commit, err := s.Resolve(req.RepoURL); err == nil {
+		sha = commit
 		if repoMap := s.cachedAt(canonical, sha); repoMap != nil {
 			writeJSON(w, repoMap)
 			return
 		}
 	}
 
-	res, err := s.Scan(req.RepoURL)
+	res, err := s.Scan(req.RepoURL, sha)
 	if err != nil {
 		httpError(w, http.StatusBadRequest, err.Error())
 		return
@@ -242,7 +294,7 @@ func (s *Server) analyze(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, repoMap)
 		return
 	}
-	repoMap, warnings, err := s.Analyze(r.Context(), res, req.Model)
+	repoMap, warnings, err := s.Analyze(r.Context(), res, graph.LLMOpts{Model: req.Model})
 	if err != nil {
 		httpError(w, http.StatusBadGateway, err.Error())
 		return
@@ -262,16 +314,51 @@ func (s *Server) analyze(w http.ResponseWriter, r *http.Request) {
 // analyzeStream runs analyze as a job and writes NDJSON events on this response.
 // done releases the caller's analyze slot when the job finishes.
 func (s *Server) analyzeStream(w http.ResponseWriter, ctx context.Context, repoURL, model string, done func()) {
-	j := s.startAnalyzeJob(repoURL, model, done)
+	// Legacy path: no picker, so the analyzer keeps its own environment.
+	j := s.startAnalyzeJob(analyzeJob{
+		repoURL: repoURL,
+		sel:     modelSelection{Opts: graph.LLMOpts{Model: model}},
+	}, done)
 	s.streamJobEvents(w, ctx, j)
+}
+
+// analyzeRequest is the enqueue body. Model is the legacy free-form override;
+// ModelID names a catalog entry and is what the workspace picker sends.
+//
+// APIKey is request-scoped BYOK material. It is read here, handed to the
+// analyzer, and dropped — never stored, logged, or put on a job event.
+type analyzeRequest struct {
+	RepoURL string `json:"repo_url"`
+	ProbeID string `json:"probe_id"`
+	ModelID string `json:"model_id"`
+	APIKey  string `json:"api_key"`
+	Model   string `json:"model"`
+}
+
+// selectModel validates the picker fields and resolves them. fallbackModel is
+// the legacy free-form override, honoured only when nothing was picked. It
+// writes the 400 itself and reports ok=false when the request cannot run.
+func (s *Server) selectModel(w http.ResponseWriter, modelID, apiKey, fallbackModel string) (modelSelection, bool) {
+	if modelID == "" {
+		// No pick: legacy/operator behaviour, TERRA_LLM_* decides.
+		return modelSelection{Opts: graph.LLMOpts{Model: fallbackModel}}, true
+	}
+	entry := catalog.Find(modelID)
+	if entry == nil {
+		httpError(w, http.StatusBadRequest, fmt.Sprintf("unknown model_id %q", modelID))
+		return modelSelection{}, false
+	}
+	if entry.RequiresAPIKey && strings.TrimSpace(apiKey) == "" {
+		httpError(w, http.StatusBadRequest,
+			fmt.Sprintf("%s needs a %s API key", entry.DisplayName, entry.Provider))
+		return modelSelection{}, false
+	}
+	return resolveModel(s.Cfg, entry, strings.TrimSpace(apiKey)), true
 }
 
 // enqueueAnalyze starts an analyze job and returns its id.
 func (s *Server) enqueueAnalyze(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		RepoURL string `json:"repo_url"`
-		Model   string `json:"model"`
-	}
+	var req analyzeRequest
 	if !decodeBody(w, r, &req, `body must be {"repo_url": "github.com/user/project"}`) {
 		return
 	}
@@ -283,13 +370,25 @@ func (s *Server) enqueueAnalyze(w http.ResponseWriter, r *http.Request) {
 		httpError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	sel, ok := s.selectModel(w, req.ModelID, req.APIKey, req.Model)
+	if !ok {
+		return
+	}
 	// Claim the slot before returning the job id: once the id is out, a
 	// failure can only surface as an event, never a 429.
 	if !s.acquireAnalyze() {
 		s.analyzeBusy(w)
 		return
 	}
-	j := s.startAnalyzeJob(req.RepoURL, req.Model, s.releaseAnalyze)
+	// A probe within its TTL already did the fetch and scan; a miss just
+	// means the job does that work itself, and says so.
+	work := analyzeJob{repoURL: req.RepoURL, sel: sel}
+	if req.ProbeID != "" {
+		if work.cached = s.readProbe(req.ProbeID); work.cached == nil {
+			work.fetchLabel = "Probe expired — rescanning " + req.RepoURL
+		}
+	}
+	j := s.startAnalyzeJob(work, s.releaseAnalyze)
 	writeJSON(w, map[string]string{"job_id": j.ID})
 }
 
@@ -312,40 +411,58 @@ func (s *Server) cancelJob(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (s *Server) startAnalyzeJob(repoURL, model string, done func()) *job.Job {
+// analyzeJob is one analyze run's inputs.
+type analyzeJob struct {
+	repoURL string
+	sel     modelSelection
+	// cached is a probe's scan being reused; non-nil skips fetch and scan.
+	cached *scan.Result
+	// fetchLabel overrides the fetch stage copy (probe expired → rescanning).
+	fetchLabel string
+}
+
+func (s *Server) startAnalyzeJob(work analyzeJob, done func()) *job.Job {
 	timeout := s.Cfg.AnalyzeTimeout
+	repoURL, sel := work.repoURL, work.sel
 	return s.Jobs.Start(func(jobCtx context.Context, emit func(job.Event)) {
 		defer done() // release the analyze slot on every exit, panic included
 		ctx, cancel := context.WithTimeout(jobCtx, timeout)
 		defer cancel()
-		emit(job.Event{Stage: "fetch", Label: "Fetching " + repoURL})
-		if err := ctx.Err(); err != nil {
-			emit(job.Event{Stage: "error", Label: stopLabel(ctx, timeout)})
-			return
-		}
 
-		// Resolve HEAD first so a commit-keyed cache hit never downloads the tree.
-		canonical, _, sha, err := s.Resolve(repoURL)
-		if err != nil {
-			emit(job.Event{Stage: "error", Label: err.Error()})
-			return
-		}
-		if repoMap := s.cachedAt(canonical, sha); repoMap != nil {
-			emit(job.Event{Stage: "done", Map: repoMap})
-			return
-		}
+		res := work.cached
+		if res == nil {
+			label := work.fetchLabel
+			if label == "" {
+				label = "Fetching " + repoURL
+			}
+			emit(job.Event{Stage: "fetch", Label: label})
+			if err := ctx.Err(); err != nil {
+				emit(job.Event{Stage: "error", Label: stopLabel(ctx, timeout)})
+				return
+			}
 
-		res, err := s.Scan(repoURL)
-		if err != nil {
-			emit(job.Event{Stage: "error", Label: err.Error()})
-			return
+			// Resolve HEAD first so a commit-keyed cache hit never downloads the tree.
+			canonical, _, sha, err := s.Resolve(repoURL)
+			if err != nil {
+				emit(job.Event{Stage: "error", Label: err.Error()})
+				return
+			}
+			if repoMap := s.cachedAt(canonical, sha); repoMap != nil {
+				emit(job.Event{Stage: "done", Map: repoMap})
+				return
+			}
+
+			res, err = s.Scan(repoURL, sha)
+			if err != nil {
+				emit(job.Event{Stage: "error", Label: err.Error()})
+				return
+			}
 		}
-		structural := graph.FromScan(res)
 		emit(job.Event{
 			Stage: "scan",
 			Label: fmt.Sprintf("Read %d files across %d languages",
 				res.Stats.SourceFiles, len(res.Languages)),
-			Map: structural,
+			Map: graph.FromScan(res),
 		})
 		// Belt-and-suspenders: Scan may see a newer commit than Resolve raced.
 		if repoMap := s.cached(res); repoMap != nil {
@@ -356,15 +473,28 @@ func (s *Server) startAnalyzeJob(repoURL, model string, done func()) *job.Job {
 			emit(job.Event{Stage: "error", Label: stopLabel(ctx, timeout)})
 			return
 		}
+		// Local weights may not be on the host yet; the sidecar downloads and
+		// loads them before the analyzer is allowed to call it.
+		if sel.Local {
+			if err := s.ensureModel(ctx, sel.HFID, emit); err != nil {
+				if ctx.Err() != nil {
+					emit(job.Event{Stage: "error", Label: stopLabel(ctx, timeout)})
+					return
+				}
+				emit(job.Event{Stage: "error", Label: err.Error()})
+				return
+			}
+		}
 		emit(job.Event{Stage: "analyze", Label: "Terra is reading the architecture"})
-		repoMap, warnings, err := s.Analyze(ctx, res, model)
+		repoMap, warnings, err := s.Analyze(ctx, res, sel.Opts)
 		if err != nil {
 			if ctx.Err() != nil {
 				emit(job.Event{Stage: "error", Label: stopLabel(ctx, timeout)})
 				return
 			}
-			// Keep the structural map on the client; surface the failure as an event.
-			emit(job.Event{Stage: "error", Label: err.Error()})
+			// Keep the structural map on the client; surface the failure as an
+			// event — with any echoed key material stripped out first.
+			emit(job.Event{Stage: "error", Label: scrub(err.Error(), sel.Opts.APIKey)})
 			return
 		}
 		for _, warn := range warnings {
@@ -449,15 +579,20 @@ type askRequest struct {
 	Question   string           `json:"question"`
 	Selection  map[string]any   `json:"selection"`
 	Selections []map[string]any `json:"selections"`
+	// The workspace reuses the model it picked for this session. The sidecar
+	// may have been switched since analyze ran, so the job path still calls
+	// ensure_model rather than assuming the weights are resident.
+	ModelID string `json:"model_id"`
+	APIKey  string `json:"api_key"`
 }
 
 // ask answers synchronously; prefer POST /jobs/ask for the web client.
 func (s *Server) ask(w http.ResponseWriter, r *http.Request) {
-	req, ok := decodeAsk(w, r)
+	req, sel, ok := s.decodeAsk(w, r)
 	if !ok {
 		return
 	}
-	data, err := s.RunTask(r.Context(), "qa", s.askPayload(req))
+	data, err := s.RunTask(r.Context(), "qa", s.askPayload(req, sel))
 	if err != nil {
 		httpError(w, http.StatusBadGateway, err.Error())
 		return
@@ -468,20 +603,35 @@ func (s *Server) ask(w http.ResponseWriter, r *http.Request) {
 
 // enqueueAsk starts a qa job and returns its id immediately.
 func (s *Server) enqueueAsk(w http.ResponseWriter, r *http.Request) {
-	req, ok := decodeAsk(w, r)
+	req, sel, ok := s.decodeAsk(w, r)
 	if !ok {
 		return
 	}
-	payload := s.askPayload(req)
+	payload := s.askPayload(req, sel)
+	// Job events are replayed to every subscriber, so an analyzer error that
+	// echoed the key back must be scrubbed before it becomes a label.
+	key := strings.TrimSpace(req.APIKey)
 	j := s.Jobs.Start(func(ctx context.Context, emit func(job.Event)) {
 		emit(job.Event{Stage: "ask", Label: "Terra is reading the selection"})
 		if err := ctx.Err(); err != nil {
 			emit(job.Event{Stage: "error", Label: "cancelled"})
 			return
 		}
+		// The sidecar may be serving something else by now — analyze having
+		// loaded these weights once is not a guarantee.
+		if sel.Local {
+			if err := s.ensureModel(ctx, sel.HFID, emit); err != nil {
+				if ctx.Err() != nil {
+					emit(job.Event{Stage: "error", Label: "cancelled"})
+					return
+				}
+				emit(job.Event{Stage: "error", Label: err.Error()})
+				return
+			}
+		}
 		data, err := s.RunTask(ctx, "qa", payload)
 		if err != nil {
-			emit(job.Event{Stage: "error", Label: err.Error()})
+			emit(job.Event{Stage: "error", Label: scrub(err.Error(), key)})
 			return
 		}
 		if err := ctx.Err(); err != nil {
@@ -500,19 +650,23 @@ func (s *Server) enqueueAsk(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]string{"job_id": j.ID})
 }
 
-func decodeAsk(w http.ResponseWriter, r *http.Request) (askRequest, bool) {
+// decodeAsk reads the body and resolves the picker fields through the same
+// validation analyze uses: an unknown model_id or a missing BYOK key is a 400
+// here rather than a failure deep inside the provider.
+func (s *Server) decodeAsk(w http.ResponseWriter, r *http.Request) (askRequest, modelSelection, bool) {
 	var req askRequest
 	if !decodeBody(w, r, &req, `body must be {"repo_url": "...", "question": "...", "selection": {...}}`) {
-		return req, false
+		return req, modelSelection{}, false
 	}
 	if req.RepoURL == "" || req.Question == "" {
 		httpError(w, http.StatusBadRequest, `body must be {"repo_url": "...", "question": "...", "selection": {...}}`)
-		return req, false
+		return req, modelSelection{}, false
 	}
-	return req, true
+	sel, ok := s.selectModel(w, req.ModelID, req.APIKey, "")
+	return req, sel, ok
 }
 
-func (s *Server) askPayload(req askRequest) map[string]any {
+func (s *Server) askPayload(req askRequest, sel modelSelection) map[string]any {
 	sels := req.Selections
 	if len(sels) == 0 && req.Selection != nil {
 		sels = []map[string]any{req.Selection}
@@ -526,6 +680,13 @@ func (s *Server) askPayload(req askRequest) map[string]any {
 	}
 
 	payload := map[string]any{"question": req.Question, "selection": primary}
+	if sel.Opts.Model != "" {
+		payload["model"] = sel.Opts.Model
+		payload["base_url"] = sel.Opts.BaseURL
+		if sel.Opts.APIKey != "" {
+			payload["api_key"] = sel.Opts.APIKey
+		}
+	}
 	if len(sels) > 1 {
 		payload["selections"] = sels
 	}
@@ -808,6 +969,24 @@ func (s *Server) get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, repoMap)
+}
+
+func (s *Server) deleteAnalysis(w http.ResponseWriter, r *http.Request) {
+	var id int64
+	if _, err := fmt.Sscan(r.PathValue("id"), &id); err != nil {
+		httpError(w, http.StatusBadRequest, "id must be a number")
+		return
+	}
+	ok, err := store.Delete(s.DB, id)
+	if err != nil {
+		httpError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if !ok {
+		httpError(w, http.StatusNotFound, fmt.Sprintf("no analysis with id %d", id))
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func writeJSON(w http.ResponseWriter, payload any) {

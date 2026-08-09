@@ -49,6 +49,10 @@ func withToken(want string, next http.Handler) http.Handler {
 	})
 }
 
+// requiresToken lists the gated routes. GET /models and GET /host/capabilities
+// are deliberately absent: both return constants about this binary and this
+// machine, not repo data, so they sit with /healthz on the open side and the
+// picker can populate before the user has pasted a token.
 func requiresToken(r *http.Request) bool {
 	p := r.URL.Path
 	switch r.Method {
@@ -58,6 +62,10 @@ func requiresToken(r *http.Request) bool {
 			return true
 		}
 		if strings.HasPrefix(p, "/jobs/") {
+			return true
+		}
+	case http.MethodDelete:
+		if strings.HasPrefix(p, "/analyses/") {
 			return true
 		}
 	case http.MethodGet:

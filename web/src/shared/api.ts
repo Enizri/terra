@@ -1,5 +1,15 @@
 /** Go server client (`terra serve`). Same-origin / Vite proxy; errors as {"error":"..."}. */
 import type { TerraMap } from "./map/types";
+import {
+  analyzeBody,
+  type AnalyzeOptions,
+  type CatalogEntry,
+  type HostCapabilities,
+  type ProbeRepo,
+  type Recommendation,
+} from "./models";
+
+export { analyzeBody, type AnalyzeOptions };
 import { ndjsonSplitter } from "./ndjson";
 import { getToken, notifyUnauthorized } from "./token";
 import { tracesURL } from "./tracesUrl";
@@ -10,11 +20,28 @@ export { tracesURL };
 export type Selection = Record<string, unknown>;
 
 export type AnalyzeEvent = {
-  stage: "fetch" | "clone" | "scan" | "analyze" | "store" | "ask" | "done" | "error";
+  stage:
+    | "fetch"
+    | "clone"
+    | "scan"
+    | "recommend"
+    | "ensure_model"
+    | "analyze"
+    | "store"
+    | "ask"
+    | "done"
+    | "error";
   label?: string;
   map?: TerraMap;
   answer?: string;
+  /** probe only */
+  probe_id?: string;
+  repo?: ProbeRepo;
+  recommendation?: Recommendation;
 };
+
+/** What the picker needs before the gate can render. */
+export type ModelChoice = { modelId: string; apiKey?: string };
 
 function authHeaders(extra?: Record<string, string>): HeadersInit {
   const headers: Record<string, string> = { ...extra };
@@ -100,11 +127,35 @@ async function* jobEvents(jobId: string, signal?: AbortSignal): AsyncGenerator<A
   }
 }
 
+/** Cheap first half: fetch, scan, recommend a model. No LLM call, no gate
+ * decision — the caller shows the recommendation and waits for the user. */
+export async function* probe(repoUrl: string, signal?: AbortSignal): AsyncGenerator<AnalyzeEvent> {
+  const created = await post("/jobs/probe", { repo_url: repoUrl }, signal);
+  const { job_id } = await json<{ job_id: string }>(created, "probe");
+  yield* jobEvents(job_id, signal);
+}
+
 /** Enqueue analyze; stream stage events. Abort also cancels the job. */
-export async function* analyze(repoUrl: string, signal?: AbortSignal): AsyncGenerator<AnalyzeEvent> {
-  const created = await post("/jobs/analyze", { repo_url: repoUrl }, signal);
+export async function* analyze(
+  opts: AnalyzeOptions,
+  signal?: AbortSignal,
+): AsyncGenerator<AnalyzeEvent> {
+  const created = await post("/jobs/analyze", analyzeBody(opts), signal);
   const { job_id } = await json<{ job_id: string }>(created, "analyze");
   yield* jobEvents(job_id, signal);
+}
+
+/** Static model catalog. Open route — no token needed. */
+export async function models(signal?: AbortSignal): Promise<CatalogEntry[]> {
+  const res = await fetch("/models", { headers: authHeaders(), signal });
+  const data = await json<{ models: CatalogEntry[] }>(res, "models");
+  return data.models ?? [];
+}
+
+/** What this Terra host can run locally. Open route. */
+export async function hostCapabilities(signal?: AbortSignal): Promise<HostCapabilities> {
+  const res = await fetch("/host/capabilities", { headers: authHeaders(), signal });
+  return json<HostCapabilities>(res, "host capabilities");
 }
 
 /** Ask via background job. Last selection is primary; list sent when length > 1. */
@@ -113,17 +164,19 @@ export async function ask(
   question: string,
   selections: Selection[],
   signal?: AbortSignal,
+  choice?: ModelChoice,
 ): Promise<string> {
-  const created = await post(
-    "/jobs/ask",
-    {
-      repo_url: repoUrl,
-      question,
-      selection: selections[selections.length - 1] ?? {},
-      selections,
-    },
-    signal,
-  );
+  const body: Record<string, unknown> = {
+    repo_url: repoUrl,
+    question,
+    selection: selections[selections.length - 1] ?? {},
+    selections,
+  };
+  // Ask reuses the model the workspace analyzed with; omitted means the
+  // analyzer's own environment decides, exactly as before.
+  if (choice?.modelId) body.model_id = choice.modelId;
+  if (choice?.apiKey?.trim()) body.api_key = choice.apiKey.trim();
+  const created = await post("/jobs/ask", body, signal);
   const { job_id } = await json<{ job_id: string }>(created, "ask");
   for await (const ev of jobEvents(job_id, signal)) {
     if (ev.stage === "done") return ev.answer ?? "No answer.";
@@ -198,4 +251,13 @@ export async function analyses(signal?: AbortSignal): Promise<AnalysisSummary[]>
 export async function analysis(id: number, signal?: AbortSignal): Promise<TerraMap> {
   const res = await fetch(`/analyses/${id}`, { headers: authHeaders(), signal });
   return json<TerraMap>(res, "analysis");
+}
+
+/** Delete a stored analysis from the database. */
+export async function deleteAnalysis(id: number, signal?: AbortSignal): Promise<void> {
+  const res = await fetch(`/analyses/${id}`, { method: "DELETE", headers: authHeaders(), signal });
+  noteUnauthorized(res);
+  if (res.ok) return;
+  const data = await res.json().catch(() => null);
+  throw new Error((data as { error?: string } | null)?.error ?? `delete failed (${res.status})`);
 }

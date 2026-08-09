@@ -19,6 +19,7 @@ type Config struct {
 	AnalyzeTimeout     time.Duration // TERRA_ANALYZE_TIMEOUT
 
 	AnalyzerURL string // TERRA_ANALYZER_URL, no trailing slash
+	LocalLLMURL string // TERRA_LOCAL_LLM_URL — the host sidecar the picker's local models load into
 	WebURL      string // TERRA_WEB_URL
 	PublicURL   string // TERRA_PUBLIC_URL, no trailing slash; empty follows Addr (see PublicBase)
 
@@ -44,6 +45,7 @@ func FromEnv() *Config {
 		AnalyzeConcurrency: 4,
 		AnalyzeTimeout:     15 * time.Minute,
 		AnalyzerURL:        "http://localhost:8010",
+		LocalLLMURL:        "http://localhost:8020",
 		WebURL:             strings.TrimSpace(os.Getenv("TERRA_WEB_URL")),
 		PreviewMode:        strings.ToLower(strings.TrimSpace(os.Getenv("TERRA_PREVIEW_MODE"))),
 		PreviewMax:         2,
@@ -69,6 +71,9 @@ func FromEnv() *Config {
 	}
 	if u := strings.TrimSuffix(os.Getenv("TERRA_ANALYZER_URL"), "/"); u != "" {
 		c.AnalyzerURL = u
+	}
+	if u := strings.TrimSuffix(strings.TrimSpace(os.Getenv("TERRA_LOCAL_LLM_URL")), "/"); u != "" {
+		c.LocalLLMURL = u
 	}
 	if u := strings.TrimSpace(os.Getenv("TERRA_PUBLIC_URL")); u != "" {
 		c.PublicURL = strings.TrimRight(u, "/")

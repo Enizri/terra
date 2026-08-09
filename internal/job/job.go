@@ -11,14 +11,24 @@ import (
 	"time"
 
 	"github.com/Enizri/terra/internal/graph"
+	"github.com/Enizri/terra/internal/recommend"
 )
 
 // Event is one progress update (NDJSON / SSE wire shape).
+//
+// Nothing secret goes here: events are replayed to every subscriber and to
+// the browser. In particular a request's API key must never reach an Event,
+// not even inside Label.
 type Event struct {
 	Stage  string     `json:"stage"`
 	Label  string     `json:"label,omitempty"`
 	Map    *graph.Map `json:"map,omitempty"`
 	Answer string     `json:"answer,omitempty"`
+
+	// Probe job only: the handle analyze reuses, plus what the picker shows.
+	ProbeID        string                    `json:"probe_id,omitempty"`
+	Repo           *recommend.RepoInfo       `json:"repo,omitempty"`
+	Recommendation *recommend.Recommendation `json:"recommendation,omitempty"`
 }
 
 // RunFunc runs job work. emit is concurrency-safe; ctx cancels on Cancel or finish.

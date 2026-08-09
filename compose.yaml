@@ -28,6 +28,9 @@ services:
         required: false
     environment:
       TERRA_ANALYZER_URL: http://analyzer:8010
+      # The picker loads local models into the llm service, not into this
+      # container — localhost:8020 would be nothing here.
+      TERRA_LOCAL_LLM_URL: ${TERRA_LOCAL_LLM_URL:-http://llm:8020}
       TERRA_TOKEN: ${TERRA_TOKEN:-}
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       TERRA_PREVIEW_MODE: docker

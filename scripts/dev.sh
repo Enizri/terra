@@ -10,6 +10,16 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PROCFILE="${ROOT}/Procfile.dev"
 cd "$ROOT"
 
+# Load repo .env the same way Compose does so GITHUB_TOKEN / TERRA_* apply
+# without a manual export. Note this OVERWRITES existing shell exports —
+# to override a value for one run, set it per-process, not in the environment.
+if [[ -f "$ROOT/.env" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "$ROOT/.env"
+  set +a
+fi
+
 if [[ ! -f "$PROCFILE" ]]; then
   echo "missing ${PROCFILE}" >&2
   exit 1

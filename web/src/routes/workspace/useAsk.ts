@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ask as askServer, type Selection } from "../../shared/api";
+import { wsCache } from "./cache";
 import {
   buildProcess,
   advanceProcess,
@@ -82,7 +83,15 @@ export function useAsk(repoUrl: string | null) {
       }, 700);
 
       try {
-        const answer = await askServer(repoUrl, q, selections ?? (selection ? [selection] : []), ac.signal);
+        // Reuse the model this workspace analyzed with; null falls back to
+        // whatever TERRA_LLM_* the analyzer was started with.
+        const answer = await askServer(
+          repoUrl,
+          q,
+          selections ?? (selection ? [selection] : []),
+          ac.signal,
+          wsCache.selectedModel ?? undefined,
+        );
         clearStageTimer();
         setMessages((msgs) => {
           const idx = msgs.length - 1;

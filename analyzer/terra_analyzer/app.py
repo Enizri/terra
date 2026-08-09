@@ -103,7 +103,9 @@ def run_task(name: str, payload: dict) -> dict:
 def analyze(req: AnalyzeRequest) -> AnalyzeResponse:
     """Go wire contract: architecture task facade."""
     try:
-        draft, warnings = llm.generate(req.scan, model=req.model)
+        draft, warnings = llm.generate(
+            req.scan, model=req.model, base_url=req.base_url, api_key=req.api_key
+        )
     except llm.LLMError as e:
         # Go prints detail verbatim.
         raise HTTPException(status_code=502, detail=str(e)) from e

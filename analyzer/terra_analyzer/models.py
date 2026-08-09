@@ -77,6 +77,10 @@ class Draft(BaseModel):
 class AnalyzeRequest(BaseModel):
     scan: ScanResult
     model: str = ""
+    # Per-request routing from Go (workspace picker). Empty keeps the
+    # operator's TERRA_LLM_* environment as the source of truth.
+    base_url: str = ""
+    api_key: str = ""
 
 
 class AnalyzeResponse(BaseModel):

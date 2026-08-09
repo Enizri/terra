@@ -3,7 +3,7 @@ import { useLocation, useParams } from "react-router-dom";
 import type { Component, TerraMap } from "../../shared/map/types";
 import type { LiveSelection } from "../../shared/live";
 import memosFixture from "../../data/memos.map.json";
-import { analyses, analysis } from "../../shared/api";
+import { analyses, analysis, deleteAnalysis } from "../../shared/api";
 import { wsCache } from "./cache";
 import { useAnalyze } from "./useAnalyze";
 import { nextSelection } from "./selection";
@@ -26,6 +26,8 @@ export default function Workspace() {
   const [history, setHistory] = useState<HistoryEntry[]>(wsCache.history ?? []);
   /** Stored map from the rail — no pipeline re-run. */
   const [storedMap, setStoredMap] = useState<TerraMap | null>(wsCache.storedMap);
+  /** Keep deleted ids out of the rail until the server catches up / refetch lands. */
+  const deletedIds = useRef(new Set<number>());
 
   const fixture =
     import.meta.env.DEV && new URLSearchParams(search).has("fixture")
@@ -55,7 +57,7 @@ export default function Workspace() {
     const ac = new AbortController();
     analyses(ac.signal)
       .then((rows) => {
-        const h = toHistory(rows);
+        const h = toHistory(rows).filter((entry) => !deletedIds.current.has(entry.id));
         wsCache.history = h;
         setHistory(h);
       })
@@ -84,6 +86,30 @@ export default function Workspace() {
     }
   };
 
+  const remove = async (entry: HistoryEntry) => {
+    deletedIds.current.add(entry.id);
+    let snapshot: HistoryEntry[] = [];
+    setHistory((prev) => {
+      snapshot = prev;
+      const next = prev.filter((h) => h.id !== entry.id);
+      wsCache.history = next;
+      return next;
+    });
+
+    try {
+      await deleteAnalysis(entry.id);
+      if (storedMap?.project.repository_url === entry.repoUrl) {
+        setStoredMap(null);
+        wsCache.storedMap = null;
+      }
+    } catch (e) {
+      deletedIds.current.delete(entry.id);
+      setHistory(snapshot);
+      wsCache.history = snapshot;
+      console.error("Failed to remove analysis:", e);
+    }
+  };
+
   const select = (id: string | null, additive?: boolean) => {
     if (!id) return setSelectedIds([]);
     setSelectedIds((prev) => nextSelection(prev, id, additive));
@@ -105,6 +131,7 @@ export default function Workspace() {
         history={history}
         onSelect={select}
         onOpen={open}
+        onRemove={remove}
         busy={analyze.running}
       />
       <DropStage

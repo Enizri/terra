@@ -54,7 +54,7 @@ func TestAnalyzeAssemblesScanFacts(t *testing.T) {
 			"warnings": []string{"heads up"},
 		})
 	})
-	m, warnings, err := Analyze(context.Background(), srv.URL, testScan(), "some-model")
+	m, warnings, err := Analyze(context.Background(), srv.URL, testScan(), LLMOpts{Model: "some-model"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +87,7 @@ func TestAnalyzeRejectsEmptyComponents(t *testing.T) {
 	srv := fakeAnalyzer(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"draft":{"components":[]},"warnings":[]}`))
 	})
-	_, _, err := Analyze(context.Background(), srv.URL, testScan(), "")
+	_, _, err := Analyze(context.Background(), srv.URL, testScan(), LLMOpts{})
 	if err == nil || !strings.Contains(err.Error(), "no components") {
 		t.Fatalf("err = %v", err)
 	}
@@ -98,7 +98,7 @@ func TestAnalyzePropagates502Detail(t *testing.T) {
 		w.WriteHeader(http.StatusBadGateway)
 		w.Write([]byte(`{"detail":"model qwen2.5:3b produced no usable map after two attempts"}`))
 	})
-	_, _, err := Analyze(context.Background(), srv.URL, testScan(), "")
+	_, _, err := Analyze(context.Background(), srv.URL, testScan(), LLMOpts{})
 	if err == nil || !strings.Contains(err.Error(), "no usable map after two attempts") {
 		t.Fatalf("err = %v", err)
 	}
@@ -111,7 +111,7 @@ func TestAnalyzeHonoursContext(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 	start := time.Now()
-	_, _, err := Analyze(ctx, srv.URL, testScan(), "")
+	_, _, err := Analyze(ctx, srv.URL, testScan(), LLMOpts{})
 	if err == nil || !strings.Contains(err.Error(), "context deadline exceeded") {
 		t.Fatalf("err = %v, want context deadline exceeded", err)
 	}
@@ -122,11 +122,45 @@ func TestAnalyzeHonoursContext(t *testing.T) {
 
 func TestAnalyzeWhenServiceIsDown(t *testing.T) {
 	start := time.Now()
-	_, _, err := Analyze(context.Background(), "http://127.0.0.1:1", testScan(), "")
+	_, _, err := Analyze(context.Background(), "http://127.0.0.1:1", testScan(), LLMOpts{})
 	if err == nil || !strings.Contains(err.Error(), "TERRA_ANALYZER_URL") {
 		t.Fatalf("err = %v, want a hint mentioning TERRA_ANALYZER_URL", err)
 	}
 	if elapsed := time.Since(start); elapsed > 2*time.Second {
 		t.Fatalf("dead analyzer took %s to fail; preflight should give up in ~5s, not hang", elapsed)
+	}
+}
+
+// The analyzer must not be able to tell an unrouted request from a pre-picker
+// one — otherwise every operator-configured deployment changes behaviour.
+func TestAnalyzeOmitsEmptyRoutingFields(t *testing.T) {
+	var body map[string]any
+	srv := fakeAnalyzer(t, func(w http.ResponseWriter, r *http.Request) {
+		json.NewDecoder(r.Body).Decode(&body)
+		w.WriteHeader(http.StatusBadGateway)
+	})
+	Analyze(context.Background(), srv.URL, testScan(), LLMOpts{})
+	if _, ok := body["base_url"]; ok {
+		t.Error("empty BaseURL still reached the wire")
+	}
+	if _, ok := body["api_key"]; ok {
+		t.Error("empty APIKey still reached the wire")
+	}
+	if got := body["model"]; got != "" {
+		t.Errorf("model = %v, want empty", got)
+	}
+}
+
+func TestAnalyzeSendsRoutingOverrides(t *testing.T) {
+	var body map[string]any
+	srv := fakeAnalyzer(t, func(w http.ResponseWriter, r *http.Request) {
+		json.NewDecoder(r.Body).Decode(&body)
+		w.WriteHeader(http.StatusBadGateway)
+	})
+	Analyze(context.Background(), srv.URL, testScan(),
+		LLMOpts{Model: "gpt-4.1-mini", BaseURL: "https://api.openai.com/v1", APIKey: "sk-test"})
+	if body["base_url"] != "https://api.openai.com/v1" || body["model"] != "gpt-4.1-mini" ||
+		body["api_key"] != "sk-test" {
+		t.Errorf("routing fields missing from request: %v", body)
 	}
 }

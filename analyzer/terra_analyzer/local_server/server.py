@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -22,9 +23,30 @@ class _State:
     tokenizer: Any = None
     model: Any = None
     loaded: bool = False
+    # Set while a background load_model is running; the chat endpoints refuse
+    # to serve until it clears, because the old weights are already gone.
+    loading: str = ""
+    load_error: str = ""
+    # Bumped by /admin/cancel and by a superseding /admin/load. from_pretrained
+    # cannot be interrupted, so a worker whose generation went stale throws its
+    # weights away instead of installing them.
+    load_gen: int = 0
 
 
 state = _State()
+
+# Serializes state transitions between request handlers and the loader thread.
+state_lock = threading.Lock()
+
+
+def state_name() -> str:
+    if state.loading:
+        return "loading"
+    if state.loaded:
+        return "ready"
+    if state.load_error:
+        return "error"
+    return "empty"
 
 
 def pick_device(requested: str = "") -> str:
@@ -45,7 +67,9 @@ def pick_device(requested: str = "") -> str:
     return "cpu"
 
 
-def load_model(model_id: str = "", device: str = "") -> None:
+def load_model(model_id: str = "", device: str = "", gen: int | None = None) -> bool:
+    """Loads weights and installs them as the served model. Returns False when
+    gen went stale (cancelled or superseded) — nothing is installed then."""
     try:
         import torch
         from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -60,6 +84,9 @@ def load_model(model_id: str = "", device: str = "") -> None:
     dtype = torch.float16 if device in ("cuda", "mps") else torch.float32
 
     tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
+    if gen is not None and gen != state.load_gen:
+        # Cancelled while fetching the tokenizer: skip the expensive part.
+        return False
     model = AutoModelForCausalLM.from_pretrained(
         model_id,
         torch_dtype=dtype,
@@ -68,11 +95,16 @@ def load_model(model_id: str = "", device: str = "") -> None:
     model.to(device)
     model.eval()
 
-    state.model_id = model_id
-    state.device = device
-    state.tokenizer = tokenizer
-    state.model = model
-    state.loaded = True
+    with state_lock:
+        if gen is not None and gen != state.load_gen:
+            return False
+        state.model_id = model_id
+        state.device = device
+        state.tokenizer = tokenizer
+        state.model = model
+        state.loaded = True
+        state.load_error = ""
+    return True
 
 
 @asynccontextmanager
@@ -114,8 +146,10 @@ class ChatCompletionRequest(BaseModel):
 
 
 def _ensure_loaded() -> None:
+    if state.loading:
+        raise HTTPException(status_code=503, detail=f"loading {state.loading}")
     if not state.loaded or state.model is None or state.tokenizer is None:
-        raise HTTPException(status_code=503, detail="model not loaded")
+        raise HTTPException(status_code=503, detail=state.load_error or "model not loaded")
 
 
 def _messages_for_generate(req: ChatCompletionRequest) -> list[dict[str, str]]:
@@ -187,6 +221,83 @@ def healthz() -> dict:
         "device": state.device,
         "loaded": state.loaded,
     }
+
+
+class LoadRequest(BaseModel):
+    model_id: str
+
+
+@app.get("/admin/status")
+def admin_status() -> dict:
+    """What the host is serving, and whether a switch is in flight."""
+    return {
+        "model_id": state.loading or state.model_id,
+        "device": state.device,
+        "state": state_name(),
+        "error": state.load_error,
+    }
+
+
+def _load_worker(model_id: str, gen: int) -> None:
+    try:
+        load_model(model_id, gen=gen)
+    except Exception as e:  # noqa: BLE001 — the message is the whole payload
+        with state_lock:
+            # A cancelled load's failure is nobody's problem, and its marker
+            # belongs to whoever superseded it.
+            if gen == state.load_gen:
+                state.load_error = f"loading {model_id} failed: {e}"
+                state.loaded = False
+    finally:
+        with state_lock:
+            if gen == state.load_gen:
+                state.loading = ""
+
+
+@app.post("/admin/load")
+def admin_load(req: LoadRequest) -> dict:
+    """Switch the served weights. Returns immediately; poll /admin/status."""
+    model_id = (req.model_id or "").strip()
+    if not model_id:
+        raise HTTPException(status_code=400, detail="model_id is required")
+    with state_lock:
+        if state.loading == model_id:
+            return {"model_id": model_id, "state": "loading"}
+        if state.loaded and state.model_id == model_id:
+            # Already serving what the caller wants. If a switch to something
+            # else is in flight it must be abandoned, or it would overwrite
+            # this model moments after we reported it ready.
+            if state.loading:
+                state.load_gen += 1
+                state.loading = ""
+            return {"model_id": model_id, "state": "ready"}
+        # A different model supersedes whatever is in flight rather than 409ing:
+        # a user who cancels and picks something smaller must not be stuck
+        # behind the download they abandoned.
+        state.load_gen += 1
+        gen = state.load_gen
+        # Set before unlocking: a concurrent request must see "loading".
+        state.loading = model_id
+        state.load_error = ""
+        # state.loaded is deliberately left alone: the weights already in RAM
+        # keep serving until the new ones are installed, so a switch that is
+        # cancelled or fails does not strand a model that still works.
+    threading.Thread(target=_load_worker, args=(model_id, gen), daemon=True).start()
+    return {"model_id": model_id, "state": "loading"}
+
+
+@app.post("/admin/cancel")
+def admin_cancel() -> dict:
+    """Abandon the load in flight. Bytes already downloading still finish —
+    what this guarantees is that the result never becomes the active model."""
+    with state_lock:
+        cancelled = state.loading
+        state.load_gen += 1
+        state.loading = ""
+        # The abandoned load's error is nobody's problem either; leaving it set
+        # would report "error" forever with nothing in flight.
+        state.load_error = ""
+    return {"cancelled": cancelled, "state": state_name()}
 
 
 @app.get("/v1/models")

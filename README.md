@@ -41,6 +41,7 @@ make venv-local
 
 # one terminal: llm (:8020) + analyzer (:8010) + api (:8080) + web (vite)
 # opens http://localhost:5173/ (API GET / redirects there too)
+# loads repo .env (GITHUB_TOKEN, TERRA_*, …) like Compose
 make dev
 # backend only (no web): make dev-api
 
@@ -81,7 +82,9 @@ make down
 ```
 
 Local HF instead: `TERRA_LLM_URL=http://llm:8020/v1`, leave `TERRA_LLM_API_KEY`
-empty, run `make up-llm`. Optional: `GITHUB_TOKEN` for higher GitHub rate limits.
+empty, run `make up-llm`. Set `GITHUB_TOKEN` to a classic PAT with public-repo
+read (`contents:read`); without it analyze shares GitHub’s ~60 REST req/hour/IP
+quota and will rate-limit quickly (~5,000/hour with a token).
 
 Troubleshooting (`docker compose logs analyzer`):
 
@@ -117,7 +120,7 @@ Supports `package.json` frontends only; runfile/Go-only repos need `make dev`
 | `make down` | Docker Compose: stop and remove containers |
 | `terra scan <url>` | Clone + deterministic scan, JSON to stdout |
 | `terra map <url>` | Scan, ask the analyzer for a map, store in `terra.db` |
-| `terra serve` | HTTP API: `POST /analyze`, `GET /analyses`, `GET /analyses/{id}`, `POST /preview`, `POST /ask`, `GET /files` |
+| `terra serve` | HTTP API: `POST /jobs/probe`, `POST /jobs/analyze`, `GET /models`, `GET /host/capabilities`, `GET /analyses`, `POST /preview`, `POST /ask`, `GET /files` |
 
 ## Environment variables
 
@@ -137,8 +140,46 @@ Supports `package.json` frontends only; runfile/Go-only repos need `make dev`
 | `TERRA_PUBLIC_URL` | Go | `http://127.0.0.1:8080` | Origin used in `/__live/...` preview URLs |
 | `TERRA_PREVIEW_MAX` | Go | `2` | Max concurrent Docker previews |
 | `TERRA_PREVIEW_TTL` | Go | `30m` | Idle TTL before a Docker preview is stopped |
-| `TERRA_DEVICE` | local LLM | `auto` (`mps` / `cuda` / `cpu`) | Torch device for `make run-llm` / Compose `llm` |
-| `GITHUB_TOKEN` | Go scan | _(empty)_ | Optional; higher GitHub API rate limits |
+| `TERRA_DEVICE` | local LLM + Go | `auto` (`mps` / `cuda` / `cpu`) | Torch device for `make run-llm` / Compose `llm`; also reported by `GET /host/capabilities` |
+| `TERRA_LOCAL_LLM_URL` | Go | `http://localhost:8020` | Sidecar the workspace picker loads local models into (`http://llm:8020` in Compose) |
+| `GITHUB_TOKEN` | Go scan | _(empty)_ | GitHub PAT for analyze/fetch; without it ~60 REST req/hour/IP, with it ~5,000/hour |
+
+## Choosing a model in the workspace
+
+Pasting a repo URL runs a **probe** first — fetch, scan, and a rule-based
+recommendation — and then stops at a hard gate. No LLM call happens until you
+press Continue.
+
+```
+POST /jobs/probe {repo_url}      → NDJSON: fetch → [recommend] → scan → done{probe_id, repo, recommendation}
+                                   (a repo already mapped at this commit skips
+                                    the gate: done carries the stored map)
+   ↓ user picks a model
+POST /jobs/analyze {repo_url, probe_id, model_id, api_key?}
+                                 → NDJSON: [scan] → [ensure_model] → analyze → store → done
+```
+
+- **Catalog** — `GET /models` (open, no token) is a static allowlist shipped in
+  `internal/catalog`: local Hugging Face weights and curated remote
+  OpenAI-compatible endpoints. IDs are provisional; the shape is not.
+- **Host fit** — `GET /host/capabilities` (open) reports this machine's RAM and
+  torch device. Local models that cannot fit stay visible but disabled.
+- **Local models** load on the Terra sidecar during analyze: the API calls
+  `POST /admin/load {model_id}` and polls `GET /admin/status` until the weights
+  are ready, streaming `ensure_model` events. No `.env` edit, no restart.
+- **Remote models are BYOK.** The key is stored in the browser's `localStorage`
+  under `terra_key_<provider>`, sent on the analyze request, forwarded to the
+  provider, and dropped. It is never written to SQLite, a job event, or a log;
+  provider errors are scrubbed before they become event labels.
+- **Ask** reuses the model the workspace analyzed with. It does not run
+  `ensure_model` — the weights are already loaded from the analyze that
+  preceded it.
+- **Operator fallback is unchanged.** A request without `model_id` (the CLI,
+  `POST /analyze`, any older client) behaves exactly as before and uses
+  `TERRA_LLM_URL` / `TERRA_MODEL` / `TERRA_LLM_API_KEY`.
+
+Probe results are cached in memory for 15 minutes. If the gate sits open longer
+than that, analyze rescans and says so.
 
 ## Analyzer HTTP surface
 
@@ -148,6 +189,16 @@ Supports `package.json` frontends only; runfile/Go-only repos need `make dev`
 | `POST /analyze` | Architecture map (Go wire contract) |
 | `GET /tasks` | Registered agent tasks |
 | `POST /tasks/{name}` | Run a named task (`architecture`, …) |
+
+`POST /analyze` and `POST /tasks/qa` accept optional `base_url` and `api_key`
+alongside `model`, which override `TERRA_LLM_*` for that request only.
+
+Local model sidecar (`make run-llm`, port 8020):
+
+| Route | Purpose |
+|---|---|
+| `GET /admin/status` | `{model_id, device, state: ready\|loading\|error\|empty, error}` |
+| `POST /admin/load` | Switch the served weights; returns immediately, 409 while another load is in flight |
 
 ## Tests
 

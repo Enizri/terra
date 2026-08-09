@@ -28,10 +28,10 @@ func limiterTestHandler(t *testing.T) http.Handler {
 	t.Helper()
 	s := &Server{
 		DB: filepath.Join(t.TempDir(), "terra.db"),
-		Scan: func(url string) (*scan.Result, error) {
+		Scan: func(url, _ string) (*scan.Result, error) {
 			return &scan.Result{RepositoryURL: url, Name: "notes", ScannedAt: time.Now().UTC()}, nil
 		},
-		Analyze: func(ctx context.Context, res *scan.Result, model string) (*graph.Map, []string, error) {
+		Analyze: func(ctx context.Context, res *scan.Result, opts graph.LLMOpts) (*graph.Map, []string, error) {
 			return &graph.Map{
 				Project:    graph.Project{Name: "Notes", RepositoryURL: res.RepositoryURL},
 				Components: []graph.Component{{ID: "web", Name: "Web", Purpose: "p", Importance: "critical", Type: "frontend"}},

@@ -15,7 +15,7 @@ def test_default_registry_lists_architecture():
 def test_architecture_task_run(monkeypatch, scan, good_draft):
     mapper = ArchitectureMapper()
 
-    def fake_generate(res, model="", base_url="", client=None):
+    def fake_generate(res, model="", base_url="", client=None, api_key=""):
         return good_draft, ["w"]
 
     monkeypatch.setattr(mapper, "generate", fake_generate)

@@ -257,8 +257,16 @@
   list-style: none;
 }
 
+.sh-ws__history-item {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+}
+
 .sh-ws__history-row {
   display: flex;
+  flex: 1;
+  min-width: 0;
   flex-direction: column;
   gap: 2px;
   width: 100%;
@@ -270,6 +278,31 @@
   text-align: left;
   color: #111;
   cursor: pointer;
+}
+
+.sh-ws__history-remove {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  color: #a3a3a3;
+  cursor: pointer;
+}
+
+.sh-ws__history-item:hover .sh-ws__history-remove,
+.sh-ws__history-remove:focus-visible {
+  color: #737373;
+}
+
+.sh-ws__history-remove:hover {
+  border-color: rgba(232, 64, 13, 0.35);
+  background: #fff4f0;
+  color: #e8400d;
 }
 
 .sh-ws__history-row b {
@@ -1126,4 +1159,99 @@
   .sh-ws__dock .sh-terra-chat--open {
     height: 320px;
   }
+}
+
+/* Model gate — the hard stop between probe and analyze. */
+.sh-gate {
+  max-width: 560px;
+  text-align: center;
+}
+
+.sh-gate__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.sh-gate__card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 20px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, currentColor 14%, transparent);
+  background: color-mix(in srgb, var(--sh-bg, #0b0d10) 88%, transparent);
+}
+
+.sh-gate__name {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.sh-gate__tag {
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.7;
+}
+
+.sh-gate__why,
+.sh-gate__fit {
+  display: block;
+  margin: 0;
+  font-size: 13px;
+  color: var(--sh-muted-2);
+}
+
+.sh-gate__fit {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.sh-gate__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-height: 40vh;
+  overflow-y: auto;
+  text-align: left;
+}
+
+.sh-gate__choice {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sh-gate__choice:hover:not(:disabled) {
+  border-color: color-mix(in srgb, currentColor 30%, transparent);
+}
+
+.sh-gate__choice:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }

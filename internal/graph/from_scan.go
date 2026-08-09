@@ -55,15 +55,15 @@ func FromScan(res *scan.Result) *Map {
 			RepositoryURL:    res.RepositoryURL,
 			Description:      "Structural map — Terra is still reading the architecture",
 			Kind:             "structural",
-			PrimaryLanguages: res.PrimaryLanguages,
+			PrimaryLanguages: orEmpty(res.PrimaryLanguages),
 			Stats: ProjectStats{
 				ApproxSourceFiles: res.Stats.SourceFiles,
-				TopLevelDirs:      res.Stats.TopLevelDirs,
+				TopLevelDirs:      orEmpty(res.Stats.TopLevelDirs),
 			},
 		},
 		Components:         components,
 		Relationships:      structuralRels(components, res),
-		SuggestedQuestions: nil,
+		SuggestedQuestions: []string{},
 	}
 }
 
@@ -181,25 +181,109 @@ func sampleFiles(files []string, prefix string, limit int) []string {
 	return out
 }
 
-// structuralRels links an obvious frontend → backend pair when both exist.
+// orEmpty keeps nil slices out of the JSON — the frontend types are non-nullable.
+func orEmpty(s []string) []string {
+	if s == nil {
+		return []string{}
+	}
+	return s
+}
+
+var importanceRank = map[string]int{"critical": 0, "high": 1, "medium": 2, "low": 3}
+
+func rankOf(importance string) int {
+	if r, ok := importanceRank[importance]; ok {
+		return r
+	}
+	return len(importanceRank)
+}
+
+// structuralRels wires every component to a hub so no block is drawn orphaned:
+// the core is the most important backend (else infrastructure) block, and
+// frontend/database/infrastructure/sibling blocks hang off it.
 func structuralRels(components []Component, res *scan.Result) []Relationship {
-	var front, back string
+	rels := []Relationship{}
+	core := pickCore(components)
+	if core == nil {
+		return rels
+	}
+	dirs := dirByID(res)
+	seen := map[string]bool{}
+	add := func(from, to string, verb string, because []string) {
+		if from == to || len(rels) >= 18 {
+			return
+		}
+		key := from + "|" + to
+		if seen[key] {
+			return
+		}
+		seen[key] = true
+		rels = append(rels, Relationship{From: from, To: to, Type: verb, Because: because})
+	}
+
+	// ponytail: typed edges first so the 18-edge cap only ever truncates the
+	// sibling tail — connectivity is guaranteed up to 18 non-core components.
 	for _, c := range components {
 		switch c.Type {
 		case "frontend":
-			if front == "" {
-				front = c.ID
+			// Only call it a frontend→backend hop when the core really is backend.
+			if core.Type == "backend" {
+				add(c.ID, core.ID, "calls", manifestBecause(res))
+			} else {
+				add(c.ID, core.ID, "uses", siblingBecause(c, dirs[c.ID], *core, dirs[core.ID]))
 			}
-		case "backend":
-			if back == "" {
-				back = c.ID
-			}
+		case "database":
+			add(core.ID, c.ID, "reads_writes", dirBecause(c, dirs[c.ID], res))
+		case "infrastructure":
+			add(c.ID, core.ID, "hosts", dirBecause(c, dirs[c.ID], res))
 		}
 	}
-	if front == "" || back == "" {
-		return nil
+	for _, c := range components {
+		if c.Type == "backend" {
+			add(c.ID, core.ID, "uses", siblingBecause(c, dirs[c.ID], *core, dirs[core.ID]))
+		}
 	}
-	because := []string{}
+	return rels
+}
+
+// pickCore returns the hub: the best-ranked backend, else infrastructure, else
+// the largest component of any type.
+func pickCore(components []Component) *Component {
+	better := func(a, b *Component) bool {
+		if rankOf(a.Importance) != rankOf(b.Importance) {
+			return rankOf(a.Importance) < rankOf(b.Importance)
+		}
+		return a.FileCount > b.FileCount
+	}
+	for _, want := range []string{"backend", "infrastructure"} {
+		var best *Component
+		for i, c := range components {
+			if c.Type == want && (best == nil || better(&components[i], best)) {
+				best = &components[i]
+			}
+		}
+		if best != nil {
+			return best
+		}
+	}
+	var largest *Component
+	for i := range components {
+		if largest == nil || components[i].FileCount > largest.FileCount {
+			largest = &components[i]
+		}
+	}
+	return largest
+}
+
+func dirByID(res *scan.Result) map[string]string {
+	out := map[string]string{}
+	for _, d := range res.Stats.TopLevelDirs {
+		out[sanitizeID(d)] = d
+	}
+	return out
+}
+
+func manifestBecause(res *scan.Result) []string {
 	hasNPM, hasGo := false, false
 	for _, m := range res.Dependencies {
 		switch m.Ecosystem {
@@ -210,14 +294,50 @@ func structuralRels(components []Component, res *scan.Result) []Relationship {
 		}
 	}
 	if hasNPM && hasGo {
-		because = append(because, "package.json and go.mod both present")
-	} else {
-		because = append(because, "top-level frontend and backend directories")
+		return []string{"package.json and go.mod both present"}
 	}
-	return []Relationship{{
-		From:    front,
-		To:      back,
-		Type:    "calls",
-		Because: because,
-	}}
+	return []string{"top-level frontend and backend directories"}
+}
+
+// dirBecause cites only scan facts: the directory, a manifest under it, its languages.
+func dirBecause(c Component, dir string, res *scan.Result) []string {
+	if dir == "" {
+		dir = c.ID
+	}
+	because := []string{fmt.Sprintf("top-level %s/ — %d source files", dir, c.FileCount)}
+	for _, m := range res.Dependencies {
+		if strings.HasPrefix(m.Manifest, dir+"/") {
+			because = append(because, fmt.Sprintf("%s (%s)", m.Manifest, m.Ecosystem))
+			break
+		}
+	}
+	if len(c.Tech) > 0 && len(because) < 3 {
+		because = append(because, fmt.Sprintf("%s sources under %s/", strings.Join(c.Tech, ", "), dir))
+	}
+	return because
+}
+
+func siblingBecause(c Component, dir string, core Component, coreDir string) []string {
+	if dir == "" {
+		dir = c.ID
+	}
+	if coreDir == "" {
+		coreDir = core.ID
+	}
+	because := []string{fmt.Sprintf("top-level %s/ in the same source tree", dir)}
+	if shared := sharedTech(c.Tech, core.Tech); shared != "" {
+		because = append(because, fmt.Sprintf("%s in both %s/ and %s/", shared, dir, coreDir))
+	}
+	return because
+}
+
+func sharedTech(a, b []string) string {
+	for _, x := range a {
+		for _, y := range b {
+			if strings.EqualFold(x, y) {
+				return x
+			}
+		}
+	}
+	return ""
 }

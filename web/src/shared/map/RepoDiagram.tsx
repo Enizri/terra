@@ -91,7 +91,8 @@ function routeEdge(a: DiagramNodeView, b: DiagramNodeView, ra: Box, rb: Box): Ro
       { x: cx, y: down ? rb.y - ARROW_GAP : rb.y + rb.h + ARROW_GAP },
     ];
   } else {
-    const dx = Math.min(ra.x, rb.x) - DETOUR;
+    // Stagger by row distance so hub-and-spoke detours don't stack on one line.
+    const dx = Math.min(ra.x, rb.x) - DETOUR * Math.abs(a.row - b.row);
     pts = [
       { x: ra.x, y: ay },
       { x: dx, y: ay },

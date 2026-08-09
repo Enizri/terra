@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Enizri/terra/internal/catalog"
 	"github.com/Enizri/terra/internal/config"
 	"github.com/Enizri/terra/internal/graph"
 	"github.com/Enizri/terra/internal/preview"
@@ -25,7 +26,7 @@ func testServer(t *testing.T) (*Server, *httptest.Server) {
 	t.Helper()
 	s := &Server{
 		DB: filepath.Join(t.TempDir(), "terra.db"),
-		Scan: func(url string) (*scan.Result, error) {
+		Scan: func(url, _ string) (*scan.Result, error) {
 			return &scan.Result{
 				RepositoryURL: url,
 				Name:          "notes",
@@ -39,7 +40,7 @@ func testServer(t *testing.T) (*Server, *httptest.Server) {
 			canonical, name, err := scan.NormalizeURL(url)
 			return canonical, name, "", err
 		},
-		Analyze: func(ctx context.Context, res *scan.Result, model string) (*graph.Map, []string, error) {
+		Analyze: func(ctx context.Context, res *scan.Result, opts graph.LLMOpts) (*graph.Map, []string, error) {
 			return &graph.Map{
 				Project: graph.Project{Name: "Notes", RepositoryURL: res.RepositoryURL},
 				Components: []graph.Component{{ID: "web", Name: "Web", Purpose: "p",
@@ -95,14 +96,14 @@ func TestAnalyzeReusesStoredMapForUnchangedCommit(t *testing.T) {
 	s, ts := testServer(t)
 	calls := 0
 	scanCommit := "aaa111"
-	s.Scan = func(url string) (*scan.Result, error) {
+	s.Scan = func(url, _ string) (*scan.Result, error) {
 		return &scan.Result{RepositoryURL: url, Name: "notes", Commit: scanCommit,
 			ScannedAt: time.Now().UTC()}, nil
 	}
 	realAnalyze := s.Analyze
-	s.Analyze = func(ctx context.Context, res *scan.Result, model string) (*graph.Map, []string, error) {
+	s.Analyze = func(ctx context.Context, res *scan.Result, opts graph.LLMOpts) (*graph.Map, []string, error) {
 		calls++
-		return realAnalyze(ctx, res, model)
+		return realAnalyze(ctx, res, opts)
 	}
 
 	for i := 0; i < 2; i++ {
@@ -132,12 +133,12 @@ func TestAnalyzeReusesStoredMapForUnchangedCommit(t *testing.T) {
 
 func TestAnalyzeStreamCacheHitEndsWithDone(t *testing.T) {
 	s, ts := testServer(t)
-	s.Scan = func(url string) (*scan.Result, error) {
+	s.Scan = func(url, _ string) (*scan.Result, error) {
 		return &scan.Result{RepositoryURL: url, Name: "notes", Commit: "aaa111",
 			ScannedAt: time.Now().UTC()}, nil
 	}
 	postAnalyze(t, ts, `{"repo_url":"https://github.com/acme/notes"}`) // warm the store
-	s.Analyze = func(ctx context.Context, res *scan.Result, model string) (*graph.Map, []string, error) {
+	s.Analyze = func(ctx context.Context, res *scan.Result, opts graph.LLMOpts) (*graph.Map, []string, error) {
 		t.Error("analyzer must not run on a cache hit")
 		return nil, nil, fmt.Errorf("unreachable")
 	}
@@ -200,7 +201,7 @@ func TestAnalyzeStreamsStages(t *testing.T) {
 
 func TestAnalyzeStreamsStructuralMapOnScan(t *testing.T) {
 	s, ts := testServer(t)
-	s.Scan = func(url string) (*scan.Result, error) {
+	s.Scan = func(url, _ string) (*scan.Result, error) {
 		return &scan.Result{
 			RepositoryURL:    url,
 			Name:             "notes",
@@ -257,7 +258,7 @@ func TestAnalyzeStreamsStructuralMapOnScan(t *testing.T) {
 func TestAnalyzeJobCacheHitSkipsScan(t *testing.T) {
 	s, ts := testServer(t)
 	const sha = "aaa111"
-	s.Scan = func(url string) (*scan.Result, error) {
+	s.Scan = func(url, _ string) (*scan.Result, error) {
 		return &scan.Result{RepositoryURL: url, Name: "notes", Commit: sha,
 			ScannedAt: time.Now().UTC()}, nil
 	}
@@ -268,11 +269,11 @@ func TestAnalyzeJobCacheHitSkipsScan(t *testing.T) {
 	postAnalyze(t, ts, `{"repo_url":"https://github.com/acme/notes"}`) // warm store
 
 	scanCalls := 0
-	s.Scan = func(url string) (*scan.Result, error) {
+	s.Scan = func(url, _ string) (*scan.Result, error) {
 		scanCalls++
 		return nil, fmt.Errorf("scan must not run on a resolve+commit cache hit")
 	}
-	s.Analyze = func(ctx context.Context, res *scan.Result, model string) (*graph.Map, []string, error) {
+	s.Analyze = func(ctx context.Context, res *scan.Result, opts graph.LLMOpts) (*graph.Map, []string, error) {
 		t.Error("analyzer must not run on a cache hit")
 		return nil, nil, fmt.Errorf("unreachable")
 	}
@@ -290,7 +291,7 @@ func TestAnalyzeJobCacheHitSkipsScan(t *testing.T) {
 // to arrive as an error event, not a 502.
 func TestAnalyzeStreamsFailureAsEvent(t *testing.T) {
 	s, ts := testServer(t)
-	s.Analyze = func(ctx context.Context, res *scan.Result, model string) (*graph.Map, []string, error) {
+	s.Analyze = func(ctx context.Context, res *scan.Result, opts graph.LLMOpts) (*graph.Map, []string, error) {
 		return nil, nil, fmt.Errorf("cannot reach the analyzer service")
 	}
 	req, _ := http.NewRequest("POST", ts.URL+"/analyze",
@@ -341,7 +342,7 @@ func TestAnalyzeRejectsBadBody(t *testing.T) {
 
 func TestAnalyzeReportsAnalyzerFailure(t *testing.T) {
 	s, ts := testServer(t)
-	s.Analyze = func(ctx context.Context, res *scan.Result, model string) (*graph.Map, []string, error) {
+	s.Analyze = func(ctx context.Context, res *scan.Result, opts graph.LLMOpts) (*graph.Map, []string, error) {
 		return nil, nil, fmt.Errorf("cannot reach the analyzer service")
 	}
 	resp := postAnalyze(t, ts, `{"repo_url":"https://github.com/acme/notes"}`)
@@ -625,6 +626,53 @@ func TestGetUnknownIDIs404(t *testing.T) {
 	}
 }
 
+func TestDeleteAnalysis(t *testing.T) {
+	_, ts := testServer(t)
+	resp := postAnalyze(t, ts, `{"repo_url":"https://github.com/acme/notes"}`)
+	if resp.StatusCode != 200 {
+		t.Fatalf("analyze status = %d", resp.StatusCode)
+	}
+	resp.Body.Close()
+
+	var list []map[string]any
+	getJSON(t, ts.URL+"/analyses", &list)
+	if len(list) != 1 {
+		t.Fatalf("list = %v", list)
+	}
+	id := list[0]["id"]
+
+	req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/analyses/%v", ts.URL, id), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != 204 {
+		t.Fatalf("delete status = %d, want 204", resp.StatusCode)
+	}
+	resp.Body.Close()
+
+	getJSON(t, ts.URL+"/analyses", &list)
+	if len(list) != 0 {
+		t.Fatalf("list after delete = %v", list)
+	}
+
+	req, err = http.NewRequest(http.MethodDelete, ts.URL+"/analyses/999", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != 404 {
+		t.Errorf("delete missing id: status = %d, want 404", resp.StatusCode)
+	}
+	resp.Body.Close()
+}
+
 // snippet answers workspace questions with no preview running, so it falls
 // back to an already-cloned checkout — and must never clone one itself.
 func TestSnippetFallsBackToExistingCheckout(t *testing.T) {
@@ -873,7 +921,7 @@ func TestEnqueueAnalyzeReturnsBeforeWorkFinishes(t *testing.T) {
 	s, ts := testServer(t)
 	started := make(chan struct{})
 	release := make(chan struct{})
-	s.Analyze = func(ctx context.Context, res *scan.Result, model string) (*graph.Map, []string, error) {
+	s.Analyze = func(ctx context.Context, res *scan.Result, opts graph.LLMOpts) (*graph.Map, []string, error) {
 		close(started)
 		<-release
 		return &graph.Map{
@@ -941,12 +989,12 @@ func TestJobEventsUnknownID(t *testing.T) {
 func TestCancelAnalyzeJob(t *testing.T) {
 	s, ts := testServer(t)
 	enteredScan := make(chan struct{})
-	s.Scan = func(url string) (*scan.Result, error) {
+	s.Scan = func(url, _ string) (*scan.Result, error) {
 		close(enteredScan)
 		time.Sleep(100 * time.Millisecond) // window for cancel to land
 		return &scan.Result{RepositoryURL: url, Name: "notes", ScannedAt: time.Now().UTC()}, nil
 	}
-	s.Analyze = func(ctx context.Context, res *scan.Result, model string) (*graph.Map, []string, error) {
+	s.Analyze = func(ctx context.Context, res *scan.Result, opts graph.LLMOpts) (*graph.Map, []string, error) {
 		t.Error("Analyze must not run after cancel")
 		return nil, nil, fmt.Errorf("unreachable")
 	}
@@ -1035,7 +1083,7 @@ func TestAnalyzeJobDeadline(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			t.Setenv("TERRA_ANALYZE_TIMEOUT", c.timeout)
 			s, ts := testServer(t)
-			s.Analyze = func(ctx context.Context, res *scan.Result, model string) (*graph.Map, []string, error) {
+			s.Analyze = func(ctx context.Context, res *scan.Result, opts graph.LLMOpts) (*graph.Map, []string, error) {
 				if c.block {
 					<-ctx.Done()
 					return nil, nil, ctx.Err()
@@ -1062,7 +1110,7 @@ func TestAnalyzeJobDeadline(t *testing.T) {
 func TestCancelPropagatesToAnalyze(t *testing.T) {
 	s, ts := testServer(t)
 	entered := make(chan struct{})
-	s.Analyze = func(ctx context.Context, res *scan.Result, model string) (*graph.Map, []string, error) {
+	s.Analyze = func(ctx context.Context, res *scan.Result, opts graph.LLMOpts) (*graph.Map, []string, error) {
 		close(entered)
 		<-ctx.Done() // hangs forever unless cancel reaches the in-flight call
 		return nil, nil, ctx.Err()
@@ -1105,7 +1153,7 @@ func TestAnalyzeQueueRejectsWhenFull(t *testing.T) {
 	t.Setenv("TERRA_RATE_LIMIT", "0")
 	s, ts := testServer(t)
 	gate := make(chan struct{})
-	s.Analyze = func(ctx context.Context, res *scan.Result, model string) (*graph.Map, []string, error) {
+	s.Analyze = func(ctx context.Context, res *scan.Result, opts graph.LLMOpts) (*graph.Map, []string, error) {
 		<-gate
 		return nil, nil, fmt.Errorf("released")
 	}
@@ -1216,5 +1264,45 @@ func TestEnqueueAskReturnsBeforeWorkFinishes(t *testing.T) {
 	}
 	if last.Stage != "done" || last.Answer != "hello from qa" {
 		t.Fatalf("last = %+v", last)
+	}
+}
+
+func TestModelsAndHostCapabilitiesAreOpen(t *testing.T) {
+	s := &Server{Cfg: &config.Config{Token: "secret", AnalyzeConcurrency: 1}}
+	ts := httptest.NewServer(s.Handler())
+	defer ts.Close()
+
+	resp, err := http.Get(ts.URL + "/models")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /models without a token: %s", resp.Status)
+	}
+	var out struct {
+		Models []catalog.Entry `json:"models"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatal(err)
+	}
+	if len(out.Models) == 0 {
+		t.Fatal("catalog came back empty")
+	}
+
+	capsResp, err := http.Get(ts.URL + "/host/capabilities")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer capsResp.Body.Close()
+	if capsResp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /host/capabilities without a token: %s", capsResp.Status)
+	}
+	var caps catalog.Capabilities
+	if err := json.NewDecoder(capsResp.Body).Decode(&caps); err != nil {
+		t.Fatal(err)
+	}
+	if caps.Device == "" {
+		t.Error("capabilities must always name a device")
 	}
 }

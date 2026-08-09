@@ -68,7 +68,7 @@ def test_list_tasks():
 
 def test_analyze_happy_path(monkeypatch, scan, good_draft):
     monkeypatch.setattr(app_module.llm, "generate",
-                        lambda res, model="": (good_draft, ["heads up"]))
+                        lambda res, model="", **kw: (good_draft, ["heads up"]))
     response = client.post("/analyze", json={"scan": scan.model_dump(), "model": ""})
     assert response.status_code == 200
     body = response.json()
@@ -81,7 +81,7 @@ def test_analyze_happy_path(monkeypatch, scan, good_draft):
 
 def test_tasks_architecture_happy_path(monkeypatch, scan, good_draft):
     monkeypatch.setattr(app_module.llm, "generate",
-                        lambda res, model="": (good_draft, []))
+                        lambda res, model="", **kw: (good_draft, []))
 
     def fake_run(name, payload):
         assert name == "architecture"
@@ -101,7 +101,7 @@ def test_tasks_unknown_404():
 
 
 def test_analyze_llm_error_becomes_502(monkeypatch, scan):
-    def boom(res, model=""):
+    def boom(res, model="", **kw):
         raise LLMError("cannot reach a model server at http://localhost:8020/v1")
     monkeypatch.setattr(app_module.llm, "generate", boom)
     response = client.post("/analyze", json={"scan": scan.model_dump()})

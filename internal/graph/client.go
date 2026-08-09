@@ -32,9 +32,21 @@ type draft struct {
 	SuggestedQuestions []string       `json:"suggested_questions"`
 }
 
+// LLMOpts routes one analyze request. Empty fields leave the analyzer on its
+// own TERRA_LLM_* environment, so an operator-configured deployment behaves
+// exactly as it did before the workspace picker existed.
+//
+// APIKey is request-scoped secret material: it lives here and in the analyzer
+// request body only. It must never reach a job event, a log line, or the store.
+type LLMOpts struct {
+	Model   string
+	BaseURL string
+	APIKey  string
+}
+
 // Analyze sends the scan to the analyzer at base (config.AnalyzerURL) and
 // returns an assembled Map.
-func Analyze(ctx context.Context, base string, res *scan.Result, model string) (*Map, []string, error) {
+func Analyze(ctx context.Context, base string, res *scan.Result, opts LLMOpts) (*Map, []string, error) {
 	base = strings.TrimSuffix(base, "/")
 	if base == "" {
 		base = DefaultAnalyzerURL
@@ -43,7 +55,16 @@ func Analyze(ctx context.Context, base string, res *scan.Result, model string) (
 		return nil, nil, err
 	}
 
-	body, err := json.Marshal(map[string]any{"scan": res, "model": model})
+	// Only non-empty overrides go on the wire: an unrouted request marshals
+	// byte-for-byte the same body the analyzer has always received.
+	payload := map[string]any{"scan": res, "model": opts.Model}
+	if opts.BaseURL != "" {
+		payload["base_url"] = opts.BaseURL
+	}
+	if opts.APIKey != "" {
+		payload["api_key"] = opts.APIKey
+	}
+	body, err := json.Marshal(payload)
 	if err != nil {
 		return nil, nil, err
 	}

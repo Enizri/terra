@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import type { TerraMap } from "../map/types";
 import { buildFileTree, countLeaves, type FileNode } from "../fileTree";
-import { ChevronIcon } from "./icons";
+import { ChevronIcon, CloseIcon } from "./icons";
 
 /** One stored analysis in the rail — canonical home so shared/ needs no route import. */
 export type HistoryEntry = { id: number; repoUrl: string; name: string; scannedAt: string };
@@ -86,6 +86,7 @@ export function Sidebar({
   history,
   onSelect,
   onOpen,
+  onRemove,
   busy,
 }: {
   map: TerraMap | null;
@@ -93,6 +94,8 @@ export function Sidebar({
   onSelect: (id: string) => void;
   /** Load a stored analysis's saved map — no pipeline re-run. */
   onOpen: (entry: HistoryEntry) => void;
+  /** Drop one stored analysis from the rail and the database. */
+  onRemove: (entry: HistoryEntry) => void;
   busy: boolean;
 }) {
   const tree = useMemo(() => (map ? buildFileTree(map.components) : []), [map]);
@@ -118,7 +121,7 @@ export function Sidebar({
         ) : (
           <ul className="sh-ws__history">
             {history.map((h) => (
-              <li key={h.id}>
+              <li key={h.id} className="sh-ws__history-item">
                 <button
                   type="button"
                   className={`sh-ws__history-row${h.repoUrl === current ? " is-current" : ""}`}
@@ -128,6 +131,18 @@ export function Sidebar({
                 >
                   <b>{h.name}</b>
                   <em>{new Date(h.scannedAt).toLocaleDateString()}</em>
+                </button>
+                <button
+                  type="button"
+                  className="sh-ws__history-remove"
+                  aria-label={`Remove ${h.name}`}
+                  title={`Remove ${h.name}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemove(h);
+                  }}
+                >
+                  <CloseIcon />
                 </button>
               </li>
             ))}

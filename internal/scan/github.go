@@ -3,6 +3,8 @@ package scan
 import (
 	"archive/tar"
 	"compress/gzip"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,6 +12,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -24,6 +27,24 @@ var (
 
 // Tarball downloads can be large; commit resolution is a tiny JSON call.
 var httpClient = &http.Client{Timeout: 2 * time.Minute}
+
+// RateLimitError is returned when GitHub rejects a request for quota reasons.
+type RateLimitError struct {
+	Status string
+	Body   string
+	Reset  time.Time // zero if unknown
+}
+
+func (e *RateLimitError) Error() string {
+	msg := "GitHub rate limit hit"
+	if !e.Reset.IsZero() {
+		msg += "; retry after " + e.Reset.UTC().Format(time.RFC3339)
+	}
+	if os.Getenv("GITHUB_TOKEN") == "" {
+		msg += " — set GITHUB_TOKEN for higher limits"
+	}
+	return msg
+}
 
 // NormalizeURL turns any common GitHub repo reference into a canonical
 // https URL and returns it with the repo name.
@@ -43,6 +64,42 @@ func ownerRepo(raw string) (owner, repo string, err error) {
 	return match[1], match[2], nil
 }
 
+func setGitHubAuth(req *http.Request) {
+	if tok := os.Getenv("GITHUB_TOKEN"); tok != "" {
+		req.Header.Set("Authorization", "Bearer "+tok)
+	}
+}
+
+func githubAPIError(op, owner, repo string, resp *http.Response, body []byte) error {
+	text := strings.TrimSpace(string(body))
+	if resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusTooManyRequests {
+		return &RateLimitError{
+			Status: resp.Status,
+			Body:   text,
+			Reset:  rateLimitReset(resp),
+		}
+	}
+	return fmt.Errorf("%s %s/%s: GitHub API returned %s: %s",
+		op, owner, repo, resp.Status, text)
+}
+
+func rateLimitReset(resp *http.Response) time.Time {
+	if ra := resp.Header.Get("Retry-After"); ra != "" {
+		if secs, err := strconv.Atoi(ra); err == nil {
+			return time.Now().Add(time.Duration(secs) * time.Second)
+		}
+		if t, err := http.ParseTime(ra); err == nil {
+			return t
+		}
+	}
+	if raw := resp.Header.Get("X-RateLimit-Reset"); raw != "" {
+		if unix, err := strconv.ParseInt(raw, 10, 64); err == nil {
+			return time.Unix(unix, 0)
+		}
+	}
+	return time.Time{}
+}
+
 // ResolveCommit asks the GitHub API for the SHA of the default branch's HEAD.
 // Everything downstream — scans, stored maps, checkouts — keys off this SHA.
 func ResolveCommit(owner, repo string) (string, error) {
@@ -52,9 +109,7 @@ func ResolveCommit(owner, repo string) (string, error) {
 	}
 	// The .sha media type returns the bare SHA instead of a commit object.
 	req.Header.Set("Accept", "application/vnd.github.sha")
-	if tok := os.Getenv("GITHUB_TOKEN"); tok != "" {
-		req.Header.Set("Authorization", "Bearer "+tok)
-	}
+	setGitHubAuth(req)
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return "", err
@@ -62,8 +117,7 @@ func ResolveCommit(owner, repo string) (string, error) {
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("resolve %s/%s: GitHub API returned %s: %s",
-			owner, repo, resp.Status, strings.TrimSpace(string(body)))
+		return "", githubAPIError("resolve", owner, repo, resp, body)
 	}
 	sha := strings.TrimSpace(string(body))
 	if sha == "" {
@@ -75,15 +129,38 @@ func ResolveCommit(owner, repo string) (string, error) {
 // fetchTarball streams the repo tarball for one commit from codeload. No git,
 // no .git directory, no working tree unless the caller extracts one.
 func fetchTarball(owner, repo, sha string) (io.ReadCloser, error) {
-	resp, err := httpClient.Get(codeloadBase + "/" + owner + "/" + repo + "/tar.gz/" + sha)
+	req, err := http.NewRequest("GET", codeloadBase+"/"+owner+"/"+repo+"/tar.gz/"+sha, nil)
+	if err != nil {
+		return nil, err
+	}
+	setGitHubAuth(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 		resp.Body.Close()
-		return nil, fmt.Errorf("download %s/%s@%s: codeload returned %s", owner, repo, sha[:min(7, len(sha))], resp.Status)
+		short := sha
+		if len(sha) > 7 {
+			short = sha[:7]
+		}
+		if resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusTooManyRequests {
+			return nil, &RateLimitError{
+				Status: resp.Status,
+				Body:   strings.TrimSpace(string(body)),
+				Reset:  rateLimitReset(resp),
+			}
+		}
+		return nil, fmt.Errorf("download %s/%s@%s: codeload returned %s", owner, repo, short, resp.Status)
 	}
 	return resp.Body, nil
+}
+
+// IsRateLimited reports whether err is (or wraps) a GitHub rate-limit failure.
+func IsRateLimited(err error) bool {
+	var rl *RateLimitError
+	return errors.As(err, &rl)
 }
 
 // stripRoot removes the "repo-sha/" prefix codeload puts on every entry.
@@ -220,4 +297,37 @@ func extractTarball(r io.Reader, dir string) error {
 			}
 		}
 	}
+}
+
+// RepoMeta fetches the cheap GitHub metadata behind the provisional model
+// recommendation: the repo's primary language and its size in KB. It costs
+// one API call and callers treat failure as "no signal yet", never fatal.
+func RepoMeta(rawURL string) (language string, sizeKB int64, err error) {
+	owner, repo, err := ownerRepo(rawURL)
+	if err != nil {
+		return "", 0, err
+	}
+	req, err := http.NewRequest("GET", apiBase+"/repos/"+owner+"/"+repo, nil)
+	if err != nil {
+		return "", 0, err
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	setGitHubAuth(req)
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return "", 0, err
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<16))
+	if resp.StatusCode != http.StatusOK {
+		return "", 0, githubAPIError("metadata", owner, repo, resp, body)
+	}
+	var meta struct {
+		Language string `json:"language"`
+		Size     int64  `json:"size"`
+	}
+	if err := json.Unmarshal(body, &meta); err != nil {
+		return "", 0, fmt.Errorf("metadata %s/%s: %w", owner, repo, err)
+	}
+	return meta.Language, meta.Size, nil
 }

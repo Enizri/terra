@@ -4,12 +4,15 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 const testSHA = "abc1234def5678abc1234def5678abc1234def56"
@@ -75,15 +78,101 @@ func TestCheckoutDirUsesOverride(t *testing.T) {
 
 func TestResolveCommitReportsAPIFailure(t *testing.T) {
 	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "rate limit exceeded", http.StatusForbidden)
+		http.Error(w, "not found", http.StatusNotFound)
 	}))
 	old := apiBase
 	apiBase = api.URL
 	t.Cleanup(func() { apiBase = old; api.Close() })
 
 	_, err := ResolveCommit("o", "r")
-	if err == nil || !strings.Contains(err.Error(), "403") {
+	if err == nil || !strings.Contains(err.Error(), "404") {
 		t.Errorf("err = %v, want the API status surfaced", err)
+	}
+}
+
+func TestResolveCommitRateLimitError(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "")
+	reset := time.Now().Add(time.Hour).Unix()
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-RateLimit-Reset", strconv.FormatInt(reset, 10))
+		http.Error(w, "API rate limit exceeded", http.StatusForbidden)
+	}))
+	old := apiBase
+	apiBase = api.URL
+	t.Cleanup(func() { apiBase = old; api.Close() })
+
+	_, err := ResolveCommit("o", "r")
+	if !IsRateLimited(err) {
+		t.Fatalf("err = %v, want RateLimitError", err)
+	}
+	msg := err.Error()
+	if !strings.Contains(msg, "GitHub rate limit hit") || !strings.Contains(msg, "GITHUB_TOKEN") {
+		t.Errorf("err = %q, want friendly rate-limit message", msg)
+	}
+	var rl *RateLimitError
+	if !errors.As(err, &rl) || rl.Reset.Unix() != reset {
+		t.Errorf("Reset = %v, want unix %d", rl, reset)
+	}
+}
+
+func TestGitHubAuthHeaderOnResolveAndTarball(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "test-token")
+	var apiAuth, codeAuth string
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		apiAuth = r.Header.Get("Authorization")
+		w.Write([]byte(testSHA))
+	}))
+	codeload := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		codeAuth = r.Header.Get("Authorization")
+		w.Write(makeTarball(t, "r-"+testSHA[:7], map[string]string{"main.go": "package main\n"}))
+	}))
+	oldAPI, oldCodeload := apiBase, codeloadBase
+	apiBase, codeloadBase = api.URL, codeload.URL
+	t.Cleanup(func() {
+		apiBase, codeloadBase = oldAPI, oldCodeload
+		api.Close()
+		codeload.Close()
+	})
+
+	if _, err := Scan("github.com/o/r"); err != nil {
+		t.Fatal(err)
+	}
+	want := "Bearer test-token"
+	if apiAuth != want || codeAuth != want {
+		t.Errorf("auth resolve=%q tarball=%q, want both %q", apiAuth, codeAuth, want)
+	}
+}
+
+func TestScanAtSkipsResolve(t *testing.T) {
+	apiHits := 0
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		apiHits++
+		http.Error(w, "should not call commits API", http.StatusInternalServerError)
+	}))
+	codeload := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/o/r/tar.gz/"+testSHA {
+			http.NotFound(w, r)
+			return
+		}
+		w.Write(makeTarball(t, "r-"+testSHA[:7], map[string]string{"main.go": "package main\n"}))
+	}))
+	oldAPI, oldCodeload := apiBase, codeloadBase
+	apiBase, codeloadBase = api.URL, codeload.URL
+	t.Cleanup(func() {
+		apiBase, codeloadBase = oldAPI, oldCodeload
+		api.Close()
+		codeload.Close()
+	})
+
+	res, err := ScanAt("github.com/o/r", testSHA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if apiHits != 0 {
+		t.Errorf("commits API hit %d times; ScanAt must skip resolve", apiHits)
+	}
+	if res.Commit != testSHA {
+		t.Errorf("commit = %q, want %q", res.Commit, testSHA)
 	}
 }
 
@@ -139,5 +228,44 @@ func TestCheckoutExtractsTarballSafely(t *testing.T) {
 	dir2, err := Checkout("", "github.com/o/r")
 	if err != nil || dir2 != dir {
 		t.Errorf("reuse: dir=%q err=%v, want cached %q", dir2, err, dir)
+	}
+}
+
+func TestRepoMeta(t *testing.T) {
+	var gotPath, gotAuth string
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath, gotAuth = r.URL.Path, r.Header.Get("Authorization")
+		w.Write([]byte(`{"language":"Go","size":4096,"stargazers_count":7}`))
+	}))
+	old := apiBase
+	apiBase = api.URL
+	t.Cleanup(func() { apiBase = old; api.Close() })
+	t.Setenv("GITHUB_TOKEN", "test-token")
+
+	language, sizeKB, err := RepoMeta("github.com/acme/notes")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if language != "Go" || sizeKB != 4096 {
+		t.Errorf("RepoMeta = %q, %d", language, sizeKB)
+	}
+	if gotPath != "/repos/acme/notes" {
+		t.Errorf("path = %q", gotPath)
+	}
+	if gotAuth != "Bearer test-token" {
+		t.Errorf("RepoMeta must reuse the GitHub token, got %q", gotAuth)
+	}
+}
+
+func TestRepoMetaRateLimitError(t *testing.T) {
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "API rate limit exceeded", http.StatusForbidden)
+	}))
+	old := apiBase
+	apiBase = api.URL
+	t.Cleanup(func() { apiBase = old; api.Close() })
+
+	if _, _, err := RepoMeta("github.com/acme/notes"); !IsRateLimited(err) {
+		t.Errorf("err = %v, want RateLimitError", err)
 	}
 }

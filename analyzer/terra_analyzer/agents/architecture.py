@@ -26,8 +26,12 @@ class ArchitectureMapper:
             res = ScanResult.model_validate(scan)
         else:
             raise LLMError("architecture task requires a scan object")
-        model = payload.get("model") or ""
-        draft, warnings = self.generate(res, model=model)
+        draft, warnings = self.generate(
+            res,
+            model=payload.get("model") or "",
+            base_url=payload.get("base_url") or "",
+            api_key=payload.get("api_key") or "",
+        )
         return {
             "draft": draft.model_dump(by_alias=True),
             "warnings": warnings,
@@ -39,9 +43,15 @@ class ArchitectureMapper:
         model: str = "",
         base_url: str = "",
         client: httpx.Client | None = None,
+        api_key: str = "",
     ) -> tuple[Draft, list[str]]:
         """One chat call; second only if validation fails."""
-        cfg = Config(model=model, base_url=base_url, client=client or self._client)
+        cfg = Config(
+            model=model,
+            base_url=base_url,
+            client=client or self._client,
+            api_key=api_key,
+        )
         preflight(cfg)
 
         known = known_paths(res)

@@ -14,7 +14,8 @@ def generate(
     model: str = "",
     base_url: str = "",
     client: httpx.Client | None = None,
+    api_key: str = "",
 ) -> tuple[Draft, list[str]]:
     return ArchitectureMapper(client=client).generate(
-        res, model=model, base_url=base_url, client=client
+        res, model=model, base_url=base_url, client=client, api_key=api_key
     )

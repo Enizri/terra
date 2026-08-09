@@ -157,6 +157,40 @@ func List(dbPath string) ([]Summary, error) {
 	return out, rows.Err()
 }
 
+// Delete removes one stored analysis and its components and relationships.
+// Returns false when the id is not in the database.
+func Delete(dbPath string, id int64) (bool, error) {
+	db, err := open(dbPath)
+	if err != nil {
+		return false, err
+	}
+	defer db.Close()
+
+	tx, err := db.Begin()
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback()
+
+	for _, table := range []string{"relationships", "components"} {
+		if _, err := tx.Exec("DELETE FROM "+table+" WHERE project_id = ?", id); err != nil {
+			return false, fmt.Errorf("clear %s: %w", table, err)
+		}
+	}
+	res, err := tx.Exec("DELETE FROM projects WHERE id = ?", id)
+	if err != nil {
+		return false, fmt.Errorf("delete project: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	if n == 0 {
+		return false, nil
+	}
+	return true, tx.Commit()
+}
+
 // Get returns the stored map for one analysis, or (nil, nil) when the id is
 // not in the database.
 func Get(dbPath string, id int64) (*graph.Map, error) {

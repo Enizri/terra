@@ -59,3 +59,241 @@ def test_response_format_parses_schema_alias():
     }
     req = ChatCompletionRequest.model_validate(raw)
     assert req.response_format.json_schema.schema_ == {"type": "object"}
+
+
+# --- /admin/load state machine -------------------------------------------
+# These drive the module state directly: a real load pulls gigabytes of
+# weights, and what matters here is the transitions Go polls on.
+
+import threading
+
+import pytest
+from fastapi import HTTPException
+
+from terra_analyzer.local_server import server as local
+
+
+def _reset_state():
+    local.state.model_id = ""
+    local.state.loaded = False
+    local.state.loading = ""
+    local.state.load_error = ""
+    local.state.load_gen = 0
+    local.state.model = None
+    local.state.tokenizer = None
+
+
+@pytest.fixture(autouse=True)
+def reset_state():
+    _reset_state()
+    yield
+    _reset_state()
+
+
+def test_status_reports_empty_before_any_load():
+    assert local.admin_status()["state"] == "empty"
+
+
+def test_load_spawns_a_worker_and_reports_ready(monkeypatch):
+    done = threading.Event()
+
+    def fake_load(model_id="", device="", gen=None):
+        local.state.model_id = model_id
+        local.state.loaded = True
+        done.set()
+
+    monkeypatch.setattr(local, "load_model", fake_load)
+    out = local.admin_load(local.LoadRequest(model_id="Qwen/Qwen2.5-0.5B-Instruct"))
+    assert out["state"] == "loading"
+    assert done.wait(2)
+    # The worker's finally clears `loading`; give the thread a beat to land.
+    for _ in range(100):
+        if local.admin_status()["state"] == "ready":
+            break
+        threading.Event().wait(0.01)
+    status = local.admin_status()
+    assert status["state"] == "ready"
+    assert status["model_id"] == "Qwen/Qwen2.5-0.5B-Instruct"
+
+
+def test_load_is_a_noop_when_the_model_is_already_serving():
+    local.state.model_id = "Qwen/Qwen2.5-0.5B-Instruct"
+    local.state.loaded = True
+    out = local.admin_load(local.LoadRequest(model_id="Qwen/Qwen2.5-0.5B-Instruct"))
+    assert out["state"] == "ready"
+
+
+def test_reloading_the_model_already_in_flight_is_a_noop():
+    local.state.loading = "Qwen/Qwen2.5-7B-Instruct"
+    out = local.admin_load(local.LoadRequest(model_id="Qwen/Qwen2.5-7B-Instruct"))
+    assert out["state"] == "loading"
+
+
+def test_load_requires_a_model_id():
+    with pytest.raises(HTTPException) as excinfo:
+        local.admin_load(local.LoadRequest(model_id="  "))
+    assert excinfo.value.status_code == 400
+
+
+def test_failed_load_surfaces_as_error_and_allows_a_retry(monkeypatch):
+    def boom(model_id="", device="", gen=None):
+        raise RuntimeError("no such model")
+
+    monkeypatch.setattr(local, "load_model", boom)
+    local.admin_load(local.LoadRequest(model_id="nope/nope"))
+    for _ in range(200):
+        if local.admin_status()["state"] == "error":
+            break
+        threading.Event().wait(0.01)
+    status = local.admin_status()
+    assert status["state"] == "error"
+    assert "no such model" in status["error"]
+    # A failure must not wedge the sidecar: the next load is accepted.
+    monkeypatch.setattr(local, "load_model", lambda model_id="", device="", gen=None: None)
+    assert local.admin_load(local.LoadRequest(model_id="other/model"))["state"] == "loading"
+
+
+def test_chat_refuses_to_serve_while_loading():
+    local.state.loading = "Qwen/Qwen2.5-7B-Instruct"
+    with pytest.raises(HTTPException) as excinfo:
+        local._ensure_loaded()
+    assert excinfo.value.status_code == 503
+    assert "loading" in excinfo.value.detail
+
+
+# --- load generation: cancel and supersede -------------------------------
+#
+# from_pretrained cannot be interrupted, so "cancel" means the result is
+# discarded rather than the download stopped. These pin that contract.
+
+import sys
+import types
+
+
+def _fake_backends(monkeypatch, on_tokenizer=None, on_model=None):
+    """Lets load_model run without torch or transformers installed."""
+    def weights(model_id):
+        return types.SimpleNamespace(name=model_id, to=lambda _d: None, eval=lambda: None)
+
+    class FakeTokenizer:
+        @staticmethod
+        def from_pretrained(model_id, **_kw):
+            if on_tokenizer:
+                on_tokenizer()
+            return weights(model_id)
+
+    class FakeModel:
+        @staticmethod
+        def from_pretrained(model_id, **_kw):
+            if on_model:
+                on_model()
+            return weights(model_id)
+
+    monkeypatch.setitem(sys.modules, "torch", types.SimpleNamespace(float16="f16", float32="f32"))
+    monkeypatch.setitem(sys.modules, "transformers", types.SimpleNamespace(
+        AutoTokenizer=FakeTokenizer, AutoModelForCausalLM=FakeModel))
+    monkeypatch.setattr(local, "pick_device", lambda _requested="": "cpu")
+
+
+def test_load_model_installs_its_weights(monkeypatch):
+    _fake_backends(monkeypatch)
+    assert local.load_model("Qwen/Good", gen=local.state.load_gen) is True
+    assert local.state.model_id == "Qwen/Good"
+    assert local.state.loaded is True
+
+
+def test_load_model_gives_up_when_cancelled_during_the_tokenizer(monkeypatch):
+    _fake_backends(monkeypatch, on_tokenizer=lambda: local.admin_cancel())
+    assert local.load_model("Qwen/Abandoned", gen=local.state.load_gen) is False
+    assert local.state.loaded is False
+    assert local.state.model_id == ""
+
+
+def test_load_model_discards_weights_a_cancel_superseded(monkeypatch):
+    _fake_backends(monkeypatch, on_model=lambda: local.admin_cancel())
+    assert local.load_model("Qwen/Abandoned", gen=local.state.load_gen) is False
+    assert local.state.loaded is False
+    assert local.state.model_id == ""
+
+
+def test_admin_cancel_reports_what_it_abandoned(monkeypatch):
+    monkeypatch.setattr(local, "_load_worker", lambda model_id, gen: None)
+    local.admin_load(local.LoadRequest(model_id="Qwen/Big"))
+    out = local.admin_cancel()
+    assert out["cancelled"] == "Qwen/Big"
+    # Nothing in flight and nothing loaded: a fresh EnsureModel starts a load
+    # rather than waiting on the abandoned one.
+    assert out["state"] == "empty"
+    assert local.state.loading == ""
+
+
+def test_admin_load_supersedes_a_load_in_flight(monkeypatch):
+    monkeypatch.setattr(local, "_load_worker", lambda model_id, gen: None)
+    local.admin_load(local.LoadRequest(model_id="Qwen/Big"))
+    first = local.state.load_gen
+    out = local.admin_load(local.LoadRequest(model_id="Qwen/Small"))
+    assert out == {"model_id": "Qwen/Small", "state": "loading"}
+    assert local.state.loading == "Qwen/Small"
+    assert local.state.load_gen > first
+
+
+def test_a_superseded_worker_leaves_the_new_load_alone(monkeypatch):
+    def boom(model_id="", device="", gen=None):
+        raise RuntimeError("the download died")
+
+    monkeypatch.setattr(local, "load_model", boom)
+    local.state.load_gen = 5
+    local.state.loading = "Qwen/New"
+    local._load_worker("Qwen/Abandoned", gen=4)
+    assert local.state.loading == "Qwen/New", "a stale worker must not clear the new marker"
+    assert local.state.load_error == "", "a stale worker's failure is nobody's problem"
+
+
+def test_cancelling_a_switch_leaves_the_resident_model_serving(monkeypatch):
+    """A model already in RAM must survive a cancelled switch to another one.
+
+    Clearing `loaded` when the switch starts would strand it: the worker that
+    would have restored it has been abandoned, so nothing ever sets it back.
+    """
+    monkeypatch.setattr(local, "_load_worker", lambda model_id, gen: None)
+    local.state.model_id = "Qwen/Resident"
+    local.state.loaded = True
+    local.state.model = object()
+    local.state.tokenizer = object()
+
+    local.admin_load(local.LoadRequest(model_id="Qwen/Big"))
+    assert local.admin_status()["state"] == "loading"
+
+    local.admin_cancel()
+    assert local.admin_status()["state"] == "ready"
+    assert local.admin_status()["model_id"] == "Qwen/Resident"
+    local._ensure_loaded()  # must not raise: the weights never left memory
+
+
+def test_cancel_clears_a_stale_load_error(monkeypatch):
+    """Otherwise the sidecar reports "error" forever with nothing in flight."""
+    monkeypatch.setattr(local, "_load_worker", lambda model_id, gen: None)
+    local.state.load_error = "loading Qwen/Old failed: boom"
+    local.admin_load(local.LoadRequest(model_id="Qwen/Big"))
+    local.admin_cancel()
+    assert local.state.load_error == ""
+    assert local.admin_status()["state"] == "empty"
+
+
+def test_asking_for_the_resident_model_abandons_a_competing_switch(monkeypatch):
+    """Reporting "ready" must mean it stays ready.
+
+    The resident model now survives a switch, so "already serving it" can be
+    true while a load of something else is still in flight. Returning ready
+    without abandoning that load would let it overwrite the caller's choice.
+    """
+    monkeypatch.setattr(local, "_load_worker", lambda model_id, gen: None)
+    local.state.model_id = "Qwen/Resident"
+    local.state.loaded = True
+
+    local.admin_load(local.LoadRequest(model_id="Qwen/Other"))
+    assert local.state.loading == "Qwen/Other"
+
+    out = local.admin_load(local.LoadRequest(model_id="Qwen/Resident"))
+    assert out["state"] == "ready"
+    assert local.state.loading == ""

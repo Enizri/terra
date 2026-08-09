@@ -7,6 +7,7 @@ import { ArrowIcon } from "../../../shared/workspace/icons";
 import { StatusLine } from "../../../shared/workspace/StatusLine";
 import { WsDropCard } from "../../../shared/workspace/DropCard";
 import { MapStage } from "./MapStage";
+import { ModelGate } from "./ModelGate";
 
 /** Centre column: drop / mapping / map. */
 export function DropStage({
@@ -25,7 +26,8 @@ export function DropStage({
   const [over, setOver] = useState(false);
   const [url, setUrl] = useState("");
   const [intakeError, setIntakeError] = useState<string | null>(null);
-  const { start, cancel, status, error, running, elapsed, partial } = analyze;
+  const { start, proceed, cancel, status, error, running, elapsed, partial, recommendation } =
+    analyze;
 
   const begin = (repo: string) => {
     setIntakeError(null);
@@ -63,8 +65,10 @@ export function DropStage({
   };
 
   return (
-    <main className={`sh-ws__stage${map ? " is-map" : ""}`}>
-      {map ? (
+    <main className={`sh-ws__stage${map && !recommendation ? " is-map" : ""}`}>
+      {recommendation ? (
+        <ModelGate recommendation={recommendation} onContinue={proceed} onCancel={cancel} />
+      ) : map ? (
         <>
           <MapStage map={map} selectedIds={selectedIds} onSelect={onSelect} onElements={onElements} />
           {running && (
