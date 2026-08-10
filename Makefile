@@ -1,4 +1,6 @@
-.PHONY: run-analyzer run-server run-llm run-web build-web dev dev-api up down up-llm test test-fixtures test-go test-py lint fmt-go venv venv-local
+.PHONY: run-analyzer run-server run-llm run-web build-web dev dev-api up down up-llm \
+	test test-fixtures sync-fixtures test-go test-py test-web test-integration \
+	lint lint-go lint-web check fmt-go venv venv-local
 
 # One-command local stack (host processes, hot reload):
 #   make venv-local   # once
@@ -11,6 +13,11 @@
 #   make up                # api + analyzer (hosted LLM via .env)
 #   make up-llm            # same + local HF llm profile
 #   make down
+#
+# Verification:
+#   make check            # fixtures + Go/Python/web tests + lint
+#   make test             # fixtures + Go/Python/web tests (no lint)
+#   make test-integration # opt-in live GitHub + live LLM (needs env + services)
 
 VENV := analyzer/.venv
 GOIMPORTS := $(shell go env GOPATH)/bin/goimports
@@ -53,15 +60,27 @@ up-llm:
 down:
 	docker compose down
 
-test: test-fixtures test-go test-py
+# Fast suite: fixtures + every language's default tests.
+test: test-fixtures test-go test-py test-web
 
-# web/src/data/memos.map.json is a hand-copy of the golden map with no
-# regeneration path, so nothing but this stops the two drifting apart.
+# Full gate used by CI and local "am I green?" runs.
+check: test lint
+
+# Canonical golden: case-studies/memos.map.json.
+# Web ships a copy under web/src/data/ for the Vite bundle.
+sync-fixtures:
+	./scripts/sync-fixtures.sh
+
 test-fixtures:
-	diff -q case-studies/memos.map.json web/src/data/memos.map.json
+	./scripts/sync-fixtures.sh --check
 
-lint:
-	golangci-lint run
+lint: lint-go lint-web
+
+lint-go:
+	PATH="$(shell go env GOPATH)/bin:$$PATH" golangci-lint run
+
+lint-web:
+	cd web && npm install && npm run lint
 
 fmt-go:
 	gofmt -w $$(find . -name '*.go' -not -path './analyzer/*')
@@ -72,3 +91,11 @@ test-go:
 
 test-py:
 	cd analyzer && .venv/bin/python -m pytest -q -m 'not slow'
+
+test-web:
+	cd web && npm install && npm test
+
+# Opt-in live suites. Accepts TERRA_INTEGRATION=1, or the legacy
+# TERRA_LIVE / TERRA_SLOW knobs (see README).
+test-integration:
+	./scripts/test-integration.sh

@@ -119,6 +119,9 @@ Supports `package.json` frontends only; runfile/Go-only repos need `make dev`
 | `make up` | Docker Compose: build/start api + analyzer (detached) |
 | `make up-llm` | Same as `make up` with local HF `llm` profile |
 | `make down` | Docker Compose: stop and remove containers |
+| `make check` | Fixtures + Go/Python/web tests + lint (CI entry point) |
+| `make test` | Fixtures + Go/Python/web tests |
+| `make sync-fixtures` | Copy `case-studies/memos.map.json` → `web/src/data/` |
 | `terra scan <url>` | Clone + deterministic scan, JSON to stdout |
 | `terra map <url>` | Scan, ask the analyzer for a map, store in `terra.db` |
 | `terra serve` | HTTP API: `POST /jobs/probe`, `POST /jobs/analyze`, `GET /models`, `GET /host/capabilities`, `GET /analyses`, `POST /preview`, `POST /ask`, `GET /files` |
@@ -206,11 +209,24 @@ Local model sidecar (`make run-llm`, port 8020):
 ## Tests
 
 ```sh
-make test        # go test ./... + pytest (skips @pytest.mark.slow)
+make check              # fixtures + Go + Python + web + lint (CI entry point)
+make test               # fixtures + Go + Python + web (no lint)
+make test-integration   # opt-in live suites (needs TERRA_INTEGRATION=1)
+make sync-fixtures      # copy case-studies/memos.map.json → web/src/data/
 ```
+
+| Suite | Location | Default command |
+|---|---|---|
+| Go unit/integration | `internal/*/*_test.go` (colocated) | `make test-go` |
+| Python | `analyzer/tests/` | `make test-py` (excludes `@pytest.mark.slow`) |
+| Web logic | `web/src/**/*.test.ts` | `make test-web` (`node --test`) |
+| Web components | `web/src/**/*.test.tsx` | part of `make test-web` (vitest) |
+| Fixture sync | `case-studies/` ↔ `web/src/data/` | `make test-fixtures` |
+| Live GitHub | `internal/scan/live_test.go` | `TERRA_INTEGRATION=1 make test-integration` |
+| Live LLM | `analyzer/tests/test_slow_llm.py` | same (`TERRA_SLOW=1` still works alone) |
 
 The wire contract between Go and Python is the draft JSON in
 `analyzer/terra_analyzer/models.py` mirrored by `internal/graph/types.go`;
 the enums and model JSON schema live only in `analyzer/terra_analyzer/schema.py`.
 `case-studies/memos.map.json` is the golden answer key and is checked by
-`analyzer/tests/test_app.py`.
+`analyzer/tests/test_app.py` and `internal/graph/contract_test.go`.

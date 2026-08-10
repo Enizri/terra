@@ -4,31 +4,14 @@ import { motion, useReducedMotion } from "motion/react";
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { rise, spring } from "../motion";
 import TechIcon from "./TechIcon";
+import type { DiagramEdgeView, DiagramGroupView, DiagramNodeView } from "./diagramViews";
 
-export type DiagramKind = "frontend" | "backend" | "data" | "service";
-
-export type DiagramNodeView = {
-  id: string;
-  label: string;
-  purpose: string;
-  hint: string;
-  kind: DiagramKind;
-  /** Flow column: 0 entry, 1 work, 2 storage. */
-  col: 0 | 1 | 2;
-  row: number;
-  group?: string;
-  tech?: string[];
-};
-
-export type DiagramEdgeView = {
-  from: string;
-  to: string;
-  label?: string;
-  /** Right→left edge: route forwards, reverse arrowhead. */
-  back?: boolean;
-};
-
-export type DiagramGroupView = { id: string; title: string; hint: string; col: number };
+export type {
+  DiagramEdgeView,
+  DiagramGroupView,
+  DiagramKind,
+  DiagramNodeView,
+} from "./diagramViews";
 
 const colDelay = (col: number) => 0.15 + col * 0.4;
 const nodeDelay = (n: DiagramNodeView) => colDelay(n.col) + 0.1 + n.row * 0.08;

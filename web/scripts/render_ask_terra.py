@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
-"""Bake Screen Studio timeline speed + cursor into ask-terra.mp4."""
+"""Bake Screen Studio timeline speed + cursor into ask-terra.mp4.
+
+Paths are required CLI args — this script is local tooling, not part of the
+product build. Example:
+
+  python scripts/render_ask_terra.py \\
+    --project ~/Screen\\ Studio\\ Projects/Area\\ ….screenstudio \\
+    --out public/videos/landing/ask-terra.mp4
+"""
 
 from __future__ import annotations
 
+import argparse
 import json
 import subprocess
 import tempfile
 from pathlib import Path
 
 from PIL import Image
-
-PROJECT = Path(
-    "/Users/user/Screen Studio Projects/Area 2026-08-04 17:33:41.screenstudio"
-)
-REC = PROJECT / "recording"
-SRC = REC / "channel-1-display-0.mp4"
-OUT = Path(
-    "/Users/user/projects/Terra/web/public/videos/landing/ask-terra.mp4"
-)
 
 VW, VH = 2330, 1390
 OX, OY = 2500.0, 323.0
@@ -33,12 +33,52 @@ def src_sec(ms: float) -> float:
 
 
 def main() -> None:
-    project = json.loads((PROJECT / "project.json").read_text())["json"]
+    here = Path(__file__).resolve().parent
+    default_out = here.parent / "public" / "videos" / "landing" / "ask-terra.mp4"
+    parser = argparse.ArgumentParser(
+        description="Bake Screen Studio recording into ask-terra.mp4"
+    )
+    parser.add_argument(
+        "--project",
+        type=Path,
+        required=True,
+        help="Path to the .screenstudio project directory",
+    )
+    parser.add_argument(
+        "--out",
+        type=Path,
+        default=default_out,
+        help=f"Output mp4 (default: {default_out})",
+    )
+    parser.add_argument(
+        "--source",
+        type=Path,
+        default=None,
+        help="Source display mp4 inside the project (default: recording/channel-1-display-0.mp4)",
+    )
+    args = parser.parse_args()
+
+    project_dir: Path = args.project.expanduser().resolve()
+    rec = project_dir / "recording"
+    src = (
+        args.source.expanduser().resolve()
+        if args.source
+        else rec / "channel-1-display-0.mp4"
+    )
+    out: Path = args.out.expanduser().resolve()
+    out.parent.mkdir(parents=True, exist_ok=True)
+
+    if not project_dir.is_dir():
+        raise SystemExit(f"--project not a directory: {project_dir}")
+    if not src.is_file():
+        raise SystemExit(f"source mp4 missing: {src}")
+
+    project = json.loads((project_dir / "project.json").read_text())["json"]
     scene = project["scenes"][0]
     slices = scene["slices"]
-    moves = json.loads((REC / "mousemoves-0.json").read_text())
+    moves = json.loads((rec / "mousemoves-0.json").read_text())
     cursors_meta = {
-        c["id"]: c for c in json.loads((REC / "cursors.json").read_text())
+        c["id"]: c for c in json.loads((rec / "cursors.json").read_text())
     }
     zoom_ranges = [
         z for z in scene.get("zoomRanges", []) if not z.get("isDisabled")
@@ -71,7 +111,7 @@ def main() -> None:
             "-v",
             "error",
             "-i",
-            str(SRC),
+            str(src),
             "-filter_complex",
             speed_filter,
             "-map",
@@ -136,7 +176,7 @@ def main() -> None:
         # Preload cursors
         cursor_imgs: dict[str, dict] = {}
         for cid, info in cursors_meta.items():
-            png = REC / "cursors" / f"{cid}.png"
+            png = rec / "cursors" / f"{cid}.png"
             if not png.exists():
                 continue
             im = Image.open(png).convert("RGBA")
@@ -235,7 +275,7 @@ def main() -> None:
                 "fast",
                 "-movflags",
                 "+faststart",
-                str(OUT),
+                str(out),
             ],
             stdin=subprocess.PIPE,
         )
@@ -281,7 +321,7 @@ def main() -> None:
         rc = enc.wait()
         if rc != 0:
             raise SystemExit(f"encode failed: {rc}")
-        print("wrote", OUT, OUT.stat().st_size, flush=True)
+        print("wrote", out, out.stat().st_size, flush=True)
 
 
 if __name__ == "__main__":

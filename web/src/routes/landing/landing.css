@@ -3384,7 +3384,7 @@
   will-change: transform;
 }
 
-/* Pin the desktop layout: workspace.css media queries key off the viewport,
+/* Pin the desktop layout: shell.css media queries key off the viewport,
    not this scaled box, and the grid must fill the logical frame, not 100dvh.
    Rail and dock run narrower than the real workspace's 240/380: the film is
    watched from across a room, and every px taken off the chrome is a px the

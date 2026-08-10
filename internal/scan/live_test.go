@@ -6,10 +6,13 @@ import (
 	"testing"
 )
 
-// Live network test, opt-in: TERRA_LIVE=1 go test -run TestLiveCheckout ./internal/scan/
+// Live network test, opt-in:
+//
+//	TERRA_INTEGRATION=1 go test -run TestLiveCheckout ./internal/scan/
+//	TERRA_LIVE=1         (legacy alias)
 func TestLiveCheckoutNoGit(t *testing.T) {
-	if os.Getenv("TERRA_LIVE") != "1" {
-		t.Skip("set TERRA_LIVE=1 for live GitHub checkout test")
+	if os.Getenv("TERRA_INTEGRATION") != "1" && os.Getenv("TERRA_LIVE") != "1" {
+		t.Skip("set TERRA_INTEGRATION=1 (or TERRA_LIVE=1) for live GitHub checkout test")
 	}
 	dir, err := Checkout("", "github.com/octocat/Hello-World")
 	if err != nil {

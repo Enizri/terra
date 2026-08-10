@@ -85,7 +85,8 @@ func Publish(span Span) {
 			break
 		}
 	}
-	ring := append(recent[span.Repo], span)
+	ring := recent[span.Repo]
+	ring = append(ring, span)
 	if len(ring) > keep {
 		ring = ring[len(ring)-keep:]
 	}

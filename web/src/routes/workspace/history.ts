@@ -1,7 +1,7 @@
 import type { AnalysisSummary } from "../../shared/api";
-import type { HistoryEntry } from "../../shared/workspace/Sidebar";
+import type { HistoryEntry } from "../../shared/shell/types";
 
-export type { HistoryEntry } from "../../shared/workspace/Sidebar";
+export type { HistoryEntry } from "../../shared/shell/types";
 
 export const HISTORY_CAP = 8;
 

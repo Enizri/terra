@@ -38,16 +38,18 @@ this list:
 | Package | Does | Imports |
 |---|---|---|
 | `cmd/terra` | CLI: `scan`, `map`, `serve` | all of the below |
-| `internal/server` | HTTP API — `/analyze`, `/analyses`, `/preview`, `/ask`, `/files` | graph, preview, scan, store |
+| `internal/server` | HTTP API — jobs, analyses, preview, ask, files, models | graph, preview, store, job, catalog, recommend, llmlocal, config, … |
 | `internal/store` | SQLite persistence keyed by repo URL | graph, scan |
-| `internal/preview` | Clone a repo, boot its dev server, reverse-proxy it with `select.js` injected | scan |
+| `internal/preview` | Clone a repo, boot its dev server, reverse-proxy it with `select.js` injected | scan, runfile, trace |
 | `internal/graph` | Wire types + the HTTP client to the analyzer | scan |
+| `internal/catalog` | Static model allowlist + host capability helpers | nothing domain-specific |
+| `internal/config` | Parses every `TERRA_*` env var once at startup | nothing |
 | `internal/scan` | Tarball ingest (SHA-keyed, no git), languages, dependency manifests | nothing |
 
 Rules:
 
 - **No `internal` package imports `server`** — only `cmd/*` does. It is the top
-  of the stack.
+  of the stack. Enforced by `.golangci.yaml` depguard.
 - **`internal/scan` stays dependency-free.** It is the leaf every other package
   is allowed to build on.
 - Product-specific behavior belongs at the top (`cmd/`, `internal/server`);
@@ -65,15 +67,15 @@ terra_analyzer/
   models.py           Pydantic mirrors of the Go wire types
   validate.py         normalize / repair / build a retry message
   inference/          the OpenAI-compatible client and its config
-  local_server/       an optional Transformers-backed /v1 server (:8020)
+  local_server/       an optional GGUF-backed /v1 server (:8020)
 ```
 
 `local_server` is behind the optional `[local]` extra and nothing else in the
 package imports it — it is a separate process, not a dependency.
 
-Do **not** relocate `analyzer/`: `analyzer/tests/test_app.py` reaches
-`../../case-studies` by relative path and is `skipif`-guarded, so a move makes
-the golden-dataset test skip silently instead of failing.
+Do **not** relocate `analyzer/` casually: `analyzer/tests/test_app.py` resolves
+`../../case-studies` by relative path. The golden test now **fails hard** if that
+fixture is missing (it used to `skipif`, which hid broken layouts).
 
 ## Web — `web/src`
 
@@ -88,9 +90,14 @@ routes/
               nothing else; sections/* are the four panes, selection.ts is the
               pick maths, slug.ts is imported by the router alone so minting a
               session id never pulls the route in
-shared/       api.ts, live.tsx, motion.ts, map/, markdown, fileTree, ndjson,
-              styles/{tokens,ui}.css
-data/         committed fixtures
+shared/       api.ts, live.tsx, motion.ts, map/, shell/, markdown, fileTree,
+              ndjson, styles/{tokens,ui,global}.css
+  shell/      workspace chrome reused by landing hero + product workspace
+              (CSS classes stay `.sh-ws__*`; folder name is shell because both
+              routes own it)
+  map/        wire types, diagramViews (view-model), RepoDiagram renderer,
+              toDiagram layout
+data/         committed fixtures (synced from case-studies/)
 ```
 
 Rules:
@@ -114,6 +121,34 @@ Rules:
   that `landing.css` still reads.
 - No path aliases. `npm test` runs `node --test` directly over `.ts` files with
   explicit extensions, and it does not resolve tsconfig `paths`.
+- Import rules are enforced by `web/src/boundaries.test.ts`.
+
+## Fixtures and contracts
+
+- **Canonical golden map:** `case-studies/memos.map.json`.
+- **Web bundle copy:** `web/src/data/memos.map.json`, produced by
+  `make sync-fixtures` (`scripts/sync-fixtures.sh`). `make test-fixtures`
+  fails if they differ.
+- **Scan micro-fixtures** for Go unit tests live under `internal/scan/testdata/`
+  and are independent of the memos case study.
+- Do not commit `*.generated.json` under `case-studies/` — those are scratch
+  LLM outputs, not golden inputs.
+
+## Verification
+
+| Command | What it runs |
+|---|---|
+| `make test` | fixtures + Go + Python (not slow) + web |
+| `make lint` | golangci-lint + `web` oxlint |
+| `make check` | `test` + `lint` (CI entry point) |
+| `make test-integration` | live GitHub + live LLM when `TERRA_INTEGRATION=1` |
+
+Tests stay language-native: Go `*_test.go` colocated, Python under
+`analyzer/tests/`, web `*.test.ts(x)` colocated. Do not invent a root `tests/`
+tree for unit tests.
+
+Web dual runners (intentional): pure-logic `*.test.ts` on `node --test`;
+DOM `*.test.tsx` on vitest/jsdom.
 
 ## Adding a new product
 
@@ -145,9 +180,6 @@ is cheaper to fix when there is a real second case than to generalize now.
 - **`internal/store` is typed to `graph.Map`,** so it is Terra's schema rather
   than a generic store, and it has **no migrations** — the schema is re-created
   on open and the documented fix for a shape change is deleting `terra.db`.
-- **No config, logging or error-type layer in Go.** Four env vars are read at
-  their point of use and errors are `fmt.Errorf` strings. Fine at this size;
+- **No shared logging or error-type layer in Go.** `internal/config` centralizes
+  `TERRA_*` parsing; errors remain `fmt.Errorf` strings. Fine at this size;
   revisit when a second binary needs the same wiring.
-- **`web/src/data/memos.map.json` is a hand-copy** of
-  `case-studies/memos.map.json` with no regeneration path. `make test` diffs
-  them so the copies cannot drift apart unnoticed.

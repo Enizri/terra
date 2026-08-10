@@ -16,7 +16,7 @@ import HeroBackdrop from "../HeroBackdrop";
 import { rise, stagger } from "../../../shared/motion";
 import { copy, users } from "../data";
 import { ComponentTile, MacPointer, PENCIL_INK, WindowChrome } from "../primitives";
-import { WsDropCard } from "../../../shared/workspace/DropCard";
+import { WsDropCard } from "../../../shared/shell/DropCard";
 import { HeroScriptedDemo } from "./HeroDemo";
 
 /** Lerp follower for scroll-driven flight; RAF only while catching up. */

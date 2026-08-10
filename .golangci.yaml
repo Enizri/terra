@@ -32,27 +32,32 @@ linters:
         - -ST1003
         - -ST1021
     revive:
-      enable-all-rules: true
+      # Curated defaults — enable-all-rules floods this repo with style nits
+      # (add-constant, use-slices-sort, …) that aren't part of the layering
+      # contract. depguard above is the architectural guard.
       rules:
-        - name: file-header
-          disabled: true
-        - name: line-length-limit
-          disabled: true
-        - name: function-length
-          disabled: true
-        - name: max-public-structs
-          disabled: true
-        - name: function-result-limit
-          disabled: true
-        - name: argument-limit
-          disabled: true
-        - name: cognitive-complexity
-          disabled: true
-        - name: cyclomatic
-          disabled: true
-        - name: exported
-          disabled: true
+        - name: blank-imports
+        - name: context-keys-type
+        - name: dot-imports
+        - name: error-return
+        - name: error-strings
+        - name: error-naming
+        - name: if-return
+        - name: increment-decrement
+        - name: var-declaration
         - name: package-comments
+          disabled: true
+        - name: range
+        - name: receiver-naming
+        - name: time-naming
+        - name: unexported-return
+        - name: indent-error-flow
+        - name: errorf
+        - name: empty-block
+        - name: superfluous-else
+        - name: unreachable-code
+        - name: redefines-builtin-id
+        - name: exported
           disabled: true
     govet:
       enable-all: true

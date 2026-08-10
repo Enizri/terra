@@ -8,13 +8,13 @@ import { wsCache } from "./cache";
 import { useAnalyze } from "./useAnalyze";
 import { nextSelection } from "./selection";
 import { toHistory, type HistoryEntry } from "./history";
-import { WorkspaceHeader } from "../../shared/workspace/WorkspaceHeader";
-import { Sidebar } from "../../shared/workspace/Sidebar";
+import { WorkspaceHeader } from "../../shared/shell/WorkspaceHeader";
+import { Sidebar } from "../../shared/shell/Sidebar";
 import { DropStage } from "./sections/Stage";
 import { AgentDock } from "./sections/AgentDock";
 import "../../shared/styles/tokens.css";
 import "../../shared/styles/ui.css";
-import "../../shared/workspace/workspace.css";
+import "../../shared/shell/shell.css";
 
 /** Workspace: analysis run, selection, and the mapped tab. */
 export default function Workspace() {
