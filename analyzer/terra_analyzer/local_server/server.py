@@ -26,9 +26,9 @@ MAX_OUTPUT_TOKENS = 4096
 # against the prompt budgets in prompts/architecture.py: 8.1k tokens for a
 # maxed-out prompt, and a strict retry re-sends the rejected answer (up to
 # MAX_OUTPUT_TOKENS) plus a correction before asking for another one —
-# 8.1k + 4k + 4k ≈ 16.5k. The KV cache at this size, not the weights, is what
-# the host pays for beyond the file: roughly 1.4 GB on a 7B.
-N_CTX = int(os.environ.get("TERRA_N_CTX") or 24576)
+# 8.1k + 4k + 4k ≈ 16.5k. Default sits just above that; a bigger window
+# mostly grows the KV cache and the heat, not map quality.
+N_CTX = int(os.environ.get("TERRA_N_CTX") or 18432)
 
 # Threads for inference. llama.cpp otherwise takes every core it can see —
 # n_threads_batch defaults to the full count — which pins the whole machine
@@ -37,6 +37,12 @@ N_CTX = int(os.environ.get("TERRA_N_CTX") or 24576)
 N_THREADS = int(os.environ.get("TERRA_N_THREADS") or 0) or max(
     1, (os.cpu_count() or 4) // 2
 )
+
+# Partial GPU offload sweet spot. Catalog models are ~24–36 layers; putting
+# roughly half on the accelerator is still much faster than CPU-only without
+# pinning Metal/CUDA the way n_gpu_layers=-1 does on a laptop. Set
+# TERRA_N_GPU_LAYERS=-1 for max speed on a cooled workstation, or 0 for CPU.
+_DEFAULT_GPU_LAYERS = 16
 
 
 class _State:
@@ -91,6 +97,20 @@ def pick_device(requested: str = "") -> str:
     return "cpu"
 
 
+def n_gpu_layers_for(device: str) -> int:
+    """How many transformer layers to put on the accelerator.
+
+    0 = CPU only, -1 = every layer (fastest, hottest). The default is a
+    laptop-safe partial offload when an accelerator is available.
+    """
+    raw = os.environ.get("TERRA_N_GPU_LAYERS")
+    if raw is not None and str(raw).strip() != "":
+        return int(raw)
+    if device in ("mps", "metal", "cuda"):
+        return _DEFAULT_GPU_LAYERS
+    return 0
+
+
 def _split_model_id(model_id: str) -> tuple[str, str]:
     """"org/repo/file.gguf" -> ("org/repo", "file.gguf")."""
     repo, _, filename = model_id.rpartition("/")
@@ -117,6 +137,7 @@ def load_model(model_id: str = "", device: str = "", gen: int | None = None) -> 
     model_id = model_id or os.environ.get("TERRA_MODEL") or DEFAULT_MODEL
     repo, filename = _split_model_id(model_id)
     device = pick_device(device)
+    layers = n_gpu_layers_for(device)
 
     # Download and load are separate on purpose: the download is the long
     # part, and finishing it is what makes a cancel worth checking for.
@@ -125,12 +146,12 @@ def load_model(model_id: str = "", device: str = "", gen: int | None = None) -> 
         return False
 
     # A quantized GGUF is mmapped, so nothing here allocates a second copy of
-    # the weights the way a safetensors load did. n_gpu_layers=-1 offloads
-    # every layer; on CPU llama.cpp runs the same file without one.
+    # the weights the way a safetensors load did. Partial offload (default)
+    # keeps laptops usable; TERRA_N_GPU_LAYERS=-1 restores full GPU speed.
     model = Llama(
         model_path=path,
         n_ctx=N_CTX,
-        n_gpu_layers=-1 if device in ("mps", "metal", "cuda") else 0,
+        n_gpu_layers=layers,
         n_threads=N_THREADS,
         n_threads_batch=N_THREADS,
         verbose=False,

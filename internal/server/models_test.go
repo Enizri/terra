@@ -70,6 +70,29 @@ func TestEnqueueAnalyzeRejectsBadModelSelections(t *testing.T) {
 	}
 }
 
+func TestEnqueueAnalyzeRejectsLocalModelHostCannotRun(t *testing.T) {
+	// Quality-tier local weights are ineligible on CPU-only hosts — same rule
+	// the ModelGate disables in the UI.
+	t.Setenv("TERRA_DEVICE", "cpu")
+	_, ts := testServer(t)
+	body := `{"repo_url":"https://github.com/acme/notes","model_id":"local-qwen2.5-7b"}`
+	resp, err := http.Post(ts.URL+"/jobs/analyze", "application/json", strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", resp.StatusCode)
+	}
+	var got map[string]string
+	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(got["error"], "cannot run here") {
+		t.Errorf("error = %q, want cannot-run hint", got["error"])
+	}
+}
+
 func TestAnalyzeWithoutAModelIDKeepsTheEnvFallback(t *testing.T) {
 	s, ts := testServer(t)
 	var got graph.LLMOpts
