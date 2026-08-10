@@ -3,9 +3,9 @@ import type { TerraMap } from "../../../shared/map/types";
 import type { LiveSelection } from "../../../shared/live";
 import type { useAnalyze } from "../useAnalyze";
 import { extractGitHubURL, githubURLFromDataTransfer } from "../githubUrl";
-import { ArrowIcon } from "../../../shared/workspace/icons";
-import { StatusLine } from "../../../shared/workspace/StatusLine";
-import { WsDropCard } from "../../../shared/workspace/DropCard";
+import { ArrowIcon } from "../../../shared/shell/icons";
+import { StatusLine } from "../../../shared/shell/StatusLine";
+import { WsDropCard } from "../../../shared/shell/DropCard";
 import { MapStage } from "./MapStage";
 import { ModelGate } from "./ModelGate";
 

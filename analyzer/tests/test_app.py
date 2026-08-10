@@ -113,14 +113,17 @@ def test_analyze_rejects_garbage():
     assert client.post("/analyze", json={"scan": "nope"}).status_code == 422
 
 
-@pytest.mark.skipif(not (CASE_STUDIES / "memos.map.json").exists(),
-                    reason="golden dataset not present")
 def test_golden_answer_key_passes_validation():
     """The hand-curated answer key must be structurally clean: unique ids,
     resolvable parents, connected top-level components. memos.scan.json
     predates the files/dirs fields, so path claims are checked against the
     key's own citations."""
-    map_data = json.loads((CASE_STUDIES / "memos.map.json").read_text())
+    golden = CASE_STUDIES / "memos.map.json"
+    assert golden.is_file(), (
+        f"canonical golden fixture missing: {golden} "
+        "(do not relocate analyzer/ without updating CASE_STUDIES)"
+    )
+    map_data = json.loads(golden.read_text())
     draft = Draft.model_validate({
         "description": map_data["project"]["description"],
         "kind": map_data["project"]["kind"],

@@ -1,6 +1,6 @@
 // Shape /analyze results for the three-column flow renderer (truncate to fit).
 
-import type { DiagramEdgeView, DiagramGroupView, DiagramKind, DiagramNodeView } from "./RepoDiagram";
+import type { DiagramEdgeView, DiagramGroupView, DiagramKind, DiagramNodeView } from "./diagramViews";
 import type { Component, TerraMap } from "./types";
 
 /** Column: frontend | work | storage. */

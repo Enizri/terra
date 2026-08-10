@@ -58,7 +58,7 @@ func (r *dockerRunner) Start(repoURL string) (string, error) {
 	for {
 		r.mu.Lock()
 		ttl := r.cfg.PreviewTTL
-		max := r.cfg.PreviewMax
+		limit := r.cfg.PreviewMax
 		cfg := r.cfg
 
 		if inst, ok := r.byRepo[key]; ok {
@@ -94,10 +94,10 @@ func (r *dockerRunner) Start(repoURL string) (string, error) {
 		}
 
 		inflight := len(r.byRepo) + len(r.boots)
-		if max >= 0 && inflight >= max {
-			fmt.Fprintf(os.Stderr, "preview: rejected %s, capacity full (%d/%d)\n", key, len(r.byRepo), max)
+		if limit >= 0 && inflight >= limit {
+			fmt.Fprintf(os.Stderr, "preview: rejected %s, capacity full (%d/%d)\n", key, len(r.byRepo), limit)
 			r.mu.Unlock()
-			return "", fmt.Errorf("preview capacity full (%d concurrent); stop another preview or raise TERRA_PREVIEW_MAX", max)
+			return "", fmt.Errorf("preview capacity full (%d concurrent); stop another preview or raise TERRA_PREVIEW_MAX", limit)
 		}
 		if r.boots == nil {
 			r.boots = map[string]chan struct{}{}
@@ -106,13 +106,13 @@ func (r *dockerRunner) Start(repoURL string) (string, error) {
 		r.boots[key] = ch
 		r.mu.Unlock()
 
-		url, err := r.runBoot(key, cfg, ttl, max, ch)
+		url, err := r.runBoot(key, cfg, ttl, limit, ch)
 		return url, err
 	}
 }
 
 // runBoot runs the heavy docker work outside the mutex and always clears boots.
-func (r *dockerRunner) runBoot(key string, cfg *config.Config, ttl time.Duration, max int, ch chan struct{}) (url string, err error) {
+func (r *dockerRunner) runBoot(key string, cfg *config.Config, ttl time.Duration, limit int, ch chan struct{}) (url string, err error) {
 	var inst *dockerInstance
 	defer func() {
 		if rec := recover(); rec != nil {
@@ -124,7 +124,7 @@ func (r *dockerRunner) runBoot(key string, cfg *config.Config, ttl time.Duration
 			r.resetTTLLocked(key, inst, ttl)
 			r.byRepo[key] = inst
 			fmt.Fprintf(os.Stderr, "preview: started %s at %s (ttl %s, %d/%d slots)\n",
-				inst.containerName, inst.publicURL, ttl, len(r.byRepo), max)
+				inst.containerName, inst.publicURL, ttl, len(r.byRepo), limit)
 		} else {
 			if inst != nil {
 				r.stopLocked(inst)

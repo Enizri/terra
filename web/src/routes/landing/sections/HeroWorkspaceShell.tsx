@@ -7,10 +7,10 @@ import { useImperativeHandle, useLayoutEffect, useRef, useState, type Ref } from
 import memosFixture from "../../../data/memos.map.json";
 import type { TerraMap } from "../../../shared/map/types";
 import RepoDiagram from "../../../shared/map/RepoDiagram";
-import { WorkspaceHeader } from "../../../shared/workspace/WorkspaceHeader";
-import { Sidebar } from "../../../shared/workspace/Sidebar";
-import { StatusLine } from "../../../shared/workspace/StatusLine";
-import "../../../shared/workspace/workspace.css";
+import { WorkspaceHeader } from "../../../shared/shell/WorkspaceHeader";
+import { Sidebar } from "../../../shared/shell/Sidebar";
+import { StatusLine } from "../../../shared/shell/StatusLine";
+import "../../../shared/shell/shell.css";
 import {
   TerraChatDock,
   TheaterPanel,

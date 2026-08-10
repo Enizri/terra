@@ -1,6 +1,6 @@
 /** Tech tile for a diagram card; unknown tech falls back to kind-tinted initial. */
 
-import type { DiagramKind } from "./RepoDiagram";
+import type { DiagramKind } from "./diagramViews";
 
 type Spec = { bg: string; fg: string; text: string };
 

@@ -316,7 +316,10 @@ func TestAnalyzeStreamsFailureAsEvent(t *testing.T) {
 
 	var ev struct{ Stage, Label string }
 	dec := json.NewDecoder(resp.Body)
-	for dec.Decode(&ev) == nil && ev.Stage != "error" {
+	for {
+		if err := dec.Decode(&ev); err != nil || ev.Stage == "error" {
+			break
+		}
 	}
 	if ev.Stage != "error" || !strings.Contains(ev.Label, "analyzer") {
 		t.Errorf("last event = %+v", ev)
@@ -764,7 +767,7 @@ func getJSON(t *testing.T, url string, v any) {
 // is joined onto the checkout root.
 func TestSafeJoinContainsEveryPath(t *testing.T) {
 	base := t.TempDir()
-	real, err := filepath.EvalSymlinks(base)
+	realBase, err := filepath.EvalSymlinks(base)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -779,8 +782,8 @@ func TestSafeJoinContainsEveryPath(t *testing.T) {
 		if strings.Contains(clean, "..") {
 			t.Errorf("safeJoin(%q) kept a traversal segment: %q", p, clean)
 		}
-		if full != real && !strings.HasPrefix(full, real+string(filepath.Separator)) {
-			t.Errorf("safeJoin(%q) = %q — escapes %q", p, full, real)
+		if full != realBase && !strings.HasPrefix(full, realBase+string(filepath.Separator)) {
+			t.Errorf("safeJoin(%q) = %q — escapes %q", p, full, realBase)
 		}
 	}
 

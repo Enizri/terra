@@ -1,6 +1,6 @@
 """Optional integration test against a running local HF OpenAI-compatible server.
 
-Skipped unless TERRA_SLOW=1 and the server is reachable.
+Skipped unless TERRA_INTEGRATION=1 or TERRA_SLOW=1 and the server is reachable.
 """
 
 import os
@@ -16,8 +16,8 @@ pytestmark = pytest.mark.slow
 
 @pytest.fixture
 def live_cfg():
-    if os.environ.get("TERRA_SLOW") != "1":
-        pytest.skip("set TERRA_SLOW=1 to run against a live local LLM")
+    if os.environ.get("TERRA_INTEGRATION") != "1" and os.environ.get("TERRA_SLOW") != "1":
+        pytest.skip("set TERRA_INTEGRATION=1 (or TERRA_SLOW=1) to run against a live local LLM")
     base = os.environ.get("TERRA_LLM_URL", "http://localhost:8020/v1")
     cfg = Config(base_url=base, client=httpx.Client(timeout=120))
     try:
