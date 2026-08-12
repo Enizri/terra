@@ -218,7 +218,7 @@ export const copy = {
     tail: "can understand",
   },
   heroSubtitle:
-    "Terra clones your repository, scans it, and returns the components, how they connect, and the code that proves it.",
+    "Terra maps your repo, then runs it in the cloud so you can change the live software — no local setup.",
   powerTitle: "The power of Terra",
   power:
     "One map of your repo. Select any component, chat with it, and the change lands on the fly — no cloning, no local setup. Ask questions, implement with Terra in the loop, and monitor what the architecture says is alive.",
