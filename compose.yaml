@@ -20,7 +20,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: Dockerfile.api
+      dockerfile: docker/api.Dockerfile
     ports:
       - "127.0.0.1:8080:8080"
     env_file:
@@ -66,7 +66,7 @@ services:
   analyzer:
     build:
       context: .
-      dockerfile: Dockerfile.analyzer
+      dockerfile: docker/analyzer.Dockerfile
     env_file:
       - path: .env
         required: false
@@ -95,7 +95,7 @@ services:
     profiles: [llm]
     build:
       context: .
-      dockerfile: Dockerfile.llm
+      dockerfile: docker/llm.Dockerfile
     env_file:
       - path: .env
         required: false
