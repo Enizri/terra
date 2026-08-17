@@ -32,14 +32,14 @@ fi
 
 if ((want_live == 1)); then
   echo "integration: Go live checkout (TERRA_LIVE)"
-  TERRA_LIVE=1 go test -run TestLiveCheckout ./internal/scan/
+  (cd backend/api && TERRA_LIVE=1 go test -run TestLiveCheckout ./internal/scan/)
 fi
 
 if ((want_slow == 1)); then
-  if [[ ! -x analyzer/.venv/bin/python ]]; then
-    echo "analyzer/.venv missing; run: make venv" >&2
+  if [[ ! -x backend/.venv/bin/python ]]; then
+    echo "backend/.venv missing; run: make venv" >&2
     exit 1
   fi
   echo "integration: Python live LLM (TERRA_SLOW)"
-  cd analyzer && TERRA_SLOW=1 .venv/bin/python -m pytest -q tests/test_slow_llm.py
+  cd backend/analyzer && TERRA_SLOW=1 ../.venv/bin/python -m pytest -q tests/test_slow_llm.py
 fi

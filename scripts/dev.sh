@@ -25,8 +25,8 @@ if [[ ! -f "$PROCFILE" ]]; then
   exit 1
 fi
 
-if [[ ! -x analyzer/.venv/bin/uvicorn ]]; then
-  echo "analyzer/.venv is missing; run: make venv-local" >&2
+if [[ ! -x backend/.venv/bin/python ]]; then
+  echo "backend/.venv is missing; run: make venv-local" >&2
   exit 1
 fi
 

@@ -12,9 +12,9 @@ import json, sys
 from pathlib import Path
 
 fixtures = {
-    "contracts/fixtures/analysis-map.v1.json": "contracts/analysis-map/v1.schema.json",
-    "contracts/fixtures/analyzer-request.v1.json": "contracts/analyzer/v1/request.schema.json",
-    "contracts/fixtures/analyzer-response.v1.json": "contracts/analyzer/v1/response.schema.json",
+    "packages/contracts/fixtures/analysis-map.v1.json": "packages/contracts/analysis-map/v1.schema.json",
+    "packages/contracts/fixtures/analyzer-request.v1.json": "packages/contracts/analyzer/v1/request.schema.json",
+    "packages/contracts/fixtures/analyzer-response.v1.json": "packages/contracts/analyzer/v1/response.schema.json",
 }
 
 try:
@@ -48,9 +48,9 @@ def structural_resp(doc):
             raise SystemExit(f"draft missing {k}")
 
 checks = {
-    "contracts/fixtures/analysis-map.v1.json": structural_map,
-    "contracts/fixtures/analyzer-request.v1.json": structural_req,
-    "contracts/fixtures/analyzer-response.v1.json": structural_resp,
+    "packages/contracts/fixtures/analysis-map.v1.json": structural_map,
+    "packages/contracts/fixtures/analyzer-request.v1.json": structural_req,
+    "packages/contracts/fixtures/analyzer-response.v1.json": structural_resp,
 }
 
 for fix, schema_path in fixtures.items():
@@ -62,24 +62,24 @@ for fix, schema_path in fixtures.items():
 
 golden = json.loads(Path("case-studies/memos.map.json").read_text())
 golden_stripped = {k: v for k, v in golden.items() if not str(k).startswith("$")}
-fixture = json.loads(Path("contracts/fixtures/analysis-map.v1.json").read_text())
+fixture = json.loads(Path("packages/contracts/fixtures/analysis-map.v1.json").read_text())
 if fixture != golden_stripped:
-    raise SystemExit("contracts/fixtures/analysis-map.v1.json drifts from case-studies/memos.map.json")
+    raise SystemExit("packages/contracts/fixtures/analysis-map.v1.json drifts from case-studies/memos.map.json")
 
 print("check-contracts: schemas/fixtures ok")
 PY
 
 echo "check-contracts: Go fixtures"
-go test ./internal/analysis/ -run 'TestContractFixtures|TestGoldenMapParses|TestDecodeMapJSON' -count=1
+(cd backend/api && go test ./internal/analysis/ -run 'TestContractFixtures|TestGoldenMapParses|TestDecodeMapJSON' -count=1)
 
 echo "check-contracts: Python fixtures"
 PY=python3
-if "$ROOT/analyzer/.venv/bin/python" -c 'import sys' >/dev/null 2>&1; then
-  PY="$ROOT/analyzer/.venv/bin/python"
+if "$ROOT/backend/.venv/bin/python" -c 'import sys' >/dev/null 2>&1; then
+  PY="$ROOT/backend/.venv/bin/python"
 fi
-(cd "$ROOT/analyzer" && PYTHONPATH=. "$PY" -m pytest -q tests/test_contracts.py)
+(cd "$ROOT/backend/analyzer" && PYTHONPATH=. "$PY" -m pytest -q tests/test_contracts.py)
 
 echo "check-contracts: TypeScript fixtures"
-(cd web && npm install --silent && node --test src/features/architecture-map/contract.test.ts)
+(cd apps/web && npm install --silent && node --test src/features/architecture-map/contract.test.ts)
 
 echo "check-contracts: all languages accept fixtures"

@@ -6,13 +6,13 @@ feature modules are deep (small interface, lots of behaviour).
 ## Dependency direction
 
 ```
-cmd/terra
-  → internal/server          (HTTP adapter)
-      → internal/analyze     (workflow)
-      → internal/store
-      → internal/analyzerclient
-      → internal/analysis
-      → internal/scan, preview, catalog, config, job, …
+backend/api/cmd/terra
+  → backend/api/internal/server          (HTTP adapter)
+      → backend/api/internal/analyze     (workflow)
+      → backend/api/internal/store
+      → backend/api/internal/analyzerclient
+      → backend/api/internal/analysis
+      → backend/api/internal/scan, preview, catalog, config, job, …
 
 analyzer
   terra_analyzer.api → tasks → inference
@@ -22,7 +22,7 @@ web
   app/routes → features → shared
 ```
 
-Nothing below `internal/server` may import it (depguard). Web `shared/` and
+Nothing below `backend/api/internal/server` may import it (depguard). Web `shared/` and
 `features/` must not import `routes/` or `app/` (`boundaries.test.ts`).
 
 ## Why not cross-language vertical slices?

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Keep web/src/data/memos.map.json in sync with the canonical golden map.
+# Keep apps/web/src/data/memos.map.json in sync with the canonical golden map.
 #
 # Usage:
 #   scripts/sync-fixtures.sh          # copy canonical → web
@@ -8,7 +8,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC="$ROOT/case-studies/memos.map.json"
-DST="$ROOT/web/src/data/memos.map.json"
+DST="$ROOT/apps/web/src/data/memos.map.json"
 
 if [[ ! -f "$SRC" ]]; then
   echo "missing canonical fixture: $SRC" >&2

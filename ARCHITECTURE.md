@@ -17,7 +17,7 @@ User (CLI / browser)
    Go backend (:8080)  ──────────────► SQLite (terra.db)
    tarball ingest, scan, HTTP API, storage
         |
-        | POST /analyze  {scan, model}   (contracts/analyzer/v1)
+        | POST /analyze  {scan, model}   (packages/contracts/analyzer/v1)
         v
    Python analyzer (FastAPI, :8010)
    tasks (architecture, qa), validate, retry
@@ -36,42 +36,42 @@ Two invariants hold everywhere:
 
 | Change | Put it here |
 |---|---|
-| HTTP route / job streaming | `internal/server/` (thin adapter) |
-| Analyze pipeline (scan→map→store) | `internal/analyze/` |
-| Architecture map types / assemble | `internal/analysis/` |
-| Python HTTP client | `internal/analyzerclient/` |
-| SQLite / migrations | `internal/store/` |
-| Scan / deps / tarball | `internal/scan/` |
-| Analyzer task / schema / validate | `analyzer/terra_analyzer/tasks/<name>/` |
-| Analyzer HTTP | `analyzer/terra_analyzer/api/` |
-| Wire models | `analyzer/terra_analyzer/contracts/` + root `contracts/` |
-| Local GGUF server | `analyzer/terra_local_llm/` |
-| Workspace UI pane | `web/src/routes/workspace/` |
-| Map diagram / map types | `web/src/features/architecture-map/` |
-| Analyze/ask/preview API clients | `web/src/features/{analysis,ask,preview}/` |
-| Shared chrome / CSS / http helpers | `web/src/shared/` |
+| HTTP route / job streaming | `backend/api/internal/server/` (thin adapter) |
+| Analyze pipeline (scan→map→store) | `backend/api/internal/analyze/` |
+| Architecture map types / assemble | `backend/api/internal/analysis/` |
+| Python HTTP client | `backend/api/internal/analyzerclient/` |
+| SQLite / migrations | `backend/api/internal/store/` |
+| Scan / deps / tarball | `backend/api/internal/scan/` |
+| Analyzer task / schema / validate | `backend/analyzer/terra_analyzer/tasks/<name>/` |
+| Analyzer HTTP | `backend/analyzer/terra_analyzer/api/` |
+| Wire models | `backend/analyzer/terra_analyzer/contracts/` + root `packages/contracts/` |
+| Local GGUF server | `backend/local-llm/terra_local_llm/` |
+| Workspace UI pane | `apps/web/src/routes/workspace/` |
+| Map diagram / map types | `apps/web/src/features/architecture-map/` |
+| Analyze/ask/preview API clients | `apps/web/src/features/{analysis,ask,preview}/` |
+| Shared chrome / CSS / http helpers | `apps/web/src/shared/` |
 | Golden map | `case-studies/memos.map.json` → `make sync-fixtures` |
 
-## Go — `github.com/Enizri/terra`
+## Go — `github.com/Enizri/terra/backend/api`
 
 Imports only ever point **down** this list:
 
 | Package | Does |
 |---|---|
-| `cmd/terra` | CLI composition root: `scan`, `map`, `serve` |
-| `internal/server` | HTTP-only handlers and middleware |
-| `internal/analyze` | Probe/analyze workflow |
-| `internal/store` | SQLite lifecycle, migrations, analysis persistence |
-| `internal/analyzerclient` | HTTP adapter to the Python analyzer |
-| `internal/analysis` | Map model, FromScan, Assemble, map_version decode |
-| `internal/preview` | Live preview boot + proxy |
-| `internal/catalog` | Static model allowlist |
-| `internal/config` | Every `TERRA_*` env var |
-| `internal/scan` | Tarball ingest (leaf) |
+| `backend/api/cmd/terra` | CLI composition root: `scan`, `map`, `serve` |
+| `backend/api/internal/server` | HTTP-only handlers and middleware |
+| `backend/api/internal/analyze` | Probe/analyze workflow |
+| `backend/api/internal/store` | SQLite lifecycle, migrations, analysis persistence |
+| `backend/api/internal/analyzerclient` | HTTP adapter to the Python analyzer |
+| `backend/api/internal/analysis` | Map model, FromScan, Assemble, map_version decode |
+| `backend/api/internal/preview` | Live preview boot + proxy |
+| `backend/api/internal/catalog` | Static model allowlist |
+| `backend/api/internal/config` | Every `TERRA_*` env var |
+| `backend/api/internal/scan` | Tarball ingest (leaf) |
 
 **No `internal` package imports `server`.** Enforced by `.golangci.yaml` depguard.
 
-## Python — `analyzer/`
+## Python — `backend/analyzer/` and `backend/local-llm/`
 
 ```
 terra_analyzer/
@@ -80,13 +80,14 @@ terra_analyzer/
   contracts/          Pydantic wire models
   tasks/              typed tasks (architecture, qa) + registry
   inference/          OpenAI-compatible client
-terra_local_llm/      optional GGUF /v1 server (:8020)
+../local-llm/
+  terra_local_llm/    optional GGUF /v1 server (:8020)
 ```
 
 Tasks are deterministic handlers — not autonomous agents. Register new ones in
 `tasks/registry.py` `default_registry()`.
 
-## Web — `web/src`
+## Web — `apps/web/src`
 
 ```
 app/          router + entry
@@ -97,13 +98,13 @@ data/         committed fixtures (synced from case-studies/)
 ```
 
 Import direction: `app/routes → features → shared`. Enforced by
-`web/src/boundaries.test.ts`.
+`apps/web/src/boundaries.test.ts`.
 
 ## Contracts and fixtures
 
-- Canonical schemas: [`contracts/`](contracts/README.md)
+- Canonical schemas: [`packages/contracts/`](packages/contracts/README.md)
 - Golden map: `case-studies/memos.map.json`
-- Web copy: `web/src/data/memos.map.json` via `make sync-fixtures`
+- Web copy: `apps/web/src/data/memos.map.json` via `make sync-fixtures`
 - Gate: `make check-contracts` (part of `make check`)
 
 ## Verification
@@ -117,7 +118,7 @@ Import direction: `app/routes → features → shared`. Enforced by
 
 ## Known warts
 
-- Preview boot uses Go `internal/runfile`, not a Python task.
-- `internal/preview` still carries memos-tuned demo helpers.
+- Preview boot uses Go `backend/api/internal/runfile`, not a Python task.
+- `backend/api/internal/preview` still carries memos-tuned demo helpers.
 - Wire types are hand-mirrored; `make check-contracts` catches drift (no codegen yet).
 - Components/relationships stay inside `map_json` until a real relational query need appears.
