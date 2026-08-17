@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
 import type { Component, TerraMap } from "../../features/architecture-map";
 import type { LiveSelection } from "../../features/preview";
+import { AskDock } from "../../features/ask";
 import memosFixture from "../../data/memos.map.json";
 import { analyses, analysis, deleteAnalysis } from "../../features/analysis";
 import { wsCache } from "./cache";
@@ -11,7 +12,6 @@ import { toHistory, type HistoryEntry } from "./history";
 import { WorkspaceHeader } from "../../shared/shell/WorkspaceHeader";
 import { Sidebar } from "../../shared/shell/Sidebar";
 import { DropStage } from "./sections/Stage";
-import { AgentDock } from "./sections/AgentDock";
 import "../../shared/styles/tokens.css";
 import "../../shared/styles/ui.css";
 import "../../shared/shell/shell.css";
@@ -141,11 +141,12 @@ export default function Workspace() {
         onSelect={select}
         onElements={setElements}
       />
-      <AgentDock
+      <AskDock
         map={map}
         selected={selected}
         elements={elements}
         askReady={!!map && !analyze.partial}
+        model={wsCache.selectedModel ?? undefined}
         onDropComponent={(id) => setSelectedIds((prev) => prev.filter((x) => x !== id))}
         onDropElement={(el) => setElements((prev) => prev.filter((x) => x !== el))}
       />

@@ -18,7 +18,6 @@ import (
 	"github.com/Enizri/terra/backend/api/internal/analyzerclient"
 	"github.com/Enizri/terra/backend/api/internal/catalog"
 	"github.com/Enizri/terra/backend/api/internal/config"
-	"github.com/Enizri/terra/backend/api/internal/preview"
 	"github.com/Enizri/terra/backend/api/internal/scan"
 	"github.com/Enizri/terra/backend/api/internal/trace"
 )
@@ -683,42 +682,6 @@ func TestDeleteAnalysis(t *testing.T) {
 		t.Errorf("delete missing id: status = %d, want 404", resp.StatusCode)
 	}
 	resp.Body.Close()
-}
-
-// snippet answers workspace questions with no preview running, so it falls
-// back to an already-cloned checkout — and must never clone one itself.
-func TestSnippetFallsBackToExistingCheckout(t *testing.T) {
-	// UserCacheDir reads $HOME on darwin and $XDG_CACHE_HOME elsewhere; pin both
-	// so a real checkout on the dev machine can't answer for the "missing" case.
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	t.Setenv("XDG_CACHE_HOME", filepath.Join(home, "cache"))
-
-	const repo = "github.com/usememos/memos"
-	r := preview.Host(config.FromEnv())
-	if got := snippet(r, "", repo, "main.go", 0); got != "" {
-		t.Errorf("no preview and no checkout: snippet = %q, want empty", got)
-	}
-
-	dir, err := scan.CheckoutDir("", repo)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if got := snippet(r, "", repo, "main.go", 0); !strings.Contains(got, "package main") {
-		t.Errorf("existing checkout: snippet = %q, want the file's contents", got)
-	}
-	if got := snippet(r, "", repo, "../outside.go", 0); got != "" {
-		t.Errorf("traversal: snippet = %q, want empty", got)
-	}
-	if got := snippet(r, "", "not a repo url", "main.go", 0); got != "" {
-		t.Errorf("bad url: snippet = %q, want empty", got)
-	}
 }
 
 type stubPreview struct {

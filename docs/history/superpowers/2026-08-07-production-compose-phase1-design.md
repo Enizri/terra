@@ -29,7 +29,7 @@
 - Postgres / Redis / durable job queue
 - Firecracker / microVM sandbox
 - Replacing SQLite
-- Changing the Go↔Python wire contract or agent prompts
+- Changing the Go↔Python wire contract or analyzer prompts
 
 ## Target topology
 

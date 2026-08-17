@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { renderMarkdown } from "../../../shared/markdown";
-import type { AskMessage, AskPart } from "../useAsk";
+import { renderMarkdown } from "../../shared/markdown";
+import type { AskMessage, AskPart } from "./askProcess";
 
 /** The model's reasoning: open while it streams, folded away once it lands. */
 function ThinkingPart({ part }: { part: Extract<AskPart, { type: "thinking" }> }) {

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ask as askServer, type ModelChoice, type Selection } from "./api";
 import {
-  ask as askServer,
   buildProcess,
   advanceProcess,
   completeProcess,
@@ -8,16 +8,14 @@ import {
   hasMeaningfulSelection,
   type AskMessage,
   type AskPart,
-  type Selection,
-} from "../../features/ask";
-import { wsCache } from "./cache";
+} from "./askProcess";
 
-export type { AskMessage, AskPart, ProcessStep, ProcessStepStatus } from "../../features/ask";
+export type { AskMessage, AskPart, ProcessStep, ProcessStepStatus } from "./askProcess";
 
 const THINKING_COPY = "Considering the map and what you selected…";
 
 /** Ask job for one repo; client-stages thinking/process; abort cancels. */
-export function useAsk(repoUrl: string | null) {
+export function useAsk(repoUrl: string | null, model?: ModelChoice) {
   const [messages, setMessages] = useState<AskMessage[]>([]);
   const [thinking, setThinking] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
@@ -91,7 +89,7 @@ export function useAsk(repoUrl: string | null) {
           q,
           selections ?? (selection ? [selection] : []),
           ac.signal,
-          wsCache.selectedModel ?? undefined,
+          model,
         );
         clearStageTimer();
         setMessages((msgs) => {
@@ -134,7 +132,7 @@ export function useAsk(repoUrl: string | null) {
         }
       }
     },
-    [repoUrl],
+    [repoUrl, model],
   );
 
   return { messages, ask, thinking };

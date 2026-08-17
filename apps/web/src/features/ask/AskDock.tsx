@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
-import type { Component, TerraMap } from "../../../features/architecture-map";
-import type { Selection } from "../../../features/ask";
+import type { Component, TerraMap } from "../architecture-map";
+import type { ModelChoice, Selection } from "./api";
 import {
   liveSelectionId,
   selectionLabel,
   type LiveSelection,
-} from "../../../features/preview";
-import { useFloatingDrag, useStreamingAskHint } from "../../../shared/live";
-import { useAsk } from "../useAsk";
+} from "../preview";
+import { useFloatingDrag, useStreamingAskHint } from "../../shared/live";
+import { useAsk } from "./useAsk";
 import { MessageParts } from "./messages";
 
 /** One-shot /ask follow-ups after a selection. */
@@ -20,13 +20,14 @@ const SELECTION_HINTS = [
 ];
 
 /** Workspace chat dock for the mapped repo. */
-export function AgentDock({
+export function AskDock({
   map,
   selected,
   elements,
   askReady = true,
   onDropComponent,
   onDropElement,
+  model,
 }: {
   map: TerraMap | null;
   /** Selected cards, oldest first; last is the subject. */
@@ -36,9 +37,10 @@ export function AgentDock({
   askReady?: boolean;
   onDropComponent: (id: string) => void;
   onDropElement: (el: LiveSelection) => void;
+  model?: ModelChoice;
 }) {
   const repoUrl = map?.project.repository_url ?? null;
-  const { messages, ask, thinking } = useAsk(repoUrl);
+  const { messages, ask, thinking } = useAsk(repoUrl, model);
   const [used, setUsed] = useState<Set<string>>(new Set());
   const [draft, setDraft] = useState("");
   const threadRef = useRef<HTMLDivElement | null>(null);

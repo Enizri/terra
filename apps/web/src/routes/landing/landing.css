@@ -2072,7 +2072,7 @@
 }
 
 /* ---- architecture diagram (hero drop + Map section) ----
-   A left→right flow on a dark agent canvas: the app people touch, a boxed
+   A left→right flow on a dark architecture canvas: the app people touch, a boxed
    group of the things that do the work, and where it all gets remembered. */
 
 /* With a toolbar the window is a positioned box whose height is set by chrome:

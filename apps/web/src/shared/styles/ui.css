@@ -636,7 +636,7 @@
 .sh-terra-chat {
   display: flex;
   flex-direction: column;
-  /* Narrower + taller than a composer strip — Cursor floating agent proportions. */
+  /* Narrower + taller than a composer strip — floating Ask-dock proportions. */
   width: min(360px, calc(100cqw - 36px));
   height: min(440px, calc(100cqh - 64px));
   overflow: hidden;

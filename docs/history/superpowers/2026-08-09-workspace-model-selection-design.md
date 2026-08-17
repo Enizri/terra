@@ -32,7 +32,7 @@
 - In-browser WebGPU / transformers.js inference
 - Multi-user key vault, team sharing, encrypted server-side key store
 - LLM-based model recommender (rules only in v1)
-- Changing agent prompts or map schema beyond per-request model/URL/key wiring
+- Changing analyzer prompts or map schema beyond per-request model/URL/key wiring
 
 ## Approach chosen
 
