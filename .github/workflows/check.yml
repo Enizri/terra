@@ -4,8 +4,9 @@ name: check
 
 on:
   push:
-    branches: [main, master]
+    branches: [staging, main, master]
   pull_request:
+    branches: [staging, main]
 
 jobs:
   check:
