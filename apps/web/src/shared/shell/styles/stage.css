@@ -1,0 +1,378 @@
+/* ---- stage ---- */
+
+.sh-ws__stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 32px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.sh-ws-drop {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: min(560px, 100%);
+  padding: 56px 32px;
+  border: 1.5px dashed rgba(0, 0, 0, 0.28);
+  border-radius: 16px;
+  background: #fff;
+  text-align: center;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.sh-ws-drop.is-over {
+  border-color: #e8400d;
+  background: #fff;
+}
+
+/* Brand wash bleeding out from under the icon — soft enough not to wash title. */
+.sh-ws-drop__glow {
+  position: absolute;
+  top: 34px;
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: var(--sh-terra-wash);
+  filter: blur(46px);
+  opacity: 0.18;
+  pointer-events: none;
+}
+
+.sh-ws-drop__icon {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  color: #111;
+  opacity: 0.9;
+}
+
+.sh-ws-drop__title {
+  position: relative;
+  margin: 6px 0 0;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: #111;
+}
+
+.sh-ws-drop__sub {
+  position: relative;
+  margin: 0;
+  max-width: 40ch;
+  font-size: 15px;
+  line-height: 1.45;
+  color: #525252;
+}
+
+/* ---- running ---- */
+
+/* The star already transitions `rotate` on hover (terra.css); a running
+   animation outranks that, so the two never fight. */
+@keyframes sh-ws-spin {
+  to {
+    rotate: 360deg;
+  }
+}
+
+.sh-terra-mark--spin {
+  animation: sh-ws-spin 2.4s linear infinite;
+}
+
+.sh-ws__status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 38px;
+  font-size: 17px;
+}
+
+.sh-ws__status-mark {
+  width: 24px;
+  height: 24px;
+}
+
+.sh-ws__status-label {
+  display: inline-block;
+}
+
+.sh-ws__status-time {
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  color: var(--sh-muted-2);
+}
+
+.sh-ws__running {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+/* Compact status strip while a structural map is already on stage. */
+.sh-ws__mapping-bar {
+  position: absolute;
+  left: 50%;
+  bottom: 72px;
+  transform: translateX(-50%);
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px 8px 14px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--sh-bg, #0b0d10) 88%, transparent);
+  border: 1px solid color-mix(in srgb, currentColor 14%, transparent);
+  backdrop-filter: blur(8px);
+  max-width: min(560px, calc(100% - 32px));
+}
+
+.sh-ws__mapping-bar .sh-ws__status {
+  margin: 0;
+  gap: 10px;
+}
+
+.sh-ws__mapping-bar .sh-ws__stop {
+  flex-shrink: 0;
+}
+
+.sh-ws__stop {
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  padding: 4px 16px;
+  cursor: pointer;
+  opacity: 0.6;
+}
+
+.sh-ws__stop:hover {
+  opacity: 1;
+}
+
+.sh-ws__error {
+  margin: 0;
+  max-width: 560px;
+  color: #e8400d;
+  font-size: 14px;
+  text-align: center;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+/* ---- result: the map fills the stage, everything else is a strip on top ---- */
+
+/* Centering suits the drop zone and the status line; the map wants the room. */
+.sh-ws__stage.is-map {
+  position: relative;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 14px;
+  padding: 20px;
+  overflow: hidden;
+}
+
+.sh-ws__mapbar {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 15px;
+}
+
+.sh-ws__mapbar b {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.sh-ws__mapbar em {
+  flex: 1;
+  min-width: 200px;
+  font-style: normal;
+  font-size: 13px;
+  color: var(--sh-muted);
+  /* One line: every row this strip wraps to is a row the map loses. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---- find a component ---- */
+
+.sh-ws__find {
+  position: relative;
+  margin-left: auto;
+}
+
+.sh-ws__find-input {
+  width: 190px;
+  padding: 6px 10px;
+  border: 1px solid var(--sh-border);
+  border-radius: 999px;
+  background: var(--sh-window);
+  font: inherit;
+  font-size: 13px;
+  color: inherit;
+}
+
+.sh-ws__find-input:focus {
+  outline: none;
+  border-color: var(--sh-ink);
+}
+
+.sh-ws__find-list {
+  position: absolute;
+  z-index: 3;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 260px;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  border: 1px solid var(--sh-border);
+  border-radius: 12px;
+  background: var(--sh-window);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.12);
+}
+
+.sh-ws__find-hit {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.sh-ws__find-hit:hover,
+.sh-ws__find-hit:focus-visible {
+  background: var(--sh-bg);
+}
+
+.sh-ws__find-hit em {
+  margin-left: auto;
+  font-style: normal;
+  font-size: 11px;
+  color: var(--sh-muted);
+}
+
+.sh-ws__find-empty {
+  padding: 7px 9px;
+  font-size: 13px;
+  color: var(--sh-muted);
+}
+
+.sh-ws__map {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+/* The details panel overlays the right edge, which is where the storage column
+   sits. Inset the diagram instead of letting the panel cover a card — the
+   arrows re-measure on the resize, so nothing is left pointing at a stale box. */
+.sh-ws__map.has-details > .sh-diagram {
+  padding-right: 316px;
+}
+
+/* A generated purpose is a paragraph, not the landing's hand-written one-liner.
+   Clamp it to one line: the canvas clips, and a four-card middle column with
+   two-line purposes stands taller than the canvas — the first screen showed
+   every card cut off. The full text is in the details panel. */
+.sh-ws__map .sh-diagram__purpose {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  overflow: hidden;
+}
+
+/* The hint slot reserves 16px per card for a file path only shown on focus —
+   here a click opens the details panel, which lists every file. Dropping the
+   row buys the height that keeps the middle column inside the canvas. */
+.sh-ws__map .sh-diagram__hint {
+  display: none;
+}
+
+/* Two-line card names still leave the middle column a hair taller than the
+   landing's padding allows — trade breathing room for the last clipped pixels. */
+.sh-ws__map .sh-diagram__canvas {
+  padding-top: 14px;
+  padding-bottom: 14px;
+}
+
+/* Covers the map rather than splitting it: the preview is a detour, and the
+   map is still what the question is about. */
+.sh-ws__preview {
+  position: absolute;
+  inset: 0;
+  /* Above the diagram's cards, below the details panel. */
+  z-index: 2;
+  display: flex;
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--sh-window);
+  border: 1px solid var(--sh-border);
+}
+
+.sh-ws__preview .sh-live {
+  flex: 1;
+  border: 0;
+}
+
+/* Overlaid rather than a fourth column — the grid is already three deep. */
+.sh-ws__details {
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 300px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.sh-ws__url {
+  display: flex;
+  gap: 10px;
+  width: min(560px, 100%);
+}
+
+.sh-ws__input {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 16px;
+  border: 1px solid rgba(0, 0, 0, 0.16);
+  border-radius: 8px;
+  background: #fff;
+  color: #111;
+  font: inherit;
+  font-size: 15px;
+}
+
+.sh-ws__input::placeholder {
+  color: #737373;
+}
+
+.sh-ws__input:focus-visible {
+  outline: 2px solid #e8400d;
+  outline-offset: -1px;
+}
+

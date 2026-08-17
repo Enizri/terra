@@ -1,0 +1,90 @@
+/* Workspace shell. Colors, radii and type all come from terra.css tokens —
+   nothing new is defined here beyond layout. */
+
+.sh-ws {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr) 380px;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100dvh;
+  overflow: hidden;
+}
+
+/* ---- header ---- */
+
+.sh-ws__head {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--sh-border);
+  background: var(--sh-window);
+}
+
+.sh-ws__logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.sh-ws__crumb {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  font-size: 14px;
+}
+
+.sh-ws__crumb b {
+  font-weight: 500;
+}
+
+.sh-ws__crumb em {
+  font-style: normal;
+  color: var(--sh-muted-2);
+}
+
+.sh-ws__crumb::before {
+  content: "/";
+  color: var(--sh-border);
+  margin-right: 2px;
+}
+
+.sh-ws__chips {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.sh-ws__chips .sh-chip svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Placeholder chips: visibly present, not yet wired. */
+.sh-ws .sh-chip.is-disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* A chip that does something — same pill, but it presses. */
+.sh-chip--btn {
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.sh-chip--btn:hover {
+  border-color: rgba(0, 0, 0, 0.14);
+}
+
+.sh-chip--btn.is-on {
+  background: var(--color-tint);
+  color: #fff;
+  border-color: transparent;
+}
+

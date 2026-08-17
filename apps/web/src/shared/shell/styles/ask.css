@@ -1,0 +1,415 @@
+/* ---- Ask dock ---- */
+
+.sh-ws__dock {
+  display: flex;
+  padding: 20px;
+  border-left: 1px solid var(--sh-border);
+  min-height: 0;
+  background: var(--sh-bg);
+}
+
+/* What the next question is scoped to — click one to drop it. */
+.sh-ws__crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Fill the column instead of the floating 360x440 the theater uses. */
+.sh-ws__dock .sh-terra-chat,
+.sh-ws__dock .sh-terra-chat--open {
+  width: 100%;
+  height: 100%;
+}
+
+/* Light Claude-like skin — scoped so landing theater stays dark Cursor-like. */
+.sh-ws__dock .sh-terra-chat--ws {
+  background: #fff;
+  color: #111;
+  font-size: 14px;
+  line-height: 1.5;
+  border-radius: 14px;
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.04),
+    0 12px 32px rgba(0, 0, 0, 0.06),
+    0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+
+.sh-ws__dock .sh-terra-chat__head {
+  height: 40px;
+  padding: 0 12px;
+  justify-content: flex-start;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  background: #fafafa;
+}
+
+.sh-ws-chat__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sh-ws-chat__mark {
+  width: 18px;
+  height: 18px;
+  rotate: 0deg;
+}
+
+.sh-ws__dock .sh-terra-chat__name {
+  position: static;
+  left: auto;
+  transform: none;
+  font-size: 14px;
+  font-weight: 600;
+  color: #111;
+  pointer-events: none;
+}
+
+.sh-ws__dock .sh-terra-chat__body {
+  gap: 10px;
+  padding: 12px 14px 0;
+}
+
+.sh-ws__dock .sh-terra-chat__thread {
+  gap: 12px;
+}
+
+/* Let the work trail + answer use the column; theater caps thread for option lists. */
+.sh-ws__dock .sh-terra-chat__body:has(.sh-terra-chat__hints) .sh-terra-chat__thread {
+  flex: 1 1 auto;
+  max-height: none;
+}
+
+.sh-ws__dock .sh-terra-chat__msg {
+  max-width: 100%;
+  padding: 0;
+  border-radius: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  background: transparent;
+  border: 0;
+}
+
+.sh-ws__dock .sh-terra-chat__msg--user {
+  align-self: flex-end;
+  max-width: 92%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #f0eeea;
+  color: #111;
+}
+
+.sh-ws__dock .sh-terra-chat__msg--terra,
+.sh-ws__dock .sh-ws-turn {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  color: #111;
+  background: transparent;
+  border: 0;
+}
+
+.sh-ws__dock .sh-terra-chat__msg--error {
+  color: #b42318;
+}
+
+.sh-ws__dock .sh-terra-chat__msg--error .sh-ws-md {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(180, 35, 24, 0.28);
+  background: #fef3f2;
+  color: #b42318;
+}
+
+.sh-ws__dock .sh-terra-chat__crumb {
+  padding: 4px 10px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 999px;
+  background: #f5f3ef;
+  color: #333;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.sh-ws__dock .sh-terra-chat__crumb:hover {
+  color: #111;
+  border-color: rgba(232, 64, 13, 0.45);
+  background: #fff4f0;
+}
+
+.sh-ws__dock .sh-terra-chat__hints-label {
+  color: #737373;
+}
+
+.sh-ws__dock .sh-terra-chat__hint {
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: #fafafa;
+  color: #222;
+  font-size: 13px;
+}
+
+.sh-ws__dock .sh-terra-chat__hint:hover:not(:disabled) {
+  color: #111;
+  border-color: rgba(232, 64, 13, 0.4);
+  background: #fff4f0;
+}
+
+.sh-ws__dock .sh-terra-chat__prompt {
+  position: relative;
+  margin: 8px 12px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: #f9f8f5;
+  box-shadow: none;
+  color: #111;
+  user-select: auto;
+}
+
+.sh-ws__dock .sh-ws__ask {
+  user-select: auto;
+}
+
+/* Idle typewriter sits under the transparent input so click/focus still works. */
+.sh-ws__ask-stream {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  pointer-events: none;
+  color: #737373;
+  font-size: 14px;
+}
+
+.sh-ws__ask.is-streaming .sh-ws__ask-input {
+  position: relative;
+  z-index: 1;
+  background: transparent;
+  color: transparent;
+  caret-color: #111;
+}
+
+.sh-ws__ask-input {
+  width: 100%;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  color: #111;
+  outline: none;
+}
+
+.sh-ws__ask-input::placeholder {
+  color: #737373;
+}
+
+.sh-ws__ask-input:disabled::placeholder {
+  color: #a3a3a3;
+}
+
+/* ---- Claude-like thinking + process + markdown ---- */
+
+.sh-ws-think {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+  background: #fafafa;
+  overflow: hidden;
+}
+
+.sh-ws-think.is-done {
+  background: #fff;
+}
+
+.sh-ws-think__toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 550;
+  color: #333;
+  cursor: pointer;
+  text-align: left;
+}
+
+.sh-ws-think__mark {
+  width: 14px;
+  height: 14px;
+}
+
+.sh-ws-think__label {
+  background-image: linear-gradient(
+    110deg,
+    #e8400d 0%,
+    #c084fc 55%,
+    #ac7eff 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+.sh-ws-think.is-done .sh-ws-think__label {
+  background: none;
+  color: #525252;
+  -webkit-text-fill-color: #525252;
+}
+
+.sh-ws-think__chev {
+  margin-left: auto;
+  color: #737373;
+  font-size: 11px;
+}
+
+.sh-ws-think__body {
+  margin: 0;
+  padding: 0 12px 10px 32px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #525252;
+}
+
+.sh-ws-process {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sh-ws-process__step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #a3a3a3;
+}
+
+.sh-ws-process__step.is-active {
+  color: #111;
+  font-weight: 500;
+}
+
+.sh-ws-process__step.is-done {
+  color: #525252;
+}
+
+.sh-ws-process__step.is-skipped {
+  color: #c4c4c4;
+  text-decoration: line-through;
+}
+
+.sh-ws-process__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #d4d4d4;
+  flex-shrink: 0;
+}
+
+.sh-ws-process__step.is-active .sh-ws-process__dot {
+  background: #e8400d;
+  box-shadow: 0 0 0 3px rgba(232, 64, 13, 0.18);
+}
+
+.sh-ws-process__step.is-done .sh-ws-process__dot {
+  background: #22c55e;
+}
+
+.sh-ws-process__step.is-skipped .sh-ws-process__dot {
+  background: #e5e5e5;
+}
+
+.sh-ws-md {
+  font-size: 14px;
+  line-height: 1.55;
+  color: #111;
+}
+
+.sh-ws-md > :first-child {
+  margin-top: 0;
+}
+
+.sh-ws-md > :last-child {
+  margin-bottom: 0;
+}
+
+.sh-ws-md p,
+.sh-ws-md ul,
+.sh-ws-md ol {
+  margin: 0 0 0.7em;
+}
+
+.sh-ws-md h1,
+.sh-ws-md h2,
+.sh-ws-md h3 {
+  margin: 0.9em 0 0.4em;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.sh-ws-md h1 {
+  font-size: 1.15em;
+}
+
+.sh-ws-md h2 {
+  font-size: 1.05em;
+}
+
+.sh-ws-md h3 {
+  font-size: 1em;
+}
+
+.sh-ws-md ul,
+.sh-ws-md ol {
+  padding-left: 1.25em;
+}
+
+.sh-ws-md li + li {
+  margin-top: 0.25em;
+}
+
+.sh-ws-md code {
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  background: #f0eeea;
+  font-size: 0.9em;
+}
+
+.sh-ws-md pre {
+  margin: 0 0 0.7em;
+  padding: 10px 12px;
+  overflow-x: auto;
+  border-radius: 8px;
+  background: #f5f3ef;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.sh-ws-md pre code {
+  padding: 0;
+  background: none;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sh-ws-think__label {
+    background: none;
+    color: #e8400d;
+    -webkit-text-fill-color: #e8400d;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sh-terra-mark--spin {
+    animation: none;
+  }
+}
+

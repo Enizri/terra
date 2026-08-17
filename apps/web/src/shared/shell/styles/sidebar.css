@@ -1,0 +1,254 @@
+/* ---- left rail ---- */
+
+.sh-ws__rail {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 20px 14px;
+  border-right: 1px solid var(--sh-border);
+  overflow-y: auto;
+}
+
+/* An open section may hold a long tree; a closed one is just its header. */
+.sh-ws__rail-section {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.sh-ws__rail-section.is-open {
+  flex: 0 1 auto;
+}
+
+.sh-ws__rail-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 0 0 8px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #525252;
+  cursor: pointer;
+}
+
+.sh-ws__rail-toggle:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color: #111;
+}
+
+.sh-ws__rail-toggle svg {
+  width: 14px;
+  height: 14px;
+  margin-left: auto;
+  rotate: -90deg;
+  transition: rotate 0.18s ease;
+}
+
+.sh-ws__rail-toggle[aria-expanded="true"] svg {
+  rotate: 0deg;
+}
+
+.sh-ws__rail-count {
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: #737373;
+}
+
+/* Scrolls itself so a deep tree can't push History off the rail. */
+.sh-ws__rail-body {
+  min-height: 0;
+  max-height: 46vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.sh-ws__rail-empty {
+  margin: 0;
+  padding: 0 6px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #525252;
+}
+
+/* ---- files tree ---- */
+
+.sh-ws__tree {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sh-ws__tree--nested {
+  padding-left: 12px;
+  border-left: 1px solid rgba(0, 0, 0, 0.07);
+  margin-left: 8px;
+}
+
+.sh-ws__file-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 3px 6px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  font: inherit;
+  font-size: 12.5px;
+  color: #333;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sh-ws__file-row:hover:not(:disabled) {
+  background: rgba(232, 64, 13, 0.08);
+  color: #111;
+}
+
+.sh-ws__file-row:disabled {
+  cursor: default;
+  color: #737373;
+}
+
+.sh-ws__file-row.is-file {
+  /* Aligns file names with the folder labels above them. */
+  padding-left: 20px;
+  color: #525252;
+}
+
+.sh-ws__file-row.is-dir {
+  font-weight: 550;
+  color: #111;
+}
+
+.sh-ws__file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sh-ws__file-chev {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 14px;
+  color: #737373;
+}
+
+.sh-ws__file-chev svg {
+  width: 12px;
+  height: 12px;
+  rotate: -90deg;
+  transition: rotate 0.18s ease;
+}
+
+.sh-ws__file-chev.is-open svg {
+  rotate: 0deg;
+}
+
+/* ---- history ---- */
+
+.sh-ws__history {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sh-ws__history-item {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+}
+
+.sh-ws__history-row {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  font: inherit;
+  text-align: left;
+  color: #111;
+  cursor: pointer;
+}
+
+.sh-ws__history-remove {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  color: #a3a3a3;
+  cursor: pointer;
+}
+
+.sh-ws__history-item:hover .sh-ws__history-remove,
+.sh-ws__history-remove:focus-visible {
+  color: #737373;
+}
+
+.sh-ws__history-remove:hover {
+  border-color: rgba(232, 64, 13, 0.35);
+  background: #fff4f0;
+  color: #e8400d;
+}
+
+.sh-ws__history-row b {
+  font-size: 13px;
+  font-weight: 550;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sh-ws__history-row em {
+  font-style: normal;
+  font-size: 11.5px;
+  color: #737373;
+}
+
+.sh-ws__history-row:hover:not(:disabled) {
+  border-color: rgba(232, 64, 13, 0.35);
+  background: #fff4f0;
+}
+
+.sh-ws__history-row.is-current {
+  border-color: rgba(0, 0, 0, 0.1);
+  background: #fff;
+  cursor: default;
+}
+
+.sh-ws__history-row:disabled:not(.is-current) {
+  opacity: 0.55;
+  cursor: default;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sh-ws__rail-toggle svg,
+  .sh-ws__file-chev svg {
+    transition: none;
+  }
+}
+
