@@ -95,6 +95,39 @@ def test_tasks_architecture_happy_path(monkeypatch, scan, good_draft):
     assert [component["id"] for component in response.json()["draft"]["components"]] == ["web", "server", "data"]
 
 
+def test_tasks_qa_multiselect(monkeypatch):
+    """POST /tasks/qa must pass every Ask selection into the prompt."""
+    captured: dict = {}
+
+    def fake_chat(cfg, msgs, use_schema=False):
+        captured["msgs"] = msgs
+        return "both components share the request path"
+
+    monkeypatch.setattr("terra_analyzer.agents.qa.preflight", lambda cfg: None)
+    monkeypatch.setattr("terra_analyzer.agents.qa.chat", fake_chat)
+
+    sels = [
+        {"id": "web", "file": "web/App.tsx", "label": "Web"},
+        {"id": "server", "file": "internal/server/ask.go", "label": "Server"},
+    ]
+    response = client.post(
+        "/tasks/qa",
+        json={
+            "question": "How do these relate?",
+            "selection": sels[-1],
+            "selections": sels,
+            "model": "",
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["answer"] == "both components share the request path"
+    user = captured["msgs"][1]["content"]
+    assert "Selected components:" in user
+    assert "web/App.tsx" in user
+    assert "internal/server/ask.go" in user
+    assert "How do these relate?" in user
+
+
 def test_tasks_unknown_404():
     assert client.post("/tasks/nope", json={}).status_code == 404
 
