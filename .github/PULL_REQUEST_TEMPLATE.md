@@ -8,9 +8,7 @@ Fixes #
 
 - [ ] One concern only (matches the linked issue)
 - [ ] `make check` is green on this PR
-- [ ] Cursor Bugbot completed with **success** (no unresolved findings)
-  - Enable: https://cursor.com/automations/from-cursor/bugbot
-  - Manual: comment `bugbot run` or `cursor review` on the PR
+- [ ] `actionlint` is green on this PR (workflow lint; temporary merge-gate peer)
 - [ ] Behavior-preserving unless the issue says otherwise
 
 ## Test plan

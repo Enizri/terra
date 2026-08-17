@@ -66,6 +66,6 @@ Follow the checklist in [`contracts/README.md`](contracts/README.md), then
 1. Run `make check`.
 2. Keep the PR to **one concern**.
 3. Reference the issue with `Fixes #N`.
-4. Merge gate requires Cursor Bugbot review (see `.github/workflows/merge-gate.yml` and the PR template).
+4. Merge gate requires `check` + `actionlint` (see `.github/workflows/merge-gate.yml` and the PR template).
 
 Commit messages in this repo are conventional-ish (`docs:`, `fix:`, `refactor(server):`). Match that style.
