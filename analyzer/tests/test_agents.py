@@ -7,7 +7,7 @@ from terra_analyzer.models import Draft
 
 def test_default_registry_lists_architecture():
     reg = default_registry()
-    assert reg.list() == ["architecture", "qa", "runfile"]
+    assert reg.list() == ["architecture", "qa"]
     assert reg.get("architecture") is not None
     assert reg.get("missing") is None
 
