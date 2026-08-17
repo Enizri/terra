@@ -1,0 +1,159 @@
+# Fail the PR unless `make check` (workflow job "check") and Cursor Bugbot
+# both completed with conclusion "success".
+#
+# Bugbot reports findings as "neutral" by default, which GitHub required-checks
+# treat as non-blocking. This job turns missing / failure / neutral into a hard
+# fail so unresolved Bugbot findings cannot merge to main.
+#
+# Enable Bugbot for this repo: https://cursor.com/automations/from-cursor/bugbot
+# Manual trigger on a PR: comment `bugbot run` or `cursor review`.
+name: merge-gate
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  check_run:
+    types: [completed]
+
+permissions:
+  checks: read
+  contents: read
+  pull-requests: read
+
+jobs:
+  merge-gate:
+    if: |
+      github.event.pull_request.draft != true && (
+        github.event_name == 'pull_request' ||
+        (
+          github.event_name == 'check_run' &&
+          (
+            github.event.check_run.name == 'check' ||
+            github.event.check_run.name == 'Cursor Bugbot'
+          )
+        )
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Require check + Cursor Bugbot success
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            async function headShaForPR(prNumber) {
+              const { data: pr } = await github.rest.pulls.get({
+                owner,
+                repo,
+                pull_number: prNumber,
+              });
+              return { sha: pr.head.sha, draft: pr.draft, number: pr.number };
+            }
+
+            let prNumber;
+            if (context.eventName === "pull_request") {
+              prNumber = context.payload.pull_request.number;
+            } else {
+              const prs = context.payload.check_run.pull_requests || [];
+              if (prs.length === 0) {
+                core.info("check_run has no linked pull request; skipping");
+                return;
+              }
+              prNumber = prs[0].number;
+            }
+
+            const pr = await headShaForPR(prNumber);
+            if (pr.draft) {
+              core.info(`PR #${pr.number} is draft; skipping merge-gate`);
+              return;
+            }
+
+            const required = [
+              { name: "check", label: "make check (workflow job check)" },
+              { name: "Cursor Bugbot", label: "Cursor Bugbot" },
+            ];
+
+            // Poll until both required checks completed for this head SHA,
+            // or until the job timeout. Re-runs on check_run.completed too.
+            const deadline = Date.now() + 40 * 60 * 1000;
+            let results = {};
+
+            while (Date.now() < deadline) {
+              const { data } = await github.rest.checks.listForRef({
+                owner,
+                repo,
+                ref: pr.sha,
+                per_page: 100,
+              });
+
+              results = {};
+              for (const want of required) {
+                // Prefer the newest completed run for this name on this SHA.
+                const runs = data.check_runs.filter((r) => r.name === want.name);
+                runs.sort(
+                  (a, b) =>
+                    new Date(b.completed_at || b.started_at || 0) -
+                    new Date(a.completed_at || a.started_at || 0),
+                );
+                results[want.name] = runs[0] || null;
+              }
+
+              const allPresent = required.every((w) => results[w.name]);
+              const allDone =
+                allPresent &&
+                required.every((w) => results[w.name].status === "completed");
+
+              if (allDone) break;
+
+              const waiting = required
+                .map((w) => {
+                  const run = results[w.name];
+                  if (!run) return `${w.name}=missing`;
+                  return `${w.name}=${run.status}`;
+                })
+                .join(", ");
+              core.info(`Waiting for required checks on ${pr.sha}: ${waiting}`);
+              await new Promise((r) => setTimeout(r, 15000));
+            }
+
+            const failures = [];
+            for (const want of required) {
+              const run = results[want.name];
+              if (!run) {
+                failures.push(
+                  `${want.label}: not found on ${pr.sha}. ` +
+                    (want.name === "Cursor Bugbot"
+                      ? "Enable Bugbot at https://cursor.com/automations/from-cursor/bugbot or comment `bugbot run` on the PR."
+                      : "Ensure the check workflow ran on this PR."),
+                );
+                continue;
+              }
+              if (run.status !== "completed") {
+                failures.push(
+                  `${want.label}: still ${run.status} after waiting.`,
+                );
+                continue;
+              }
+              // Only "success" is mergeable. Bugbot uses "neutral" for findings.
+              if (run.conclusion !== "success") {
+                failures.push(
+                  `${want.label}: conclusion=${run.conclusion} (need success). ` +
+                    (want.name === "Cursor Bugbot" && run.conclusion === "neutral"
+                      ? "Resolve or address Bugbot findings, then re-run review."
+                      : ""),
+                );
+              } else {
+                core.info(`${want.label}: success`);
+              }
+            }
+
+            if (failures.length) {
+              core.setFailed(failures.join("\n"));
+              return;
+            }
+
+            core.info(
+              `merge-gate OK for PR #${pr.number} @ ${pr.sha}: check + Cursor Bugbot success`,
+            );
