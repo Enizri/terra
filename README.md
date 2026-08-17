@@ -227,8 +227,8 @@ make sync-fixtures      # copy case-studies/memos.map.json → web/src/data/
 | Live LLM | `analyzer/tests/test_slow_llm.py` | same (`TERRA_SLOW=1` still works alone) |
 
 The wire contract between Go and Python is the draft JSON in
-`analyzer/terra_analyzer/models.py` mirrored by `internal/graph/types.go`;
+`analyzer/terra_analyzer/models.py` mirrored by `internal/analysis/types.go`;
 the enums and model JSON schema live only in
-`analyzer/terra_analyzer/agents/architecture/schema.py`.
+`analyzer/terra_analyzer/tasks/architecture/schema.py`.
 `case-studies/memos.map.json` is the golden answer key and is checked by
-`analyzer/tests/test_app.py` and `internal/graph/contract_test.go`.
+`analyzer/tests/test_app.py` and `internal/analysis/contract_test.go`.

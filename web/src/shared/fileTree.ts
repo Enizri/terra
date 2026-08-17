@@ -1,4 +1,5 @@
-import type { Component } from "./map/types";
+/** Minimal component shape needed to build a files tree (feature-agnostic). */
+export type FileTreeComponent = { id: string; files: string[] };
 
 /** Files-tree node; `owners` are component ids that listed this path. */
 export type FileNode = {
@@ -49,7 +50,7 @@ function finalize(level: Map<string, Draft>): FileNode[] {
 }
 
 /** Fold every map-mentioned file into one tree. */
-export function buildFileTree(components: Component[]): FileNode[] {
+export function buildFileTree(components: FileTreeComponent[]): FileNode[] {
   const root = new Map<string, Draft>();
   for (const c of components) {
     for (const file of c.files) {

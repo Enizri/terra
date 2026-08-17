@@ -9,8 +9,8 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/Enizri/terra/internal/analyzerclient"
 	"github.com/Enizri/terra/internal/config"
-	"github.com/Enizri/terra/internal/graph"
 	"github.com/Enizri/terra/internal/preview"
 	"github.com/Enizri/terra/internal/scan"
 	"github.com/Enizri/terra/internal/server"
@@ -68,7 +68,7 @@ func runMap(args []string) {
 	}
 	fmt.Fprintf(os.Stderr, "scanned %d source files, asking the analyzer for a map (this takes a minute)...\n", res.Stats.SourceFiles)
 
-	m, warnings, err := graph.Analyze(context.Background(), config.FromEnv().AnalyzerURL, res, graph.LLMOpts{Model: *model})
+	m, warnings, err := analyzerclient.Analyze(context.Background(), config.FromEnv().AnalyzerURL, res, analyzerclient.LLMOpts{Model: *model})
 	if err != nil {
 		fail(err)
 	}

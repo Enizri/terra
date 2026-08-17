@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Enizri/terra/internal/graph"
+	"github.com/Enizri/terra/internal/analysis"
 	"github.com/Enizri/terra/internal/recommend"
 )
 
@@ -20,10 +20,10 @@ import (
 // the browser. In particular a request's API key must never reach an Event,
 // not even inside Label.
 type Event struct {
-	Stage  string     `json:"stage"`
-	Label  string     `json:"label,omitempty"`
-	Map    *graph.Map `json:"map,omitempty"`
-	Answer string     `json:"answer,omitempty"`
+	Stage  string        `json:"stage"`
+	Label  string        `json:"label,omitempty"`
+	Map    *analysis.Map `json:"map,omitempty"`
+	Answer string        `json:"answer,omitempty"`
 
 	// Probe job only: the handle analyze reuses, plus what the picker shows.
 	ProbeID        string                    `json:"probe_id,omitempty"`

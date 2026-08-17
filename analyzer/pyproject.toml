@@ -11,7 +11,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest"]
+dev = ["pytest", "ruff"]
 local = [
     # GGUF via llama.cpp: mmapped quantized weights, no torch. There is no
     # usable prebuilt wheel (the published ones fail CRC), so this compiles
@@ -25,7 +25,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["terra_analyzer*"]
+include = ["terra_analyzer*", "terra_local_llm*"]
 
 [tool.pytest.ini_options]
 markers = [

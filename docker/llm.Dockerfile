@@ -9,6 +9,7 @@ RUN apt-get update \
 	&& rm -rf /var/lib/apt/lists/*
 COPY analyzer/pyproject.toml ./analyzer/
 COPY analyzer/terra_analyzer/ ./analyzer/terra_analyzer/
+COPY analyzer/terra_local_llm/ ./analyzer/terra_local_llm/
 # GGML_NATIVE=OFF: with -mcpu=native, Debian's gcc 12 compiles the fp16 NEON
 # intrinsics in a translation unit that was not given the matching +fp16 arch
 # flag, and every vaddq_f16/vfmaq_f16 fails to inline. A generic build has no
@@ -21,4 +22,4 @@ EXPOSE 8020
 # Model download + load can take a few minutes on first start.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=600s --retries=3 \
 	CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8020/healthz')"
-CMD ["uvicorn", "terra_analyzer.local_server.server:app", "--host", "0.0.0.0", "--port", "8020"]
+CMD ["uvicorn", "terra_local_llm.server:app", "--host", "0.0.0.0", "--port", "8020"]

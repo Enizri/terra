@@ -5,12 +5,18 @@ from urllib.parse import urlparse
 
 import httpx
 
-from ..agents.architecture.schema import DRAFT_SCHEMA
 from .config import MAX_OUTPUT_TOKENS, Config
 
 
 class LLMError(Exception):
     """Surfaces to Go as a 502 detail."""
+
+
+def _draft_schema():
+    # Lazy: avoid circular import with tasks.architecture → inference.client.
+    from ..tasks.architecture.schema import DRAFT_SCHEMA
+
+    return DRAFT_SCHEMA
 
 
 def _is_local(cfg: Config) -> bool:
@@ -87,7 +93,7 @@ def _body(cfg: Config, msgs: list[dict], mode: str) -> dict:
             "json_schema": {
                 "name": "terra_map",
                 "strict": True,
-                "schema": DRAFT_SCHEMA,
+                "schema": _draft_schema(),
             },
         }
     elif mode == "json_object":
@@ -95,7 +101,7 @@ def _body(cfg: Config, msgs: list[dict], mode: str) -> dict:
         body["messages"] = msgs + [{
             "role": "system",
             "content": "Reply with one JSON object matching exactly this JSON Schema "
-                       "and nothing else:\n" + json.dumps(DRAFT_SCHEMA),
+                       "and nothing else:\n" + json.dumps(_draft_schema()),
         }]
     return body
 

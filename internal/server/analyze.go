@@ -8,7 +8,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Enizri/terra/internal/graph"
+	"github.com/Enizri/terra/internal/analysis"
+	"github.com/Enizri/terra/internal/analyzerclient"
 	"github.com/Enizri/terra/internal/job"
 	"github.com/Enizri/terra/internal/scan"
 	"github.com/Enizri/terra/internal/store"
@@ -78,7 +79,7 @@ func (s *Server) analyze(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, repoMap)
 		return
 	}
-	repoMap, warnings, err := s.Analyze(r.Context(), res, graph.LLMOpts{Model: req.Model})
+	repoMap, warnings, err := s.Analyze(r.Context(), res, analyzerclient.LLMOpts{Model: req.Model})
 	if err != nil {
 		httpError(w, http.StatusBadGateway, err.Error())
 		return
@@ -101,7 +102,7 @@ func (s *Server) analyzeStream(w http.ResponseWriter, ctx context.Context, repoU
 	// Legacy path: no picker, so the analyzer keeps its own environment.
 	j := s.startAnalyzeJob(analyzeJob{
 		repoURL: repoURL,
-		sel:     modelSelection{Opts: graph.LLMOpts{Model: model}},
+		sel:     modelSelection{Opts: analyzerclient.LLMOpts{Model: model}},
 	}, done)
 	s.streamJobEvents(w, ctx, j)
 }
@@ -225,7 +226,7 @@ func (s *Server) startAnalyzeJob(work analyzeJob, done func()) *job.Job {
 			Stage: "scan",
 			Label: fmt.Sprintf("Read %d files across %d languages",
 				res.Stats.SourceFiles, len(res.Languages)),
-			Map: graph.FromScan(res),
+			Map: analysis.FromScan(res),
 		})
 		// Belt-and-suspenders: Scan may see a newer commit than Resolve raced.
 		if repoMap := s.cached(res); repoMap != nil {

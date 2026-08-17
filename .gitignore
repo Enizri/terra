@@ -5,6 +5,7 @@ __pycache__/
 *.db
 /terra
 .DS_Store
+.cache/
 .superpowers/
 .playwright-mcp/
 .playwright-cli/

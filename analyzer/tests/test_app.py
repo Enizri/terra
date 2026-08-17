@@ -4,11 +4,10 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from terra_analyzer import app as app_module
-from terra_analyzer.app import app
-from terra_analyzer.llm import LLMError
-from terra_analyzer.models import Draft
-from terra_analyzer.agents.architecture.validate import validate
+from terra_analyzer.api.app import app, create_app
+from terra_analyzer.contracts import Draft
+from terra_analyzer.inference.client import LLMError
+from terra_analyzer.tasks.architecture.validate import validate
 
 client = TestClient(app)
 CASE_STUDIES = Path(__file__).resolve().parents[2] / "case-studies"
@@ -42,10 +41,12 @@ def test_lifespan_logs_model_and_url(monkeypatch, capfd):
 
 
 def test_lifespan_rejects_localhost_in_container(monkeypatch):
-    monkeypatch.setattr(app_module, "_in_container", lambda: True)
+    import terra_analyzer.api.app as app_mod
+
+    monkeypatch.setattr(app_mod, "_in_container", lambda: True)
     monkeypatch.setenv("TERRA_LLM_URL", "http://localhost:8020/v1")
     with pytest.raises(RuntimeError, match="inside a container"):
-        with TestClient(app):
+        with TestClient(create_app()):
             pass
 
 
@@ -71,7 +72,7 @@ def test_analyze_happy_path(monkeypatch, scan, good_draft):
         assert name == "architecture"
         return {"draft": good_draft.model_dump(by_alias=True), "warnings": ["heads up"]}
 
-    monkeypatch.setattr(app_module.registry, "run", fake_run)
+    monkeypatch.setattr(app.state.registry, "run", fake_run)
     response = client.post("/analyze", json={"scan": scan.model_dump(), "model": ""})
     assert response.status_code == 200
     body = response.json()
@@ -87,8 +88,8 @@ def test_tasks_architecture_happy_path(monkeypatch, scan, good_draft):
         assert name == "architecture"
         return {"draft": good_draft.model_dump(by_alias=True), "warnings": []}
 
-    monkeypatch.setattr(app_module.registry, "run", fake_run)
-    monkeypatch.setattr(app_module.registry, "get", lambda name: object() if name == "architecture" else None)
+    monkeypatch.setattr(app.state.registry, "run", fake_run)
+    monkeypatch.setattr(app.state.registry, "get", lambda name: object() if name == "architecture" else None)
 
     response = client.post("/tasks/architecture", json={"scan": scan.model_dump(), "model": ""})
     assert response.status_code == 200
@@ -103,8 +104,10 @@ def test_tasks_qa_multiselect(monkeypatch):
         captured["msgs"] = msgs
         return "both components share the request path"
 
-    monkeypatch.setattr("terra_analyzer.agents.qa.preflight", lambda cfg: None)
-    monkeypatch.setattr("terra_analyzer.agents.qa.chat", fake_chat)
+    import terra_analyzer.tasks.qa as qa_mod
+
+    monkeypatch.setattr(qa_mod, "preflight", lambda cfg: None)
+    monkeypatch.setattr(qa_mod, "chat", fake_chat)
 
     sels = [
         {"id": "web", "file": "web/App.tsx", "label": "Web"},
@@ -136,7 +139,7 @@ def test_analyze_llm_error_becomes_502(monkeypatch, scan):
     def boom(name, payload):
         raise LLMError("cannot reach a model server at http://localhost:8020/v1")
 
-    monkeypatch.setattr(app_module.registry, "run", boom)
+    monkeypatch.setattr(app.state.registry, "run", boom)
     response = client.post("/analyze", json={"scan": scan.model_dump()})
     assert response.status_code == 502
     assert "cannot reach a model server" in response.json()["detail"]

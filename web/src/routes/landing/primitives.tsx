@@ -1,7 +1,7 @@
 import { AnimatePresence, motion, type Transition } from "motion/react";
 import { useImperativeHandle, useState, type ReactNode, type Ref } from "react";
 import { Link } from "react-router-dom";
-import RepoDiagram from "../../shared/map/RepoDiagram";
+import { RepoDiagram } from "../../features/architecture-map";
 import { rise, spring } from "../../shared/motion";
 import { diagramEdges, diagramGroups, diagramNodes, type DiagramNode } from "./data";
 import {

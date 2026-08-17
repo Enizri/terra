@@ -58,6 +58,7 @@ func loadSelectJS() []byte {
 // hookJSPath returns an absolute path to hook.js for NODE_OPTIONS --require.
 func hookJSPath() (string, error) {
 	candidates := []string{
+		"hook.js", // go test cwd is this package
 		"internal/preview/hook.js",
 		filepath.Join("..", "internal", "preview", "hook.js"),
 	}

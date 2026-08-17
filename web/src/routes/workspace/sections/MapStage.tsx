@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { TerraMap } from "../../../shared/map/types";
-import RepoDiagram from "../../../shared/map/RepoDiagram";
-import DetailsPanel from "../../../shared/map/DetailsPanel";
-import { toDiagram } from "../../../shared/map/toDiagram";
-import { matchComponents } from "../../../shared/map/search";
-import { matchSpan, topLevelId } from "../../../shared/map/spanMatch";
-import { traces } from "../../../shared/api";
-import { LiveFrame, type LiveSelection } from "../../../shared/live";
+import type { TerraMap } from "../../../features/architecture-map";
+import {
+  DetailsPanel,
+  RepoDiagram,
+  matchComponents,
+  matchSpan,
+  toDiagram,
+  topLevelId,
+} from "../../../features/architecture-map";
+import { traces, LiveFrame, type LiveSelection } from "../../../features/preview";
 import { emptyQueue, enqueue } from "../pulseQueue";
 
 function MapSearch({ map, onSelect }: { map: TerraMap; onSelect: (id: string) => void }) {

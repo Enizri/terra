@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Enizri/terra/contracts/analysis-map/v1.schema.json",
+  "title": "ArchitectureMapV1",
+  "description": "Stored architecture map (analyses.map_json). Matches internal/analysis Map and web TerraMap.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["project", "components", "relationships", "suggested_questions"],
+  "properties": {
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "repository_url", "description", "kind", "primary_languages", "stats"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "repository_url": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "kind": { "type": "string" },
+        "primary_languages": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "stats": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["approx_source_files", "top_level_dirs"],
+          "properties": {
+            "approx_source_files": { "type": "integer", "minimum": 0 },
+            "top_level_dirs": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "components": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "parent_id", "name", "purpose", "importance", "type", "files"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "parent_id": { "type": ["string", "null"] },
+          "name": { "type": "string", "minLength": 1 },
+          "purpose": { "type": "string" },
+          "importance": {
+            "type": "string",
+            "enum": ["critical", "high", "medium", "low"]
+          },
+          "type": {
+            "type": "string",
+            "enum": ["frontend", "backend", "database", "infrastructure"]
+          },
+          "tech": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "files": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "file_count": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "relationships": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["from", "to", "type", "because"],
+        "properties": {
+          "from": { "type": "string", "minLength": 1 },
+          "to": { "type": "string", "minLength": 1 },
+          "type": { "type": "string", "minLength": 1 },
+          "because": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "suggested_questions": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

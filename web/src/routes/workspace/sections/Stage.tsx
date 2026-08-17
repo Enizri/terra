@@ -1,6 +1,6 @@
 import { useState, type ClipboardEvent, type DragEvent, type FormEvent } from "react";
-import type { TerraMap } from "../../../shared/map/types";
-import type { LiveSelection } from "../../../shared/live";
+import type { TerraMap } from "../../../features/architecture-map";
+import type { LiveSelection } from "../../../features/preview";
 import type { useAnalyze } from "../useAnalyze";
 import { extractGitHubURL, githubURLFromDataTransfer } from "../githubUrl";
 import { ArrowIcon } from "../../../shared/shell/icons";

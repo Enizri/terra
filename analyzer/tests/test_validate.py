@@ -1,5 +1,5 @@
-from terra_analyzer.models import Draft
-from terra_analyzer.agents.architecture.validate import (
+from terra_analyzer.contracts import Draft
+from terra_analyzer.tasks.architecture.validate import (
     clean_path, count_files, known_paths, retry_message, validate,
 )
 

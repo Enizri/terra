@@ -1,10 +1,15 @@
 import { useMemo, useState, type ReactNode } from "react";
-import type { TerraMap } from "../map/types";
 import { buildFileTree, countLeaves, type FileNode } from "../fileTree";
 import { ChevronIcon, CloseIcon } from "./icons";
 import type { HistoryEntry } from "./types";
 
 export type { HistoryEntry } from "./types";
+
+/** Shell-local map shape — avoids importing architecture-map into shared/. */
+type SidebarMap = {
+  project: { repository_url: string };
+  components: { id: string; files: string[] }[];
+};
 
 /** One rail section: the header is the toggle, the body is what it hides. */
 function RailSection({
@@ -89,7 +94,7 @@ export function Sidebar({
   onRemove,
   busy,
 }: {
-  map: TerraMap | null;
+  map: SidebarMap | null;
   history: HistoryEntry[];
   onSelect: (id: string) => void;
   /** Load a stored analysis's saved map — no pipeline re-run. */

@@ -5,8 +5,8 @@
 
 import { useImperativeHandle, useLayoutEffect, useRef, useState, type Ref } from "react";
 import memosFixture from "../../../data/memos.map.json";
-import type { TerraMap } from "../../../shared/map/types";
-import RepoDiagram from "../../../shared/map/RepoDiagram";
+import type { TerraMap } from "../../../features/architecture-map";
+import { RepoDiagram } from "../../../features/architecture-map";
 import { WorkspaceHeader } from "../../../shared/shell/WorkspaceHeader";
 import { Sidebar } from "../../../shared/shell/Sidebar";
 import { StatusLine } from "../../../shared/shell/StatusLine";

@@ -13,9 +13,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Enizri/terra/internal/analysis"
+	"github.com/Enizri/terra/internal/analyzerclient"
 	"github.com/Enizri/terra/internal/catalog"
 	"github.com/Enizri/terra/internal/config"
-	"github.com/Enizri/terra/internal/graph"
 	"github.com/Enizri/terra/internal/job"
 	"github.com/Enizri/terra/internal/llmlocal"
 	"github.com/Enizri/terra/internal/preview"
@@ -39,7 +40,7 @@ type Server struct {
 	Scan func(url, commit string) (*scan.Result, error)
 	// Resolve returns canonical URL, short name, and HEAD SHA without a tarball.
 	Resolve func(url string) (canonical, name, commit string, err error)
-	Analyze func(ctx context.Context, res *scan.Result, opts graph.LLMOpts) (*graph.Map, []string, error)
+	Analyze func(ctx context.Context, res *scan.Result, opts analyzerclient.LLMOpts) (*analysis.Map, []string, error)
 	RunTask func(ctx context.Context, name string, payload any) (json.RawMessage, error)
 
 	// Host reports what this machine can run locally; nil detects it once.
@@ -118,8 +119,8 @@ func (s *Server) Handler() http.Handler {
 			s.Resolve = scan.ResolveHead
 		}
 		if s.Analyze == nil {
-			s.Analyze = func(ctx context.Context, res *scan.Result, opts graph.LLMOpts) (*graph.Map, []string, error) {
-				return graph.Analyze(ctx, s.Cfg.AnalyzerURL, res, opts)
+			s.Analyze = func(ctx context.Context, res *scan.Result, opts analyzerclient.LLMOpts) (*analysis.Map, []string, error) {
+				return analyzerclient.Analyze(ctx, s.Cfg.AnalyzerURL, res, opts)
 			}
 		}
 		if s.Host == nil {
@@ -137,7 +138,7 @@ func (s *Server) Handler() http.Handler {
 		}
 		if s.RunTask == nil {
 			s.RunTask = func(ctx context.Context, name string, payload any) (json.RawMessage, error) {
-				return graph.RunTask(ctx, s.Cfg.AnalyzerURL, name, payload)
+				return analyzerclient.RunTask(ctx, s.Cfg.AnalyzerURL, name, payload)
 			}
 		}
 		if s.Jobs == nil {
@@ -233,7 +234,7 @@ func (s *Server) ListenAndServe(addr string) error {
 func (s *Server) selectModel(w http.ResponseWriter, modelID, apiKey, fallbackModel string) (modelSelection, bool) {
 	if modelID == "" {
 		// No pick: legacy/operator behaviour, TERRA_LLM_* decides.
-		return modelSelection{Opts: graph.LLMOpts{Model: fallbackModel}}, true
+		return modelSelection{Opts: analyzerclient.LLMOpts{Model: fallbackModel}}, true
 	}
 	entry := catalog.Find(modelID)
 	if entry == nil {

@@ -10,7 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Enizri/terra/internal/graph"
+	"github.com/Enizri/terra/internal/analysis"
+	"github.com/Enizri/terra/internal/analyzerclient"
 	"github.com/Enizri/terra/internal/scan"
 )
 
@@ -31,10 +32,10 @@ func limiterTestHandler(t *testing.T) http.Handler {
 		Scan: func(url, _ string) (*scan.Result, error) {
 			return &scan.Result{RepositoryURL: url, Name: "notes", ScannedAt: time.Now().UTC()}, nil
 		},
-		Analyze: func(ctx context.Context, res *scan.Result, opts graph.LLMOpts) (*graph.Map, []string, error) {
-			return &graph.Map{
-				Project:    graph.Project{Name: "Notes", RepositoryURL: res.RepositoryURL},
-				Components: []graph.Component{{ID: "web", Name: "Web", Purpose: "p", Importance: "critical", Type: "frontend"}},
+		Analyze: func(ctx context.Context, res *scan.Result, opts analyzerclient.LLMOpts) (*analysis.Map, []string, error) {
+			return &analysis.Map{
+				Project:    analysis.Project{Name: "Notes", RepositoryURL: res.RepositoryURL},
+				Components: []analysis.Component{{ID: "web", Name: "Web", Purpose: "p", Importance: "critical", Type: "frontend"}},
 			}, nil, nil
 		},
 	}

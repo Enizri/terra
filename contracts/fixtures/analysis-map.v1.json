@@ -1,0 +1,420 @@
+{
+  "project": {
+    "name": "Memos",
+    "repository_url": "https://github.com/usememos/memos",
+    "description": "Open-source, self-hosted note-taking app built for quick capture. Markdown-native, single Go binary, data stays under the user's control.",
+    "kind": "Self-hosted SaaS-style web application",
+    "primary_languages": [
+      "Go",
+      "TypeScript"
+    ],
+    "stats": {
+      "approx_source_files": 1030,
+      "top_level_dirs": [
+        "cmd",
+        "server",
+        "store",
+        "internal",
+        "proto",
+        "web",
+        "docs",
+        "scripts"
+      ]
+    }
+  },
+  "components": [
+    {
+      "id": "web",
+      "parent_id": null,
+      "name": "Web Application",
+      "purpose": "Everything the user sees and clicks: writing memos, browsing the timeline, settings.",
+      "importance": "critical",
+      "type": "frontend",
+      "tech": [
+        "React",
+        "TypeScript",
+        "Vite",
+        "Tailwind CSS",
+        "TanStack Query",
+        "Connect-Web"
+      ],
+      "files": [
+        "web/src/"
+      ],
+      "file_count": 530
+    },
+    {
+      "id": "web.editor",
+      "parent_id": "web",
+      "name": "Memo Editor",
+      "purpose": "The writing surface: Markdown editing with autocomplete, syntax highlighting, and attachments.",
+      "importance": "high",
+      "type": "frontend",
+      "tech": [
+        "CodeMirror",
+        "Lezer Markdown"
+      ],
+      "files": [
+        "web/src/components/MemoEditor/"
+      ]
+    },
+    {
+      "id": "web.timeline",
+      "parent_id": "web",
+      "name": "Timeline & Browsing",
+      "purpose": "Reading side: home timeline, memo detail, explore feed, archive, search and filters.",
+      "importance": "high",
+      "type": "frontend",
+      "tech": [
+        "React",
+        "fuse.js"
+      ],
+      "files": [
+        "web/src/pages/Home.tsx",
+        "web/src/pages/Explore.tsx",
+        "web/src/pages/MemoDetail.tsx",
+        "web/src/components/MemoExplorer/",
+        "web/src/components/MemoContent/"
+      ]
+    },
+    {
+      "id": "web.settings",
+      "parent_id": "web",
+      "name": "Settings & Admin UI",
+      "purpose": "Account, workspace, and admin screens: users, identity providers, webhooks, access tokens.",
+      "importance": "medium",
+      "type": "frontend",
+      "files": [
+        "web/src/pages/Setting.tsx",
+        "web/src/components/CreateUserDialog.tsx",
+        "web/src/components/CreateIdentityProviderDialog.tsx",
+        "web/src/components/CreateWebhookDialog.tsx"
+      ]
+    },
+    {
+      "id": "api",
+      "parent_id": null,
+      "name": "API Layer",
+      "purpose": "The front door for all clients: defines every operation (memos, users, auth, attachments) as typed services that both the web app and third-party tools call.",
+      "importance": "critical",
+      "type": "backend",
+      "tech": [
+        "Connect-RPC",
+        "gRPC",
+        "grpc-gateway",
+        "Protocol Buffers",
+        "echo"
+      ],
+      "files": [
+        "server/router/api/v1/",
+        "proto/api/v1/"
+      ],
+      "file_count": 120
+    },
+    {
+      "id": "api.contracts",
+      "parent_id": "api",
+      "name": "API Contracts",
+      "purpose": "Protobuf definitions of every service and message; generated code keeps Go server and TypeScript client in sync.",
+      "importance": "high",
+      "type": "backend",
+      "tech": [
+        "Protocol Buffers"
+      ],
+      "files": [
+        "proto/api/v1/",
+        "proto/gen/"
+      ]
+    },
+    {
+      "id": "auth",
+      "parent_id": null,
+      "name": "Authentication & Identity",
+      "purpose": "Controls who can log in and what they may do: sessions, access tokens, SSO via external identity providers, per-request authorization.",
+      "importance": "critical",
+      "type": "backend",
+      "tech": [
+        "JWT/tokens",
+        "OAuth2"
+      ],
+      "files": [
+        "server/auth/",
+        "server/router/api/v1/auth_service.go",
+        "server/router/api/v1/authz.go",
+        "internal/idp/"
+      ]
+    },
+    {
+      "id": "memos",
+      "parent_id": null,
+      "name": "Memo System",
+      "purpose": "The heart of the product: creating, editing, relating, sharing, commenting on and reacting to memos.",
+      "importance": "critical",
+      "type": "backend",
+      "tech": [
+        "Go"
+      ],
+      "files": [
+        "server/router/api/v1/memo_service.go",
+        "server/router/api/v1/memo_relation_service.go",
+        "server/router/api/v1/memo_service_comments.go",
+        "internal/markdown/",
+        "server/runner/memopayload/"
+      ]
+    },
+    {
+      "id": "memos.markdown",
+      "parent_id": "memos",
+      "name": "Markdown Engine",
+      "purpose": "Parses memo text to extract structure: tags, links, mentions, tasks.",
+      "importance": "high",
+      "type": "backend",
+      "files": [
+        "internal/markdown/"
+      ]
+    },
+    {
+      "id": "attachments",
+      "parent_id": null,
+      "name": "Attachments & File Storage",
+      "purpose": "Handles uploaded images and files: storing them locally or in S3, serving them back, image/EXIF processing.",
+      "importance": "high",
+      "type": "backend",
+      "tech": [
+        "S3",
+        "presigned URLs"
+      ],
+      "files": [
+        "server/router/api/v1/attachment_service.go",
+        "internal/storage/s3/",
+        "server/router/fileserver/",
+        "server/runner/s3presign/",
+        "internal/motionphoto/"
+      ]
+    },
+    {
+      "id": "ai",
+      "parent_id": null,
+      "name": "AI Features",
+      "purpose": "Optional AI capabilities: speech-to-text for audio memos and LLM-backed helpers.",
+      "importance": "medium",
+      "type": "backend",
+      "tech": [
+        "LLM APIs",
+        "speech-to-text"
+      ],
+      "files": [
+        "internal/ai/",
+        "server/router/api/v1/ai_service.go",
+        "proto/api/v1/ai_service.proto"
+      ]
+    },
+    {
+      "id": "integrations",
+      "parent_id": null,
+      "name": "Integrations & Publishing",
+      "purpose": "Ways the outside world connects: MCP server for AI agents, RSS feeds, outgoing webhooks, email notifications.",
+      "importance": "medium",
+      "type": "backend",
+      "files": [
+        "server/router/mcp/",
+        "server/router/rss/",
+        "internal/webhook/",
+        "internal/email/",
+        "server/notification/"
+      ]
+    },
+    {
+      "id": "data",
+      "parent_id": null,
+      "name": "Data Storage",
+      "purpose": "Single store layer that persists everything (memos, users, settings) and speaks three databases interchangeably.",
+      "importance": "critical",
+      "type": "database",
+      "tech": [
+        "SQLite",
+        "MySQL",
+        "PostgreSQL"
+      ],
+      "files": [
+        "store/"
+      ],
+      "file_count": 211
+    },
+    {
+      "id": "data.drivers",
+      "parent_id": "data",
+      "name": "Database Drivers",
+      "purpose": "One implementation per supported database behind a common driver interface.",
+      "importance": "high",
+      "type": "database",
+      "files": [
+        "store/db/sqlite/",
+        "store/db/mysql/",
+        "store/db/postgres/",
+        "store/driver.go"
+      ]
+    },
+    {
+      "id": "data.migrations",
+      "parent_id": "data",
+      "name": "Schema Migrations",
+      "purpose": "Versioned SQL that upgrades the database schema across releases, per driver.",
+      "importance": "medium",
+      "type": "database",
+      "files": [
+        "store/migration/",
+        "store/migrator.go"
+      ]
+    },
+    {
+      "id": "runtime",
+      "parent_id": null,
+      "name": "Server Runtime",
+      "purpose": "Boots and runs everything as one binary: startup, config profile, HTTP server wiring, background job scheduler, serving the built web app.",
+      "importance": "high",
+      "type": "infrastructure",
+      "tech": [
+        "Go",
+        "echo",
+        "Docker"
+      ],
+      "files": [
+        "cmd/memos/",
+        "server/server.go",
+        "internal/profile/",
+        "internal/scheduler/",
+        "server/router/frontend/"
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "from": "web",
+      "to": "api",
+      "type": "calls",
+      "because": [
+        "web uses @connectrpc/connect-web against proto/gen/api clients"
+      ]
+    },
+    {
+      "from": "api",
+      "to": "auth",
+      "type": "guarded_by",
+      "because": [
+        "server/router/api/v1/authz.go and connect_interceptors.go enforce auth on every request"
+      ]
+    },
+    {
+      "from": "api",
+      "to": "memos",
+      "type": "exposes",
+      "because": [
+        "memo_service.go implements proto/api/v1/memo_service.proto"
+      ]
+    },
+    {
+      "from": "api",
+      "to": "attachments",
+      "type": "exposes",
+      "because": [
+        "attachment_service.go implements attachment_service.proto"
+      ]
+    },
+    {
+      "from": "api",
+      "to": "ai",
+      "type": "exposes",
+      "because": [
+        "ai_service.go implements ai_service.proto"
+      ]
+    },
+    {
+      "from": "auth",
+      "to": "data",
+      "type": "reads_writes",
+      "because": [
+        "server/auth uses store user, user_identity, auth_config tables"
+      ]
+    },
+    {
+      "from": "memos",
+      "to": "data",
+      "type": "reads_writes",
+      "because": [
+        "store/memo.go, memo_relation.go, memo_share.go, reaction.go"
+      ]
+    },
+    {
+      "from": "memos",
+      "to": "memos.markdown",
+      "type": "uses",
+      "because": [
+        "memo payload built from parsed markdown (server/runner/memopayload)"
+      ]
+    },
+    {
+      "from": "memos",
+      "to": "integrations",
+      "type": "notifies",
+      "because": [
+        "memo_service_webhooks.go dispatches internal/webhook on memo events"
+      ]
+    },
+    {
+      "from": "attachments",
+      "to": "data",
+      "type": "reads_writes",
+      "because": [
+        "store/attachment.go persists attachment metadata"
+      ]
+    },
+    {
+      "from": "auth",
+      "to": "integrations",
+      "type": "uses",
+      "because": [
+        "password reset / notifications sent via internal/email (server/notification)"
+      ]
+    },
+    {
+      "from": "integrations",
+      "to": "memos",
+      "type": "reads",
+      "because": [
+        "RSS and MCP routers render/serve memos"
+      ]
+    },
+    {
+      "from": "runtime",
+      "to": "api",
+      "type": "hosts",
+      "because": [
+        "server/server.go mounts apiv1, fileserver, frontend, mcp, rss routers"
+      ]
+    },
+    {
+      "from": "runtime",
+      "to": "data",
+      "type": "initializes",
+      "because": [
+        "cmd/memos/main.go opens store driver and runs migrator on boot"
+      ]
+    },
+    {
+      "from": "data.drivers",
+      "to": "data.migrations",
+      "type": "upgraded_by",
+      "because": [
+        "store/migrator.go applies store/migration/<driver>/<version> SQL"
+      ]
+    }
+  ],
+  "suggested_questions": [
+    "How does a memo get from the editor to the database?",
+    "Where would I add a new database besides SQLite/MySQL/Postgres?",
+    "How does login work, and what SSO options exist?",
+    "What happens when a memo is created \u2014 who gets notified?",
+    "Which parts are optional (AI, S3, webhooks) vs core?"
+  ]
+}

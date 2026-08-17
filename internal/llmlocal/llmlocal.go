@@ -1,5 +1,5 @@
 // Package llmlocal drives the Terra host's model sidecar
-// (analyzer/terra_analyzer/local_server) so an analyze job can switch weights
+// (analyzer/terra_local_llm) so an analyze job can switch weights
 // without an operator editing .env and restarting anything.
 package llmlocal
 

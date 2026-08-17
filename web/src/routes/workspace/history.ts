@@ -1,4 +1,4 @@
-import type { AnalysisSummary } from "../../shared/api";
+import type { AnalysisSummary } from "../../features/analysis";
 import type { HistoryEntry } from "../../shared/shell/types";
 
 export type { HistoryEntry } from "../../shared/shell/types";

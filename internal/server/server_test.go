@@ -14,9 +14,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Enizri/terra/internal/analysis"
+	"github.com/Enizri/terra/internal/analyzerclient"
 	"github.com/Enizri/terra/internal/catalog"
 	"github.com/Enizri/terra/internal/config"
-	"github.com/Enizri/terra/internal/graph"
 	"github.com/Enizri/terra/internal/preview"
 	"github.com/Enizri/terra/internal/scan"
 	"github.com/Enizri/terra/internal/trace"
@@ -40,10 +41,10 @@ func testServer(t *testing.T) (*Server, *httptest.Server) {
 			canonical, name, err := scan.NormalizeURL(url)
 			return canonical, name, "", err
 		},
-		Analyze: func(ctx context.Context, res *scan.Result, opts graph.LLMOpts) (*graph.Map, []string, error) {
-			return &graph.Map{
-				Project: graph.Project{Name: "Notes", RepositoryURL: res.RepositoryURL},
-				Components: []graph.Component{{ID: "web", Name: "Web", Purpose: "p",
+		Analyze: func(ctx context.Context, res *scan.Result, opts analyzerclient.LLMOpts) (*analysis.Map, []string, error) {
+			return &analysis.Map{
+				Project: analysis.Project{Name: "Notes", RepositoryURL: res.RepositoryURL},
+				Components: []analysis.Component{{ID: "web", Name: "Web", Purpose: "p",
 					Importance: "critical", Type: "frontend", Files: []string{"web/"}}},
 			}, nil, nil
 		},
@@ -79,7 +80,7 @@ func TestAnalyzeStoresAndReturnsMap(t *testing.T) {
 	if resp.StatusCode != 200 {
 		t.Fatalf("status = %d", resp.StatusCode)
 	}
-	var m graph.Map
+	var m analysis.Map
 	if err := json.NewDecoder(resp.Body).Decode(&m); err != nil {
 		t.Fatal(err)
 	}
@@ -93,7 +94,7 @@ func TestAnalyzeStoresAndReturnsMap(t *testing.T) {
 	if len(list) != 1 || list[0]["repo_url"] != "https://github.com/acme/notes" {
 		t.Fatalf("list = %v", list)
 	}
-	var stored graph.Map
+	var stored analysis.Map
 	getJSON(t, fmt.Sprintf("%s/analyses/%v", ts.URL, list[0]["id"]), &stored)
 	if stored.Project.Name != "Notes" {
 		t.Errorf("stored = %+v", stored.Project)
@@ -109,7 +110,7 @@ func TestAnalyzeReusesStoredMapForUnchangedCommit(t *testing.T) {
 			ScannedAt: time.Now().UTC()}, nil
 	}
 	realAnalyze := s.Analyze
-	s.Analyze = func(ctx context.Context, res *scan.Result, opts graph.LLMOpts) (*graph.Map, []string, error) {
+	s.Analyze = func(ctx context.Context, res *scan.Result, opts analyzerclient.LLMOpts) (*analysis.Map, []string, error) {
 		calls++
 		return realAnalyze(ctx, res, opts)
 	}
@@ -119,7 +120,7 @@ func TestAnalyzeReusesStoredMapForUnchangedCommit(t *testing.T) {
 		if resp.StatusCode != 200 {
 			t.Fatalf("request %d: status = %d", i, resp.StatusCode)
 		}
-		var m graph.Map
+		var m analysis.Map
 		if err := json.NewDecoder(resp.Body).Decode(&m); err != nil {
 			t.Fatal(err)
 		}
@@ -146,7 +147,7 @@ func TestAnalyzeStreamCacheHitEndsWithDone(t *testing.T) {
 			ScannedAt: time.Now().UTC()}, nil
 	}
 	postAnalyze(t, ts, `{"repo_url":"https://github.com/acme/notes"}`) // warm the store
-	s.Analyze = func(ctx context.Context, res *scan.Result, opts graph.LLMOpts) (*graph.Map, []string, error) {
+	s.Analyze = func(ctx context.Context, res *scan.Result, opts analyzerclient.LLMOpts) (*analysis.Map, []string, error) {
 		t.Error("analyzer must not run on a cache hit")
 		return nil, nil, fmt.Errorf("unreachable")
 	}
@@ -188,8 +189,8 @@ func TestAnalyzeStreamsStages(t *testing.T) {
 
 	var stages []string
 	var last struct {
-		Stage string     `json:"stage"`
-		Map   *graph.Map `json:"map"`
+		Stage string        `json:"stage"`
+		Map   *analysis.Map `json:"map"`
 	}
 	dec := json.NewDecoder(resp.Body)
 	for {
@@ -239,14 +240,14 @@ func TestAnalyzeStreamsStructuralMapOnScan(t *testing.T) {
 	defer resp.Body.Close()
 
 	var scanEv struct {
-		Stage string     `json:"stage"`
-		Map   *graph.Map `json:"map"`
+		Stage string        `json:"stage"`
+		Map   *analysis.Map `json:"map"`
 	}
 	dec := json.NewDecoder(resp.Body)
 	for dec.More() {
 		var ev struct {
-			Stage string     `json:"stage"`
-			Map   *graph.Map `json:"map"`
+			Stage string        `json:"stage"`
+			Map   *analysis.Map `json:"map"`
 		}
 		if err := dec.Decode(&ev); err != nil {
 			t.Fatal(err)
@@ -281,7 +282,7 @@ func TestAnalyzeJobCacheHitSkipsScan(t *testing.T) {
 		scanCalls++
 		return nil, fmt.Errorf("scan must not run on a resolve+commit cache hit")
 	}
-	s.Analyze = func(ctx context.Context, res *scan.Result, opts graph.LLMOpts) (*graph.Map, []string, error) {
+	s.Analyze = func(ctx context.Context, res *scan.Result, opts analyzerclient.LLMOpts) (*analysis.Map, []string, error) {
 		t.Error("analyzer must not run on a cache hit")
 		return nil, nil, fmt.Errorf("unreachable")
 	}
@@ -299,7 +300,7 @@ func TestAnalyzeJobCacheHitSkipsScan(t *testing.T) {
 // to arrive as an error event, not a 502.
 func TestAnalyzeStreamsFailureAsEvent(t *testing.T) {
 	s, ts := testServer(t)
-	s.Analyze = func(ctx context.Context, res *scan.Result, opts graph.LLMOpts) (*graph.Map, []string, error) {
+	s.Analyze = func(ctx context.Context, res *scan.Result, opts analyzerclient.LLMOpts) (*analysis.Map, []string, error) {
 		return nil, nil, fmt.Errorf("cannot reach the analyzer service")
 	}
 	req, _ := http.NewRequest("POST", ts.URL+"/analyze",
@@ -353,7 +354,7 @@ func TestAnalyzeRejectsBadBody(t *testing.T) {
 
 func TestAnalyzeReportsAnalyzerFailure(t *testing.T) {
 	s, ts := testServer(t)
-	s.Analyze = func(ctx context.Context, res *scan.Result, opts graph.LLMOpts) (*graph.Map, []string, error) {
+	s.Analyze = func(ctx context.Context, res *scan.Result, opts analyzerclient.LLMOpts) (*analysis.Map, []string, error) {
 		return nil, nil, fmt.Errorf("cannot reach the analyzer service")
 	}
 	resp := postAnalyze(t, ts, `{"repo_url":"https://github.com/acme/notes"}`)
@@ -935,12 +936,12 @@ func TestEnqueueAnalyzeReturnsBeforeWorkFinishes(t *testing.T) {
 	s, ts := testServer(t)
 	started := make(chan struct{})
 	release := make(chan struct{})
-	s.Analyze = func(ctx context.Context, res *scan.Result, opts graph.LLMOpts) (*graph.Map, []string, error) {
+	s.Analyze = func(ctx context.Context, res *scan.Result, opts analyzerclient.LLMOpts) (*analysis.Map, []string, error) {
 		close(started)
 		<-release
-		return &graph.Map{
-			Project:    graph.Project{Name: "Notes", RepositoryURL: res.RepositoryURL},
-			Components: []graph.Component{{ID: "web", Name: "Web", Purpose: "p", Importance: "critical", Type: "frontend"}},
+		return &analysis.Map{
+			Project:    analysis.Project{Name: "Notes", RepositoryURL: res.RepositoryURL},
+			Components: []analysis.Component{{ID: "web", Name: "Web", Purpose: "p", Importance: "critical", Type: "frontend"}},
 		}, nil, nil
 	}
 
@@ -974,8 +975,8 @@ func TestEnqueueAnalyzeReturnsBeforeWorkFinishes(t *testing.T) {
 	}
 	defer evResp.Body.Close()
 	var last struct {
-		Stage string     `json:"stage"`
-		Map   *graph.Map `json:"map"`
+		Stage string        `json:"stage"`
+		Map   *analysis.Map `json:"map"`
 	}
 	dec := json.NewDecoder(evResp.Body)
 	for dec.More() {
@@ -1008,7 +1009,7 @@ func TestCancelAnalyzeJob(t *testing.T) {
 		time.Sleep(100 * time.Millisecond) // window for cancel to land
 		return &scan.Result{RepositoryURL: url, Name: "notes", ScannedAt: time.Now().UTC()}, nil
 	}
-	s.Analyze = func(ctx context.Context, res *scan.Result, opts graph.LLMOpts) (*graph.Map, []string, error) {
+	s.Analyze = func(ctx context.Context, res *scan.Result, opts analyzerclient.LLMOpts) (*analysis.Map, []string, error) {
 		t.Error("Analyze must not run after cancel")
 		return nil, nil, fmt.Errorf("unreachable")
 	}
@@ -1097,14 +1098,14 @@ func TestAnalyzeJobDeadline(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			t.Setenv("TERRA_ANALYZE_TIMEOUT", c.timeout)
 			s, ts := testServer(t)
-			s.Analyze = func(ctx context.Context, res *scan.Result, opts graph.LLMOpts) (*graph.Map, []string, error) {
+			s.Analyze = func(ctx context.Context, res *scan.Result, opts analyzerclient.LLMOpts) (*analysis.Map, []string, error) {
 				if c.block {
 					<-ctx.Done()
 					return nil, nil, ctx.Err()
 				}
-				return &graph.Map{
-					Project:    graph.Project{Name: "Notes", RepositoryURL: res.RepositoryURL},
-					Components: []graph.Component{{ID: "web", Name: "Web", Purpose: "p", Importance: "critical", Type: "frontend"}},
+				return &analysis.Map{
+					Project:    analysis.Project{Name: "Notes", RepositoryURL: res.RepositoryURL},
+					Components: []analysis.Component{{ID: "web", Name: "Web", Purpose: "p", Importance: "critical", Type: "frontend"}},
 				}, nil, nil
 			}
 			stage, label := lastJobEvent(t, ts, startAnalyzeJobHTTP(t, ts))
@@ -1124,7 +1125,7 @@ func TestAnalyzeJobDeadline(t *testing.T) {
 func TestCancelPropagatesToAnalyze(t *testing.T) {
 	s, ts := testServer(t)
 	entered := make(chan struct{})
-	s.Analyze = func(ctx context.Context, res *scan.Result, opts graph.LLMOpts) (*graph.Map, []string, error) {
+	s.Analyze = func(ctx context.Context, res *scan.Result, opts analyzerclient.LLMOpts) (*analysis.Map, []string, error) {
 		close(entered)
 		<-ctx.Done() // hangs forever unless cancel reaches the in-flight call
 		return nil, nil, ctx.Err()
@@ -1167,7 +1168,7 @@ func TestAnalyzeQueueRejectsWhenFull(t *testing.T) {
 	t.Setenv("TERRA_RATE_LIMIT", "0")
 	s, ts := testServer(t)
 	gate := make(chan struct{})
-	s.Analyze = func(ctx context.Context, res *scan.Result, opts graph.LLMOpts) (*graph.Map, []string, error) {
+	s.Analyze = func(ctx context.Context, res *scan.Result, opts analyzerclient.LLMOpts) (*analysis.Map, []string, error) {
 		<-gate
 		return nil, nil, fmt.Errorf("released")
 	}

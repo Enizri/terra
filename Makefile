@@ -1,6 +1,6 @@
 .PHONY: run-analyzer run-server run-llm run-web build-web dev dev-api up down up-llm \
 	test test-fixtures sync-fixtures test-go test-py test-web test-integration \
-	lint lint-go lint-web check fmt-go venv venv-local
+	lint lint-go lint-web lint-py check check-contracts fmt-go venv venv-local
 
 # One-command local stack (host processes, hot reload):
 #   make venv-local   # once
@@ -30,7 +30,7 @@ venv-local: venv
 	$(VENV)/bin/pip install -q -e 'analyzer[dev,local]'
 
 run-llm:
-	cd analyzer && HF_XET_HIGH_PERFORMANCE=1 .venv/bin/uvicorn terra_analyzer.local_server.server:app --port 8020
+	cd analyzer && HF_XET_HIGH_PERFORMANCE=1 .venv/bin/uvicorn terra_local_llm.server:app --port 8020
 
 run-analyzer:
 	cd analyzer && TERRA_LLM_URL=$${TERRA_LLM_URL:-http://localhost:8020/v1} \
@@ -64,7 +64,7 @@ down:
 test: test-fixtures test-go test-py test-web
 
 # Full gate used by CI and local "am I green?" runs.
-check: test lint
+check: check-contracts test lint
 
 # Canonical golden: case-studies/memos.map.json.
 # Web ships a copy under web/src/data/ for the Vite bundle.
@@ -74,10 +74,19 @@ sync-fixtures:
 test-fixtures:
 	./scripts/sync-fixtures.sh --check
 
-lint: lint-go lint-web
+lint: lint-go lint-web lint-py
+
+lint-py:
+	cd analyzer && .venv/bin/python -m compileall -q terra_analyzer terra_local_llm tests
+	@# Prefer ruff when installed in the venv; otherwise compileall is the floor.
+	@if [ -x analyzer/.venv/bin/ruff ]; then analyzer/.venv/bin/ruff check analyzer/terra_analyzer analyzer/terra_local_llm analyzer/tests; 	elif command -v ruff >/dev/null 2>&1; then ruff check analyzer/terra_analyzer analyzer/terra_local_llm analyzer/tests; 	else echo "lint-py: ruff not installed; compileall only"; fi
+
+check-contracts:
+	./scripts/check-contracts.sh
 
 lint-go:
-	PATH="$(shell go env GOPATH)/bin:$$PATH" golangci-lint run
+	mkdir -p .cache/golangci
+	GOLANGCI_LINT_CACHE="$(CURDIR)/.cache/golangci" PATH="$(shell go env GOPATH)/bin:$$PATH" golangci-lint run
 
 lint-web:
 	cd web && npm install && npm run lint
