@@ -182,8 +182,10 @@ is cheaper to fix when there is a real second case than to generalize now.
   codegen; `internal/graph`'s contract test against `case-studies/memos.map.json`
   is what catches drift.
 - **`internal/store` is typed to `graph.Map`,** so it is Terra's schema rather
-  than a generic store, and it has **no migrations** — the schema is re-created
-  on open and the documented fix for a shape change is deleting `terra.db`.
+  than a generic store. Maps live only in `projects.map_json` (no normalized
+  component/relationship tables). It has **no migrations** — the schema is
+  re-created on open and the documented fix for a shape change is deleting
+  `terra.db`.
 - **No shared logging or error-type layer in Go.** `internal/config` centralizes
   `TERRA_*` parsing; errors remain `fmt.Errorf` strings. Fine at this size;
   revisit when a second binary needs the same wiring.
