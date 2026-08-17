@@ -2,15 +2,19 @@ import json
 
 import httpx
 import pytest
-
 from terra_analyzer.contracts import Draft
 from terra_analyzer.inference.client import LLMError, chat, preflight
 from terra_analyzer.inference.config import Config
 from terra_analyzer.tasks.architecture import ArchitectureMapper
 from terra_analyzer.tasks.architecture.schema import DRAFT_SCHEMA
 
-from .conftest import (DEFAULT_MODEL, draft_json, mock_client, openai_handler,
-                       schema_rejecting_handler)
+from .conftest import (
+    DEFAULT_MODEL,
+    draft_json,
+    mock_client,
+    openai_handler,
+    schema_rejecting_handler,
+)
 
 
 def generate(scan, **kwargs):

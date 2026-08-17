@@ -1,6 +1,10 @@
-from terra_analyzer.contracts import Manifest, ScanResult
+from terra_analyzer.contracts import Manifest
 from terra_analyzer.tasks.architecture.prompt import (
-    MAX_FILES_CHARS, SYSTEM_PROMPT, build_prompt, file_section, sample_paths,
+    MAX_FILES_CHARS,
+    SYSTEM_PROMPT,
+    build_prompt,
+    file_section,
+    sample_paths,
 )
 
 

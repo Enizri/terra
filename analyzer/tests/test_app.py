@@ -3,7 +3,6 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-
 from terra_analyzer.api.app import app, create_app
 from terra_analyzer.contracts import Draft
 from terra_analyzer.inference.client import LLMError
@@ -45,9 +44,11 @@ def test_lifespan_rejects_localhost_in_container(monkeypatch):
 
     monkeypatch.setattr(app_mod, "_in_container", lambda: True)
     monkeypatch.setenv("TERRA_LLM_URL", "http://localhost:8020/v1")
-    with pytest.raises(RuntimeError, match="inside a container"):
-        with TestClient(create_app()):
-            pass
+    with (
+        pytest.raises(RuntimeError, match="inside a container"),
+        TestClient(create_app()),
+    ):
+        pass
 
 
 def test_healthz_reports_llm_error(monkeypatch):
@@ -169,7 +170,7 @@ def test_golden_answer_key_passes_validation():
     })
     known = {path.strip().removeprefix("./").removeprefix("/").removesuffix("/")
              for component in map_data["components"] for path in component["files"]}
-    warnings, errs = validate(draft, known, strict=True)
+    _warnings, errs = validate(draft, known, strict=True)
     assert errs == []
     assert len(draft.components) == 16
     assert len(draft.relationships) == 15

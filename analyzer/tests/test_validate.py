@@ -1,6 +1,10 @@
 from terra_analyzer.contracts import Draft
 from terra_analyzer.tasks.architecture.validate import (
-    clean_path, count_files, known_paths, retry_message, validate,
+    clean_path,
+    count_files,
+    known_paths,
+    retry_message,
+    validate,
 )
 
 KNOWN = {"web", "web/src", "web/src/app.tsx", "server", "server/main.go", "store", "store/db.go"}

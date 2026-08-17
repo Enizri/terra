@@ -2,7 +2,6 @@ import json
 
 import httpx
 import pytest
-
 from terra_analyzer.contracts import Draft, ScanResult
 from terra_analyzer.tasks.architecture.validate import known_paths, validate
 

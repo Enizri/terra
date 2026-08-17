@@ -48,9 +48,11 @@ Return only the JSON object."""
 def build_prompt(res: ScanResult) -> str:
     """Render scan facts for the user message (kept short for local models)."""
     parts = [
-        f"PROJECT\nname: {res.name}\nrepository: {res.repository_url}\n"
-        f"source files: {res.stats.source_files}\n"
-        f"top-level dirs: {', '.join(res.stats.top_level_dirs)}\n"
+        (
+            f"PROJECT\nname: {res.name}\nrepository: {res.repository_url}\n"
+            f"source files: {res.stats.source_files}\n"
+            f"top-level dirs: {', '.join(res.stats.top_level_dirs)}\n"
+        )
     ]
 
     if res.languages:

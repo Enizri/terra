@@ -35,11 +35,11 @@ async def _lifespan(_app: FastAPI):
                 "(https://api.openai.com/v1) or http://llm:8020/v1 for the Compose llm profile."
             )
         try:
-            from ..inference.client import preflight
+            from ..inference.client import LLMError, preflight
 
             preflight(cfg)
             print("terra-analyzer: llm reachable", file=sys.stderr)
-        except Exception as e:
+        except LLMError as e:
             print(
                 f"terra-analyzer: llm UNREACHABLE: {e} — /analyze will fail with this error",
                 file=sys.stderr,
@@ -65,11 +65,11 @@ def create_app(registry: TaskRegistry | None = None) -> FastAPI:
         llm_ok = False
         llm_error = None
         try:
-            from ..inference.client import preflight
+            from ..inference.client import LLMError, preflight
 
             preflight(cfg)
             llm_ok = True
-        except Exception as e:
+        except LLMError as e:
             llm_error = str(e)
         finally:
             cfg.client.close()
