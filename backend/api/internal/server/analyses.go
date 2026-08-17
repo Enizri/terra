@@ -1,0 +1,85 @@
+package server
+
+import (
+	"fmt"
+	"net/http"
+
+	"github.com/Enizri/terra/backend/api/internal/analysis"
+	"github.com/Enizri/terra/backend/api/internal/scan"
+	"github.com/Enizri/terra/backend/api/internal/store"
+)
+
+// cached returns the stored map when HEAD matches the last analysis commit.
+func (s *Server) cached(res *scan.Result) *analysis.Map {
+	return s.cachedAt(res.RepositoryURL, res.Commit)
+}
+
+// cachedAt returns the stored map when repoURL's saved commit equals commit.
+func (s *Server) cachedAt(repoURL, commit string) *analysis.Map {
+	if s.DB == "" || repoURL == "" || commit == "" {
+		return nil
+	}
+	stored, repoMap, err := store.Find(s.DB, repoURL)
+	if err != nil || stored != commit {
+		return nil
+	}
+	return repoMap
+}
+
+// storedMap returns the saved analysis for repoURL, or nil.
+func storedMap(dbPath, repoURL string) *analysis.Map {
+	norm, _, err := scan.NormalizeURL(repoURL)
+	if err != nil {
+		return nil
+	}
+	_, repoMap, err := store.Find(dbPath, norm)
+	if err != nil {
+		return nil
+	}
+	return repoMap
+}
+
+func (s *Server) list(w http.ResponseWriter, r *http.Request) {
+	list, err := store.List(s.DB)
+	if err != nil {
+		httpError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, list)
+}
+
+func (s *Server) get(w http.ResponseWriter, r *http.Request) {
+	var id int64
+	if _, err := fmt.Sscan(r.PathValue("id"), &id); err != nil {
+		httpError(w, http.StatusBadRequest, "id must be a number")
+		return
+	}
+	repoMap, err := store.Get(s.DB, id)
+	if err != nil {
+		httpError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if repoMap == nil {
+		httpError(w, http.StatusNotFound, fmt.Sprintf("no analysis with id %d", id))
+		return
+	}
+	writeJSON(w, repoMap)
+}
+
+func (s *Server) deleteAnalysis(w http.ResponseWriter, r *http.Request) {
+	var id int64
+	if _, err := fmt.Sscan(r.PathValue("id"), &id); err != nil {
+		httpError(w, http.StatusBadRequest, "id must be a number")
+		return
+	}
+	ok, err := store.Delete(s.DB, id)
+	if err != nil {
+		httpError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if !ok {
+		httpError(w, http.StatusNotFound, fmt.Sprintf("no analysis with id %d", id))
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}

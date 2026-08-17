@@ -17,7 +17,7 @@ jobs:
       - name: Install Go
         run: |
           set -euo pipefail
-          ver="$(awk '/^go /{print $2; exit}' go.mod)"
+          ver="$(awk '/^go /{print $2; exit}' backend/api/go.mod)"
           curl -fsSL "https://go.dev/dl/go${ver}.linux-amd64.tar.gz" -o /tmp/go.tgz
           sudo rm -rf /usr/local/go
           sudo tar -C /usr/local -xzf /tmp/go.tgz

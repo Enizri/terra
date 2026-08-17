@@ -24,7 +24,7 @@ Keep your branch rebased onto (or merged with) the latest `staging` before askin
 
 | Tool | Version | Notes |
 |---|---|---|
-| Go | 1.25+ | see `go.mod` |
+| Go | 1.25+ | see `backend/api/go.mod` |
 | Python | ≥3.11 (CI uses 3.12) | analyzer venv |
 | Node | 22 | web |
 | Docker | optional | Compose / preview |
@@ -50,19 +50,19 @@ See the table in [`ARCHITECTURE.md`](ARCHITECTURE.md). Domain terms:
 
 ### Change a wire field
 
-Follow the checklist in [`contracts/README.md`](contracts/README.md), then
+Follow the checklist in [`packages/contracts/README.md`](packages/contracts/README.md), then
 `make check-contracts && make check`.
 
 ### Add a SQLite migration
 
-1. Append a new entry to `migrations` in [`internal/store/migrate.go`](internal/store/migrate.go).
+1. Append a new entry to `migrations` in [`backend/api/internal/store/migrate.go`](backend/api/internal/store/migrate.go).
 2. Never edit a shipped version.
-3. Add/extend a test under `internal/store/` (prefer a legacy DB fixture for shape changes).
-4. `go test ./internal/store/`.
+3. Add/extend a test under `backend/api/internal/store/` (prefer a legacy DB fixture for shape changes).
+4. `(cd backend/api && go test ./internal/store/)`.
 
 ### Add an analyzer task
 
-1. Create `analyzer/terra_analyzer/tasks/<name>/` with typed input/output models.
+1. Create `backend/analyzer/terra_analyzer/tasks/<name>/` with typed input/output models.
 2. Implement the `Task` protocol (`name` + `run`).
 3. Register in `default_registry()` in `tasks/registry.py`.
 4. Go reaches it via `analyzerclient.RunTask` / `POST /tasks/{name}` — no Go change for a generic task.
@@ -70,7 +70,7 @@ Follow the checklist in [`contracts/README.md`](contracts/README.md), then
 
 ### Add a web feature module
 
-1. Create `web/src/features/<name>/` with a public `index.ts`.
+1. Create `apps/web/src/features/<name>/` with a public `index.ts`.
 2. Keep routes as composition only; put domain API/UI in the feature.
 3. Import from `features/`, never from another route.
 4. `npm test` (includes `boundaries.test.ts`).
@@ -79,7 +79,7 @@ Follow the checklist in [`contracts/README.md`](contracts/README.md), then
 
 1. Edit `case-studies/memos.map.json`.
 2. `make sync-fixtures`.
-3. Refresh `contracts/fixtures/analysis-map.v1.json` if the map shape is the contract fixture source (script/`make check-contracts` expects them to match).
+3. Refresh `packages/contracts/fixtures/analysis-map.v1.json` if the map shape is the contract fixture source (script/`make check-contracts` expects them to match).
 
 ## PR expectations
 

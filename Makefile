@@ -19,28 +19,28 @@
 #   make test             # fixtures + Go/Python/web tests (no lint)
 #   make test-integration # opt-in live GitHub + live LLM (needs env + services)
 
-VENV := analyzer/.venv
+VENV := backend/.venv
 GOIMPORTS := $(shell go env GOPATH)/bin/goimports
 
 venv:
 	python3 -m venv $(VENV)
-	$(VENV)/bin/pip install -q -e 'analyzer[dev]'
+	$(VENV)/bin/python -m pip install -q -e 'backend/analyzer[dev]' -e 'backend/local-llm[dev]'
 
 venv-local: venv
-	$(VENV)/bin/pip install -q -e 'analyzer[dev,local]'
+	$(VENV)/bin/python -m pip install -q -e 'backend/local-llm[local]'
 
 run-llm:
-	cd analyzer && HF_XET_HIGH_PERFORMANCE=1 .venv/bin/uvicorn terra_local_llm.server:app --port 8020
+	cd backend/local-llm && HF_XET_HIGH_PERFORMANCE=1 ../.venv/bin/python -m uvicorn terra_local_llm.server:app --port 8020
 
 run-analyzer:
-	cd analyzer && TERRA_LLM_URL=$${TERRA_LLM_URL:-http://localhost:8020/v1} \
-		.venv/bin/uvicorn terra_analyzer.app:app --port 8010
+	cd backend/analyzer && TERRA_LLM_URL=$${TERRA_LLM_URL:-http://localhost:8020/v1} \
+		../.venv/bin/python -m uvicorn terra_analyzer.app:app --port 8010
 
 run-server:
-	go run ./cmd/terra serve
+	cd backend/api && go run ./cmd/terra serve
 
 run-web:
-	cd web && npm install && npm run dev
+	cd apps/web && npm install && npm run dev
 
 dev:
 	./scripts/dev.sh
@@ -49,7 +49,7 @@ dev-api:
 	./scripts/dev.sh llm analyzer api
 
 build-web:
-	cd web && npm install && npm run build
+	cd apps/web && npm install && npm run build
 
 up:
 	docker compose up --build -d
@@ -67,7 +67,7 @@ test: test-fixtures test-go test-py test-web
 check: check-contracts test lint
 
 # Canonical golden: case-studies/memos.map.json.
-# Web ships a copy under web/src/data/ for the Vite bundle.
+# Web ships a copy under apps/web/src/data/ for the Vite bundle.
 sync-fixtures:
 	./scripts/sync-fixtures.sh
 
@@ -77,32 +77,34 @@ test-fixtures:
 lint: lint-go lint-web lint-py
 
 lint-py:
-	cd analyzer && .venv/bin/python -m compileall -q terra_analyzer terra_local_llm tests
+	cd backend/analyzer && ../.venv/bin/python -m compileall -q terra_analyzer tests
+	cd backend/local-llm && ../.venv/bin/python -m compileall -q terra_local_llm tests
 	@# Prefer ruff when installed in the venv; otherwise compileall is the floor.
-	@if [ -x analyzer/.venv/bin/ruff ]; then analyzer/.venv/bin/ruff check analyzer/terra_analyzer analyzer/terra_local_llm analyzer/tests; 	elif command -v ruff >/dev/null 2>&1; then ruff check analyzer/terra_analyzer analyzer/terra_local_llm analyzer/tests; 	else echo "lint-py: ruff not installed; compileall only"; fi
+	@if backend/.venv/bin/python -m ruff --version >/dev/null 2>&1; then backend/.venv/bin/python -m ruff check backend/analyzer backend/local-llm; 	elif command -v ruff >/dev/null 2>&1; then ruff check backend/analyzer backend/local-llm; 	else echo "lint-py: ruff not installed; compileall only"; fi
 
 check-contracts:
 	./scripts/check-contracts.sh
 
 lint-go:
 	mkdir -p .cache/golangci
-	GOLANGCI_LINT_CACHE="$(CURDIR)/.cache/golangci" PATH="$(shell go env GOPATH)/bin:$$PATH" golangci-lint run
+	cd backend/api && GOLANGCI_LINT_CACHE="$(CURDIR)/.cache/golangci" PATH="$(shell go env GOPATH)/bin:$$PATH" golangci-lint run --config ../../.golangci.yaml
 
 lint-web:
-	cd web && npm install && npm run lint
+	cd apps/web && npm install && npm run lint
 
 fmt-go:
-	gofmt -w $$(find . -name '*.go' -not -path './analyzer/*')
-	$(GOIMPORTS) -w $$(find . -name '*.go' -not -path './analyzer/*')
+	gofmt -w $$(find backend/api -name '*.go')
+	$(GOIMPORTS) -w $$(find backend/api -name '*.go')
 
 test-go:
-	go build ./... && go test ./...
+	cd backend/api && go build ./... && go test ./...
 
 test-py:
-	cd analyzer && .venv/bin/python -m pytest -q -m 'not slow'
+	cd backend/analyzer && ../.venv/bin/python -m pytest -q -m 'not slow'
+	cd backend/local-llm && ../.venv/bin/python -m pytest -q
 
 test-web:
-	cd web && npm install && npm test
+	cd apps/web && npm install && npm test
 
 # Opt-in live suites. Accepts TERRA_INTEGRATION=1, or the legacy
 # TERRA_LIVE / TERRA_SLOW knobs (see README).

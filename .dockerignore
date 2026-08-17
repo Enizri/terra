@@ -12,7 +12,7 @@ docs
 **/__pycache__
 **/*.egg-info
 **/node_modules
-web/dist
+apps/web/dist
 
 *.db
 .env
