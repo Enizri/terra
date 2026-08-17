@@ -63,7 +63,7 @@ def test_healthz_reports_llm_error(monkeypatch):
 def test_list_tasks():
     response = client.get("/tasks")
     assert response.status_code == 200
-    assert response.json()["tasks"] == ["architecture", "qa", "runfile"]
+    assert response.json()["tasks"] == ["architecture", "qa"]
 
 
 def test_analyze_happy_path(monkeypatch, scan, good_draft):

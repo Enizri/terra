@@ -28,10 +28,8 @@ class TaskRegistry:
 def default_registry() -> TaskRegistry:
     from .architecture import ArchitectureMapper
     from .qa import QATask
-    from .runfile import RunfileWriter
 
     reg = TaskRegistry()
     reg.register(ArchitectureMapper())
     reg.register(QATask())
-    reg.register(RunfileWriter())
     return reg

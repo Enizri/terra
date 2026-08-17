@@ -168,6 +168,10 @@ Nothing outside these three additions should need to change:
 Named on purpose. None of them is load-bearing for a second product, and each
 is cheaper to fix when there is a real second case than to generalize now.
 
+- **Preview boot uses Go `internal/runfile`, not the Python agent.** Production
+  preview/dev-server boot is owned by `internal/runfile`. The analyzer's
+  `agents/runfile.py` (`RunfileWriter`) is parked/experimental and is not in
+  `default_registry()` until someone wires `RunTask("runfile")` as a fallback.
 - **`internal/preview` carries demo-specific code.** Cookie prefix, auth
   endpoints, seed content and the Go-backend heuristic are all tuned to
   `usememos/memos` (~90 lines). A second demo repo is what should force the
