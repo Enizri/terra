@@ -210,14 +210,12 @@ func TestAPIKeyNeverReachesJobEventsOrTheStore(t *testing.T) {
 		}
 	}
 	// The probe cache and the store are the two places a key could linger.
-	s.probeMu.Lock()
-	for id, entry := range s.probes {
-		data, _ := json.Marshal(entry.res)
+	for id, result := range s.Probes.Results() {
+		data, _ := json.Marshal(result)
 		if strings.Contains(string(data), leakKey) {
-			t.Errorf("api key leaked into probe %s", id)
+			t.Errorf("api key leaked into probe %d", id)
 		}
 	}
-	s.probeMu.Unlock()
 	if list, err := store.List(s.DB); err == nil {
 		data, _ := json.Marshal(list)
 		if strings.Contains(string(data), leakKey) {

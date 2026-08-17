@@ -2,68 +2,15 @@ package server
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
-	"fmt"
 	"net/http"
-	"time"
 
-	"github.com/Enizri/terra/backend/api/internal/analysis"
-	"github.com/Enizri/terra/backend/api/internal/catalog"
+	analyzepipeline "github.com/Enizri/terra/backend/api/internal/analyze"
 	"github.com/Enizri/terra/backend/api/internal/job"
-	"github.com/Enizri/terra/backend/api/internal/recommend"
 	"github.com/Enizri/terra/backend/api/internal/scan"
 )
 
-// probeTTL is how long an analyze may reuse a probe's scan. Long enough for a
-// user to read the recommendation and pick, short enough that the answer is
-// still about the repo's current HEAD.
-const probeTTL = 15 * time.Minute
-
-// probeEntry is one cached probe result. It holds scan output only — never a
-// model selection and never an API key, which arrive with the analyze request
-// and die with it.
-type probeEntry struct {
-	res     *scan.Result
-	expires time.Time
-}
-
-// storeProbe caches res under id and sweeps anything already expired. The map
-// is small (one entry per pasted URL) so a lazy sweep is enough.
-func (s *Server) storeProbe(id string, res *scan.Result) {
-	now := time.Now()
-	s.probeMu.Lock()
-	defer s.probeMu.Unlock()
-	if s.probes == nil {
-		s.probes = map[string]probeEntry{}
-	}
-	for key, entry := range s.probes {
-		if now.After(entry.expires) {
-			delete(s.probes, key)
-		}
-	}
-	s.probes[id] = probeEntry{res: res, expires: now.Add(probeTTL)}
-}
-
-// readProbe returns the cached scan for id, or nil when it is unknown or
-// expired and the caller must rescan. It deliberately does not consume the
-// entry: a failed analyze is the most likely reason a user retries, and
-// re-downloading the repo to say the same thing is the wrong answer. The TTL
-// and storeProbe's sweep are what free it.
-func (s *Server) readProbe(id string) *scan.Result {
-	s.probeMu.Lock()
-	defer s.probeMu.Unlock()
-	entry, ok := s.probes[id]
-	if !ok || time.Now().After(entry.expires) {
-		return nil
-	}
-	return entry.res
-}
-
 // enqueueProbe starts the cheap first half of an analyze: fetch, scan, and a
-// model recommendation, with no LLM call. It takes no analyze slot — nothing
-// here is expensive, and holding one across the user's decision would stall
-// the queue on a dialog nobody is looking at.
+// model recommendation, with no LLM call or analyze concurrency slot.
 func (s *Server) enqueueProbe(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		RepoURL string `json:"repo_url"`
@@ -83,94 +30,25 @@ func (s *Server) enqueueProbe(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]string{"job_id": j.ID})
 }
 
-// newProbeID is the handle analyze quotes back to reuse this probe's scan.
-// The job id would do, but Hub.Start only hands it back after the worker is
-// already running, so the probe mints its own.
-func newProbeID() string {
-	var b [8]byte
-	rand.Read(b[:])
-	return hex.EncodeToString(b[:])
-}
-
 func (s *Server) startProbeJob(repoURL string) *job.Job {
-	probeID := newProbeID()
 	timeout := s.Cfg.AnalyzeTimeout
-	caps := s.Host()
-	entries := catalog.All()
-
+	runner := analyzepipeline.ProbeRunner{
+		Resolve:  s.Resolve,
+		Scan:     s.Scan,
+		RepoMeta: s.RepoMeta,
+		Host:     s.Host,
+		DB:       s.DB,
+		Cache:    s.Probes,
+	}
 	return s.Jobs.Start(func(jobCtx context.Context, emit func(job.Event)) {
 		ctx, cancel := context.WithTimeout(jobCtx, timeout)
 		defer cancel()
-		emit(job.Event{Stage: "fetch", Label: "Fetching " + repoURL})
-
-		// RepoMeta does not depend on the resolved SHA, so it rides alongside
-		// the resolve instead of costing its own round trip. Buffered so a
-		// cache hit below can abandon it without blocking the goroutine.
-		type meta struct {
-			language string
-			sizeKB   int64
-			err      error
-		}
-		metaCh := make(chan meta, 1)
-		go func() {
-			language, sizeKB, err := s.RepoMeta(repoURL)
-			metaCh <- meta{language, sizeKB, err}
-		}()
-
-		canonical, _, sha, err := s.Resolve(repoURL)
-		if err != nil {
-			emit(job.Event{Stage: "error", Label: err.Error()})
-			return
-		}
-		// A repo we already mapped at this commit needs no model at all: hand
-		// back the stored map and let the gate stay closed (no recommendation
-		// on the event means the workspace paints straight through).
-		if repoMap := s.cachedAt(canonical, sha); repoMap != nil {
-			emit(job.Event{Stage: "done", Map: repoMap})
-			return
-		}
-
-		// Provisional pick from GitHub metadata while the tarball downloads.
-		// Best-effort: a rate limit here must not fail the probe.
-		// Received here, not before the cache check above: a stored map needs
-		// no model, and a recommend event would open the gate on it.
-		sig := recommend.Signals{}
-		if m := <-metaCh; m.err == nil {
-			sig.SizeKB = m.sizeKB
-			if m.language != "" {
-				sig.Languages = []string{m.language}
+		if err := runner.Run(ctx, repoURL, emit); err != nil {
+			label := err.Error()
+			if ctx.Err() != nil {
+				label = stopLabel(ctx, timeout)
 			}
-			provisional := recommend.Recommend(entries, caps, sig)
-			emit(job.Event{
-				Stage:          "recommend",
-				Label:          "First guess: " + provisional.ModelID,
-				Recommendation: &provisional,
-			})
+			emit(job.Event{Stage: "error", Label: label})
 		}
-
-		res, err := s.Scan(repoURL, sha)
-		if err != nil {
-			emit(job.Event{Stage: "error", Label: err.Error()})
-			return
-		}
-		emit(job.Event{
-			Stage: "scan",
-			Label: fmt.Sprintf("Read %d files across %d languages",
-				res.Stats.SourceFiles, len(res.Languages)),
-			Map: analysis.FromScan(res),
-		})
-		if err := ctx.Err(); err != nil {
-			emit(job.Event{Stage: "error", Label: stopLabel(ctx, timeout)})
-			return
-		}
-
-		refined := recommend.Recommend(entries, caps, recommend.FromScan(res))
-		s.storeProbe(probeID, res)
-		emit(job.Event{
-			Stage:          "done",
-			ProbeID:        probeID,
-			Repo:           &recommend.RepoInfo{URL: res.RepositoryURL, Commit: res.Commit, Languages: res.PrimaryLanguages},
-			Recommendation: &refined,
-		})
 	})
 }

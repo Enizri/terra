@@ -9,6 +9,7 @@ import (
 
 	"github.com/Enizri/terra/backend/api/internal/analysis"
 	"github.com/Enizri/terra/backend/api/internal/analyzerclient"
+	"github.com/Enizri/terra/backend/api/internal/job"
 	"github.com/Enizri/terra/backend/api/internal/scan"
 	"github.com/Enizri/terra/backend/api/internal/store"
 )
@@ -28,6 +29,13 @@ type Runner struct {
 	Scan    ScanFunc
 	Analyze AnalyzeFunc
 	DB      string // empty skips persistence
+}
+
+// Background configures progress and optional local-model setup for a job run.
+type Background struct {
+	FetchLabel  string
+	EnsureModel func(context.Context, func(job.Event)) error
+	Emit        func(job.Event)
 }
 
 // Error identifies which pipeline stage failed while preserving the original message.
@@ -50,16 +58,38 @@ type Result struct {
 // Run executes scan → analyze → optional store. If cached is non-nil it is
 // used as the scan (probe reuse) and fetch/scan are skipped.
 func (r *Runner) Run(ctx context.Context, repoURL string, opts analyzerclient.LLMOpts, cached *scan.Result) (*Result, error) {
+	return r.run(ctx, repoURL, opts, cached, nil)
+}
+
+// RunBackground runs the same pipeline with progress events for a queued job.
+func (r *Runner) RunBackground(ctx context.Context, repoURL string, opts analyzerclient.LLMOpts, cached *scan.Result, bg Background) (*Result, error) {
+	return r.run(ctx, repoURL, opts, cached, &bg)
+}
+
+func (r *Runner) run(ctx context.Context, repoURL string, opts analyzerclient.LLMOpts, cached *scan.Result, bg *Background) (*Result, error) {
 	res := cached
 	if res == nil {
+		if bg != nil {
+			label := bg.FetchLabel
+			if label == "" {
+				label = "Fetching " + repoURL
+			}
+			bg.Emit(job.Event{Stage: "fetch", Label: label})
+			if err := ctx.Err(); err != nil {
+				return nil, &Error{Stage: "context", Err: err}
+			}
+		}
 		commit := ""
 		if r.Resolve != nil {
 			canonical, _, resolved, err := r.Resolve(repoURL)
+			if err != nil && bg != nil {
+				return nil, &Error{Stage: "scan", Err: err}
+			}
 			if err == nil {
 				commit = resolved
 			}
-			if err == nil && r.DB != "" {
-				if storedCommit, m, err := store.Find(r.DB, canonical); err == nil && m != nil && storedCommit == commit {
+			if err == nil {
+				if m := cachedAt(r.DB, canonical, commit); m != nil {
 					return &Result{Map: m, Cached: true}, nil
 				}
 			}
@@ -70,21 +100,56 @@ func (r *Runner) Run(ctx context.Context, repoURL string, opts analyzerclient.LL
 			return nil, &Error{Stage: "scan", Err: err}
 		}
 	}
+	if bg != nil {
+		bg.Emit(job.Event{
+			Stage: "scan",
+			Label: fmt.Sprintf("Read %d files across %d languages", res.Stats.SourceFiles, len(res.Languages)),
+			Map:   ProvisionalMap(res),
+		})
+	}
 	if r.DB != "" {
-		if commit, m, err := store.Find(r.DB, res.RepositoryURL); err == nil && m != nil && commit == res.Commit {
+		if m := cachedAt(r.DB, res.RepositoryURL, res.Commit); m != nil {
 			return &Result{Map: m, Scan: res, Cached: true}, nil
 		}
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, &Error{Stage: "context", Err: err}
+	}
+	if bg != nil && bg.EnsureModel != nil {
+		if err := bg.EnsureModel(ctx, bg.Emit); err != nil {
+			return nil, &Error{Stage: "ensure_model", Err: err}
+		}
+	}
+	if bg != nil {
+		bg.Emit(job.Event{Stage: "analyze", Label: "Terra is reading the architecture"})
 	}
 	repoMap, warnings, err := r.Analyze(ctx, res, opts)
 	if err != nil {
 		return nil, &Error{Stage: "analyze", Err: err}
 	}
+	if err := ctx.Err(); err != nil {
+		return nil, &Error{Stage: "context", Err: err}
+	}
 	if r.DB != "" {
+		if bg != nil {
+			bg.Emit(job.Event{Stage: "store", Label: fmt.Sprintf("Saving %d components", len(repoMap.Components))})
+		}
 		if err := store.Save(r.DB, res, repoMap); err != nil {
 			return nil, &Error{Stage: "store", Err: fmt.Errorf("store: %w", err)}
 		}
 	}
 	return &Result{Map: repoMap, Warnings: warnings, Scan: res}, nil
+}
+
+func cachedAt(db, repoURL, commit string) *analysis.Map {
+	if db == "" || repoURL == "" || commit == "" {
+		return nil
+	}
+	stored, repoMap, err := store.Find(db, repoURL)
+	if err != nil || stored != commit {
+		return nil
+	}
+	return repoMap
 }
 
 // ProvisionalMap builds the structural map shown during the scan stage.

@@ -9,12 +9,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Enizri/terra/backend/api/internal/analysis"
 	analyzepipeline "github.com/Enizri/terra/backend/api/internal/analyze"
 	"github.com/Enizri/terra/backend/api/internal/analyzerclient"
 	"github.com/Enizri/terra/backend/api/internal/job"
 	"github.com/Enizri/terra/backend/api/internal/scan"
-	"github.com/Enizri/terra/backend/api/internal/store"
 )
 
 // acquireAnalyze claims a slot without blocking; callers 429 when full.
@@ -140,7 +138,7 @@ func (s *Server) enqueueAnalyze(w http.ResponseWriter, r *http.Request) {
 	// means the job does that work itself, and says so.
 	work := analyzeJob{repoURL: req.RepoURL, sel: sel}
 	if req.ProbeID != "" {
-		if work.cached = s.readProbe(req.ProbeID); work.cached == nil {
+		if work.cached = s.Probes.Read(req.ProbeID); work.cached == nil {
 			work.fetchLabel = "Probe expired — rescanning " + req.RepoURL
 		}
 	}
@@ -180,97 +178,36 @@ type analyzeJob struct {
 func (s *Server) startAnalyzeJob(work analyzeJob, done func()) *job.Job {
 	timeout := s.Cfg.AnalyzeTimeout
 	repoURL, sel := work.repoURL, work.sel
+	runner := analyzepipeline.Runner{Resolve: s.Resolve, Scan: s.Scan, Analyze: s.Analyze, DB: s.DB}
 	return s.Jobs.Start(func(jobCtx context.Context, emit func(job.Event)) {
 		defer done() // release the analyze slot on every exit, panic included
 		ctx, cancel := context.WithTimeout(jobCtx, timeout)
 		defer cancel()
-
-		res := work.cached
-		if res == nil {
-			label := work.fetchLabel
-			if label == "" {
-				label = "Fetching " + repoURL
-			}
-			emit(job.Event{Stage: "fetch", Label: label})
-			if err := ctx.Err(); err != nil {
-				emit(job.Event{Stage: "error", Label: stopLabel(ctx, timeout)})
-				return
-			}
-
-			// Resolve HEAD first so a commit-keyed cache hit never downloads the tree.
-			canonical, _, sha, err := s.Resolve(repoURL)
-			if err != nil {
-				emit(job.Event{Stage: "error", Label: err.Error()})
-				return
-			}
-			if repoMap := s.cachedAt(canonical, sha); repoMap != nil {
-				emit(job.Event{Stage: "done", Map: repoMap})
-				return
-			}
-
-			res, err = s.Scan(repoURL, sha)
-			if err != nil {
-				emit(job.Event{Stage: "error", Label: err.Error()})
-				return
-			}
+		safeEmit := func(ev job.Event) {
+			ev.Label = scrub(ev.Label, sel.Opts.APIKey)
+			emit(ev)
 		}
-		emit(job.Event{
-			Stage: "scan",
-			Label: fmt.Sprintf("Read %d files across %d languages",
-				res.Stats.SourceFiles, len(res.Languages)),
-			Map: analysis.FromScan(res),
-		})
-		// Belt-and-suspenders: Scan may see a newer commit than Resolve raced.
-		if repoMap := s.cached(res); repoMap != nil {
-			emit(job.Event{Stage: "done", Map: repoMap})
-			return
-		}
-		if err := ctx.Err(); err != nil {
-			emit(job.Event{Stage: "error", Label: stopLabel(ctx, timeout)})
-			return
-		}
-		// Local weights may not be on the host yet; the sidecar downloads and
-		// loads them before the analyzer is allowed to call it.
+		var ensure func(context.Context, func(job.Event)) error
 		if sel.Local {
-			if err := s.ensureModel(ctx, sel.HFID, emit); err != nil {
-				if ctx.Err() != nil {
-					emit(job.Event{Stage: "error", Label: stopLabel(ctx, timeout)})
-					return
-				}
-				emit(job.Event{Stage: "error", Label: err.Error()})
-				return
+			ensure = func(ctx context.Context, emit func(job.Event)) error {
+				return s.ensureModel(ctx, sel.HFID, emit)
 			}
 		}
-		emit(job.Event{Stage: "analyze", Label: "Terra is reading the architecture"})
-		repoMap, warnings, err := s.Analyze(ctx, res, sel.Opts)
+		result, err := runner.RunBackground(ctx, repoURL, sel.Opts, work.cached, analyzepipeline.Background{
+			FetchLabel: work.fetchLabel, EnsureModel: ensure, Emit: safeEmit,
+		})
 		if err != nil {
+			label := err.Error()
 			if ctx.Err() != nil {
-				emit(job.Event{Stage: "error", Label: stopLabel(ctx, timeout)})
-				return
+				label = stopLabel(ctx, timeout)
 			}
-			// Keep the structural map on the client; surface the failure as an
-			// event — with any echoed key material stripped out first.
-			emit(job.Event{Stage: "error", Label: scrub(err.Error(), sel.Opts.APIKey)})
+			safeEmit(job.Event{Stage: "error", Label: label})
 			return
 		}
-		for _, warn := range warnings {
+		for _, warn := range result.Warnings {
 			fmt.Fprintln(os.Stderr, "warning:", warn)
 		}
-		if err := ctx.Err(); err != nil {
-			emit(job.Event{Stage: "error", Label: stopLabel(ctx, timeout)})
-			return
-		}
-		if s.DB != "" {
-			emit(job.Event{
-				Stage: "store",
-				Label: fmt.Sprintf("Saving %d components", len(repoMap.Components)),
-			})
-			if err := store.Save(s.DB, res, repoMap); err != nil {
-				emit(job.Event{Stage: "error", Label: err.Error()})
-				return
-			}
-		}
-		emit(job.Event{Stage: "done", Map: repoMap})
+		safeEmit(job.Event{Stage: "done", Map: result.Map})
 	})
 }
 

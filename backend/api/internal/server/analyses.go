@@ -9,23 +9,6 @@ import (
 	"github.com/Enizri/terra/backend/api/internal/store"
 )
 
-// cached returns the stored map when HEAD matches the last analysis commit.
-func (s *Server) cached(res *scan.Result) *analysis.Map {
-	return s.cachedAt(res.RepositoryURL, res.Commit)
-}
-
-// cachedAt returns the stored map when repoURL's saved commit equals commit.
-func (s *Server) cachedAt(repoURL, commit string) *analysis.Map {
-	if s.DB == "" || repoURL == "" || commit == "" {
-		return nil
-	}
-	stored, repoMap, err := store.Find(s.DB, repoURL)
-	if err != nil || stored != commit {
-		return nil
-	}
-	return repoMap
-}
-
 // storedMap returns the saved analysis for repoURL, or nil.
 func storedMap(dbPath, repoURL string) *analysis.Map {
 	norm, _, err := scan.NormalizeURL(repoURL)
