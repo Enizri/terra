@@ -1,0 +1,541 @@
+/* Landing page skin. Only the landing route loads this. */
+
+/* Terra landing skin. */
+
+/* Margins are already reset globally; re-zeroing here outranks the utility
+   classes below (.sh-caption et al) and silently eats their spacing. */
+
+/* ---- nav ---- */
+
+.sh-nav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  padding: 16px 16px;
+  font-size: 16px;
+  /* Sticky already layers; keep nav compositing off the scrolling document. */
+  transform: translateZ(0);
+}
+
+.sh-nav__pill {
+  margin: 0 auto;
+  width: fit-content;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  min-height: 68px;
+  padding: 8px;
+  border-radius: 999px;
+  /* Slightly more opaque so a lighter blur still reads frosted. */
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.sh-nav__logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 22px;
+  font-size: 21px;
+  font-weight: 600;
+}
+
+/* Eight-point star cut out of the brand gradient; spins 60deg on hover with a
+   slight overshoot (duna.com's logo behaviour). */
+
+.sh-nav__logo:hover .sh-terra-mark,
+.sh-terra-mark:hover {
+  rotate: 62.5deg;
+}
+
+/* Star spins with the nav collapse/expand — same overshoot as the hover spin. */
+
+.sh-nav__logo .sh-terra-mark--collapsed,
+.sh-nav__logo:hover .sh-terra-mark--collapsed {
+  rotate: 182.5deg;
+  scale: 0.88;
+}
+
+.sh-nav__links {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+
+.sh-nav__link {
+  padding: 12px 20px;
+  border-radius: 999px;
+  color: #404040;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.sh-nav__link:hover {
+  color: #000;
+}
+
+/* Railway-style CTAs: clear rounded rects, solid fill, hairline border —
+   not pills. Hover brightens instead of growing. */
+
+.sh-caption {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--sh-muted-2);
+}
+
+.sh-caption--md {
+  font-size: 14px;
+  line-height: 20px;
+}
+
+/* ---- sections / copy ---- */
+
+.sh-section {
+  width: 100vw;
+  max-width: 100%;
+  /* Clip horizontally only (hero flights fly in from ±360px); vertical must
+     stay visible or the y:150 rise reveal gets a hard clip edge at the
+     section bottom while animating. */
+  overflow-x: clip;
+  padding: 0 16px;
+}
+
+/* The star is fixed inside the hero's stacking context, so every later section
+   needs its own layer at the same level to sit on top of it as it drifts by. */
+
+.sh-section:not(.sh-section--hero) {
+  position: relative;
+  z-index: 1;
+}
+
+/* Sticky scrub track: browser-native pin blends free scroll → framed drag
+   → hold → release with no JS position swaps. */
+
+.sh-hero-pin {
+  position: relative;
+  width: 100%;
+}
+
+/* Hero only: sticky pin + shader canvas positioning context.
+   --hero-stick-top frames the big screen card under the nav while stuck. */
+
+.sh-section--hero {
+  position: sticky;
+  top: var(--hero-stick-top, 0px);
+  /* When stick-top is negative, fill the viewport so later sections don't peek. */
+  min-height: calc(100vh - var(--hero-stick-top, 0px));
+  min-height: calc(100dvh - var(--hero-stick-top, 0px));
+  /* Opaque over later sections while sticky — same floor as the root. */
+  background-color: var(--sh-bg);
+  z-index: 1;
+  overflow-x: clip;
+}
+
+/* Skip painting offscreen sections while scrolling — design unchanged.
+   No `content-visibility: auto`: the 900px placeholder is ~500px short of the
+   real section heights, so materialising one resized the document mid-scroll
+   and yanked the page back up. `contain: paint` gets most of the win without
+   ever changing layout. */
+
+.sh-section:not(.sh-section--hero) {
+  contain: paint;
+}
+
+/* Terra-star wash: the shader canvas is clipped into the big star
+   (--sh-star-mask) and spins slowly behind the headline. */
+
+.sh-backdrop-wrap {
+  /* Fixed to the viewport so the star survives past the hero and glides
+     side to side as later sections come up. */
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  z-index: 0;
+  pointer-events: none;
+  /* Own compositor layer; contain paint so scrolling siblings don't dirty it. */
+  contain: layout style;
+  transform: translateZ(0);
+}
+
+.sh-backdrop {
+  display: block;
+  position: absolute;
+  /* Same on-screen spot as before: hero wrap top (40px) minus the old -8vh. */
+  top: calc(40px - 8vh);
+  left: 0;
+  right: 0;
+  margin-inline: auto;
+  /* --sh-star-x/y: hero defaults closer/down so a spoke tip meets the E of
+     engineers; parked and the per-section observer override x, CSS eases. */
+  translate: var(--sh-star-x, -12vw) var(--sh-star-y, 7vh);
+  scale: var(--sh-star-scale, 1);
+  /* No translate/scale transition: past the hero the pose is written per frame
+     by the section tracker, so the star holds its spot inside a section while
+     the page scrolls and glides only on a section swap. */
+  transition: opacity 0.3s ease;
+  /* Hidden behind the hero screen; the section observer reveals it from the
+     "power of Terra" section onward. */
+  opacity: 0;
+  /* Keep the travelling star responsive without letting tall/fullscreen
+     viewports grow it out of proportion with the capped hero headline.
+     Final docking measures the glyph, so the landed mark stays unchanged. */
+  width: min(20vh, 30vw, 160px);
+  /* Star viewBox ratio (padded 1 unit each side for the rounding stroke). */
+  aspect-ratio: 22.197 / 24.133;
+}
+
+/* The spinning face: mask + wash live on a child so the rotation can be a
+   pure-CSS compositor animation — no per-frame JS style writes. The parent
+   keeps translate/scale (section tracker + dock) without fighting it. */
+
+.sh-backdrop__spin {
+  position: absolute;
+  inset: 0;
+  background-color: #e8400d;
+  -webkit-mask-image: var(--sh-star-mask);
+  mask-image: var(--sh-star-mask);
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  /* Sub-pixel blur softens mask spokes under rotation. */
+  filter: blur(0.6px);
+  transform-origin: 50% 50%;
+  /* 42 deg/s ambient spin. */
+  animation: sh-star-spin 8.57s linear infinite;
+  will-change: transform;
+}
+
+@keyframes sh-star-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Hidden star = invisible work; park the animation too. */
+
+.sh-backdrop:not(.sh-backdrop--revealed) .sh-backdrop__spin {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+.sh-backdrop__spin {
+    animation: none;
+  }
+}
+
+.sh-backdrop--revealed {
+  opacity: 1;
+}
+
+/* After the word handoff the star drifts further left, clear of the headline. */
+
+.sh-backdrop--parked {
+  --sh-star-x: -28vw;
+}
+
+/* Docked into the Final glyph: it has arrived, so it now tracks the (scrolling)
+   glyph frame-exactly — a transition here would make it lag behind the page. */
+
+.sh-backdrop--docked {
+  transition: none;
+}
+
+/* The static mark steps aside while the big star occupies its slot. */
+
+.sh-final__glyph--handoff .sh-terra-mark {
+  opacity: 0;
+}
+
+.sh-backdrop-canvas {
+  display: block;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.sh-copy {
+  position: relative;
+  z-index: 10;
+  margin: 0 auto;
+  display: flex;
+  max-width: 620px;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  text-wrap: balance;
+}
+
+.sh-copy--hero {
+  /* Hero header uses my-24 — keeps flight progress at 0 on load.
+     Bottom margin tightened so the product card sits higher once the map lands. */
+  margin: 72px auto 20px;
+  max-width: 36rem;
+}
+
+/* Title + flight park: anchor is an invisible tile-sized slot to the right. */
+
+.sh-hero-head {
+  position: relative;
+  width: 100%;
+}
+
+.sh-flight-anchor {
+  position: absolute;
+  left: calc(100% + 214px);
+  top: 50%;
+  /* width/height set inline to match FLIGHT_TILE_PX */
+  transform: translateY(-50%);
+  pointer-events: none;
+  visibility: hidden;
+}
+
+@media (max-width: 900px) {
+/* Keep the card on-screen when the title column is narrow. */
+
+.sh-flight-anchor {
+    left: auto;
+    right: -12px;
+    top: auto;
+    bottom: -12px;
+    transform: none;
+  }
+}
+
+.sh-copy--section {
+  margin: 96px auto;
+  max-width: 980px;
+}
+
+/* Pencil "Try it" curl: hangs off the right edge of the Power title block and
+   points down into the demo. Purely decorative — hidden when it would crowd. */
+
+/* Anchor box for the note: shrink-wraps the headline so the curl can hang off
+   the last letter instead of off the (much wider) copy column. */
+
+.sh-section-title--note {
+  position: relative;
+  width: fit-content;
+  margin-inline: auto;
+}
+
+.sh-tryit {
+  position: absolute;
+  top: 4px;
+  left: calc(100% + 10px);
+  width: 176px;
+  height: 320px;
+  pointer-events: none;
+}
+
+.sh-tryit__word {
+  font-family: var(--font-display);
+  font-size: 26px;
+  fill: rgba(122, 113, 106, 0.14);
+  stroke: #7a716a;
+  stroke-width: 1.1px;
+  paint-order: stroke fill;
+}
+
+@media (max-width: 1180px) {
+.sh-tryit {
+    display: none;
+  }
+}
+
+/* Safe uses sm:my-32 where the other sections use my-24 */
+
+.sh-copy--lg {
+  margin: 128px auto;
+}
+
+/* Trust: headline + proof copy + logos + stage read as one unit. */
+
+.sh-copy--trust {
+  margin: 96px auto 0;
+  max-width: 720px;
+  gap: 0;
+}
+
+.sh-copy--trust .sh-section-title {
+  margin-bottom: 20px;
+  line-height: 1.05;
+}
+
+.sh-copy--trust .sh-copy__cta {
+  margin-top: 24px;
+}
+
+.sh-section--trust .sh-logos {
+  margin-top: 40px;
+}
+
+.sh-section--trust .sh-stage--safe {
+  margin: 48px auto 96px;
+}
+
+@media (min-width: 640px) {
+.sh-copy--trust {
+    margin-top: 128px;
+  }
+
+.sh-section--trust .sh-stage--safe {
+    margin: 56px auto 128px;
+  }
+}
+
+.sh-copy__cta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 16px;
+}
+
+.sh-hero-title {
+  margin: 8px 0 16px;
+  font-size: clamp(40px, 6vw, 62px);
+  letter-spacing: -0.025em;
+  font-weight: 500;
+  color: #000;
+}
+
+.sh-hero-title span {
+  display: inline-block;
+}
+
+/* Anchor for the push stage; overflow visible so the bumped word stays on screen. */
+
+.sh-hero-title__swap-anchor {
+  position: relative;
+  overflow: visible;
+}
+
+.sh-hero-title__word {
+  position: relative;
+  z-index: 2;
+}
+
+/* Sizer keeps the slot wide; the word itself starts at the slot's left edge so
+   the sweep percentages line up with the glyphs, not with the empty gap. */
+
+.sh-hero-title__swap > .sh-hero-title__word {
+  justify-self: center;
+}
+
+/* Word cell hosts the ink, its smudge, and the hand sprite in one stack. */
+
+.sh-hero-title span.sh-hero-title__word {
+  display: inline-grid;
+  justify-items: start;
+}
+
+.sh-hero-title__word > .sh-hero-title__ink,
+.sh-hero-title__word > .sh-hero-title__smudge {
+  grid-area: 1 / 1;
+}
+
+/* Graphite dust the eraser leaves behind — sits under the tool, fades fast. */
+
+.sh-hero-title__smudge {
+  color: #8d857d;
+  opacity: 0.16;
+  filter: blur(2.5px);
+  pointer-events: none;
+}
+
+/* The written word is a pencil drawing, not type: hollow graphite stroke with
+   the same texture filter and the same ink as the hero trail. It stays that
+   way after the write — the line is hand-corrected, and it reads as such. */
+
+.sh-hero-title__ink--pencil {
+  /* Faint fill so the letterforms hold at small sizes; the stroke is the drawing. */
+  /* Thin sketched outline, same grain filter as the trail. Softer than the
+     printed line above it — pencil grey, never black. */
+  color: rgba(122, 113, 106, 0.14);
+  -webkit-text-stroke: 2.1px #7a716a;
+  paint-order: stroke fill;
+  opacity: 0.85;
+  filter: url(#sh-pencil);
+}
+
+/* Eraser / pencil sprites ride the sweep edge; `left` is the animated %. */
+
+.sh-hero-title span.sh-hand {
+  position: absolute;
+  top: 50%;
+  z-index: 3;
+  display: block;
+  pointer-events: none;
+  will-change: transform;
+}
+
+/* `translate` (not `transform`) — Motion owns transform for the wobble. */
+
+.sh-hand--erase {
+  translate: -42% -50%;
+}
+
+.sh-hand--write {
+  /* Pencil tip sits at the sprite's lower-left, so hang it off the edge. */
+  translate: -14% -74%;
+}
+
+.sh-pencil-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+
+/* Capital "E" on "Engineers" — the star's grab point. */
+
+.sh-hero-title__word--cap::first-letter {
+  text-transform: uppercase;
+}
+
+/* Both words share one grid cell, so the slot is always as wide as the wider
+   of them: the line never reflows mid-swap and neither does the hand beside it.
+   Unclipped on purpose — the bumped word travels outside the line. */
+
+/* Outranks `.sh-hero-title span { display: inline-block }` above, which would
+   otherwise put the sizer beside the word instead of behind it. */
+
+.sh-hero-title span.sh-hero-title__swap {
+  position: relative;
+  z-index: 1;
+  display: inline-grid;
+  justify-items: center;
+  white-space: nowrap;
+  overflow: visible;
+}
+
+.sh-hero-title__swap > * {
+  grid-area: 1 / 1;
+}
+
+.sh-hero-title__sizer {
+  visibility: hidden;
+}
+
+.sh-section-title {
+  margin-bottom: 16px;
+  padding: 0 16px;
+  font-size: clamp(40px, 6vw, 62px);
+  letter-spacing: -0.025em;
+  font-weight: 500;
+}
+
+.sh-p1 {
+  font-size: clamp(20px, 2.2vw, 24px);
+  line-height: 1.375;
+  font-weight: 400;
+  color: #404040;
+  text-wrap: balance;
+  max-width: 620px;
+}
+
