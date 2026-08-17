@@ -35,11 +35,11 @@ func fixtures() (*scan.Result, *graph.Map) {
 	return res, m
 }
 
-func count(t *testing.T, db *sql.DB, table string) int {
+func countProjects(t *testing.T, db *sql.DB) int {
 	t.Helper()
 	var n int
-	if err := db.QueryRow("SELECT count(*) FROM " + table).Scan(&n); err != nil {
-		t.Fatalf("count %s: %v", table, err)
+	if err := db.QueryRow("SELECT count(*) FROM projects").Scan(&n); err != nil {
+		t.Fatalf("count projects: %v", err)
 	}
 	return n
 }
@@ -65,14 +65,8 @@ func TestSaveRoundTripAndUpsert(t *testing.T) {
 	}
 	defer db.Close()
 
-	if n := count(t, db, "projects"); n != 1 {
+	if n := countProjects(t, db); n != 1 {
 		t.Errorf("projects = %d, want 1", n)
-	}
-	if n := count(t, db, "components"); n != 3 {
-		t.Errorf("components = %d, want 3", n)
-	}
-	if n := count(t, db, "relationships"); n != 1 {
-		t.Errorf("relationships = %d, want 1", n)
 	}
 
 	var commit, mapJSON string
@@ -86,38 +80,27 @@ func TestSaveRoundTripAndUpsert(t *testing.T) {
 	if err := json.Unmarshal([]byte(mapJSON), &stored); err != nil {
 		t.Fatalf("map_json is not a map: %v", err)
 	}
-	if len(stored.Components) != 3 || stored.Project.Name != "Memos" {
-		t.Errorf("map_json blob does not match what was saved: %+v", stored.Project)
+	if stored.Project.Name != "Memos" || len(stored.Components) != 3 {
+		t.Errorf("map_json blob does not match what was saved: %+v", stored)
 	}
-
-	// Column-level round trip of one component.
-	var parent sql.NullString
-	var name, techJSON, filesJSON string
-	err = db.QueryRow(`SELECT parent_id, name, tech_json, files_json FROM components
-		WHERE project_id = 1 AND id = 'web.editor'`).Scan(&parent, &name, &techJSON, &filesJSON)
-	if err != nil {
-		t.Fatal(err)
+	if stored.Components[1].ParentID == nil || *stored.Components[1].ParentID != "web" {
+		t.Errorf("parent_id lost in map_json: %+v", stored.Components[1])
 	}
-	if !parent.Valid || parent.String != "web" {
-		t.Errorf("parent_id = %v, want web", parent)
+	if stored.Components[0].ParentID != nil {
+		t.Errorf("a top-level component should have nil ParentID, got %v", stored.Components[0].ParentID)
 	}
-	if name != "Editor" || filesJSON != `["web/src/App.tsx"]` || techJSON != `[]` {
-		t.Errorf("component round trip wrong: %q %q %q", name, filesJSON, techJSON)
+	if len(stored.Relationships) != 1 ||
+		stored.Relationships[0].From != "web.editor" ||
+		stored.Relationships[0].To != "web" ||
+		len(stored.Relationships[0].Because) != 1 ||
+		stored.Relationships[0].Because[0] != "web/src/App.tsx" {
+		t.Errorf("relationship round trip wrong: %+v", stored.Relationships)
 	}
-
-	if err := db.QueryRow("SELECT parent_id FROM components WHERE id = 'web'").Scan(&parent); err != nil {
-		t.Fatal(err)
+	if len(stored.Components[0].Tech) != 1 || stored.Components[0].Tech[0] != "React" {
+		t.Errorf("tech round trip wrong: %+v", stored.Components[0].Tech)
 	}
-	if parent.Valid {
-		t.Errorf("a top-level component should store NULL, got %q", parent.String)
-	}
-
-	var from, to, becauseJSON string
-	if err := db.QueryRow("SELECT from_id, to_id, because_json FROM relationships").Scan(&from, &to, &becauseJSON); err != nil {
-		t.Fatal(err)
-	}
-	if from != "web.editor" || to != "web" || becauseJSON != `["web/src/App.tsx"]` {
-		t.Errorf("relationship round trip wrong: %s -> %s %s", from, to, becauseJSON)
+	if len(stored.Components[1].Files) != 1 || stored.Components[1].Files[0] != "web/src/App.tsx" {
+		t.Errorf("files round trip wrong: %+v", stored.Components[1].Files)
 	}
 }
 
@@ -218,11 +201,15 @@ func TestDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	if n := count(t, db, "projects"); n != 1 {
+	if n := countProjects(t, db); n != 1 {
 		t.Errorf("projects = %d, want 1", n)
 	}
-	if n := count(t, db, "components"); n != 2 {
-		t.Errorf("components = %d, want 2", n)
+	got, err := Get(path, list[0].ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got == nil || len(got.Components) != 2 {
+		t.Errorf("remaining map_json = %+v", got)
 	}
 
 	ok, err = Delete(path, target)
@@ -243,6 +230,7 @@ func TestSaveSecondRepositoryKeepsTheFirst(t *testing.T) {
 	}
 	other, otherMap := fixtures()
 	other.RepositoryURL = "https://github.com/usememos/other"
+	otherMap.Project.Name = "Other"
 	if err := Save(path, other, otherMap); err != nil {
 		t.Fatal(err)
 	}
@@ -252,10 +240,22 @@ func TestSaveSecondRepositoryKeepsTheFirst(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	if n := count(t, db, "projects"); n != 2 {
+	if n := countProjects(t, db); n != 2 {
 		t.Errorf("projects = %d, want 2", n)
 	}
-	if n := count(t, db, "components"); n != 4 {
-		t.Errorf("components = %d, want 4", n)
+
+	_, firstMap, err := Find(path, res.RepositoryURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if firstMap == nil || firstMap.Project.Name != "Memos" || len(firstMap.Components) != 2 {
+		t.Errorf("first map = %+v", firstMap)
+	}
+	_, otherStored, err := Find(path, other.RepositoryURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if otherStored == nil || otherStored.Project.Name != "Other" {
+		t.Errorf("second map = %+v", otherStored)
 	}
 }

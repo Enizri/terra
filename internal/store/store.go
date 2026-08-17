@@ -1,4 +1,6 @@
 // Package store persists maps in a local SQLite file, keyed by repository URL.
+// The real payload is projects.map_json; Get/Find/List read that blob only.
+// There is no migration framework — if the on-disk shape changes, delete terra.db.
 package store
 
 import (
@@ -20,25 +22,6 @@ CREATE TABLE IF NOT EXISTS projects (
 	commit_hash TEXT,
 	scanned_at  TEXT,
 	map_json    TEXT
-);
-CREATE TABLE IF NOT EXISTS components (
-	project_id INTEGER NOT NULL,
-	id         TEXT NOT NULL,
-	parent_id  TEXT,
-	name       TEXT,
-	purpose    TEXT,
-	importance TEXT,
-	type       TEXT,
-	tech_json  TEXT,
-	files_json TEXT,
-	PRIMARY KEY (project_id, id)
-);
-CREATE TABLE IF NOT EXISTS relationships (
-	project_id   INTEGER NOT NULL,
-	from_id      TEXT NOT NULL,
-	to_id        TEXT NOT NULL,
-	type         TEXT,
-	because_json TEXT
 );`
 
 // open opens dbPath with WAL + busy_timeout and ensures the schema exists.
@@ -75,53 +58,18 @@ func Save(dbPath string, res *scan.Result, repoMap *graph.Map) error {
 	}
 	defer db.Close()
 
-	tx, err := db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	var projectID int64
-	err = tx.QueryRow(`
+	_, err = db.Exec(`
 		INSERT INTO projects (repo_url, name, commit_hash, scanned_at, map_json)
 		VALUES (?, ?, ?, ?, ?)
 		ON CONFLICT(repo_url) DO UPDATE SET
 			name = excluded.name, commit_hash = excluded.commit_hash,
-			scanned_at = excluded.scanned_at, map_json = excluded.map_json
-		RETURNING id`,
+			scanned_at = excluded.scanned_at, map_json = excluded.map_json`,
 		res.RepositoryURL, repoMap.Project.Name, res.Commit, res.ScannedAt.Format("2006-01-02T15:04:05Z"), string(mapJSON),
-	).Scan(&projectID)
+	)
 	if err != nil {
 		return fmt.Errorf("upsert project: %w", err)
 	}
-
-	for _, table := range []string{"components", "relationships"} {
-		if _, err := tx.Exec("DELETE FROM "+table+" WHERE project_id = ?", projectID); err != nil {
-			return fmt.Errorf("clear %s: %w", table, err)
-		}
-	}
-
-	for _, component := range repoMap.Components {
-		var parent any
-		if component.ParentID != nil {
-			parent = *component.ParentID
-		}
-		if _, err := tx.Exec(`INSERT INTO components
-			(project_id, id, parent_id, name, purpose, importance, type, tech_json, files_json)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			projectID, component.ID, parent, component.Name, component.Purpose, component.Importance, component.Type,
-			mustJSON(component.Tech), mustJSON(component.Files)); err != nil {
-			return fmt.Errorf("insert component %s: %w", component.ID, err)
-		}
-	}
-	for _, rel := range repoMap.Relationships {
-		if _, err := tx.Exec(`INSERT INTO relationships
-			(project_id, from_id, to_id, type, because_json) VALUES (?, ?, ?, ?, ?)`,
-			projectID, rel.From, rel.To, rel.Type, mustJSON(rel.Because)); err != nil {
-			return fmt.Errorf("insert relationship %s->%s: %w", rel.From, rel.To, err)
-		}
-	}
-	return tx.Commit()
+	return nil
 }
 
 // Summary is one row of the analyses list.
@@ -157,7 +105,7 @@ func List(dbPath string) ([]Summary, error) {
 	return out, rows.Err()
 }
 
-// Delete removes one stored analysis and its components and relationships.
+// Delete removes one stored analysis.
 // Returns false when the id is not in the database.
 func Delete(dbPath string, id int64) (bool, error) {
 	db, err := open(dbPath)
@@ -166,18 +114,7 @@ func Delete(dbPath string, id int64) (bool, error) {
 	}
 	defer db.Close()
 
-	tx, err := db.Begin()
-	if err != nil {
-		return false, err
-	}
-	defer tx.Rollback()
-
-	for _, table := range []string{"relationships", "components"} {
-		if _, err := tx.Exec("DELETE FROM "+table+" WHERE project_id = ?", id); err != nil {
-			return false, fmt.Errorf("clear %s: %w", table, err)
-		}
-	}
-	res, err := tx.Exec("DELETE FROM projects WHERE id = ?", id)
+	res, err := db.Exec("DELETE FROM projects WHERE id = ?", id)
 	if err != nil {
 		return false, fmt.Errorf("delete project: %w", err)
 	}
@@ -185,10 +122,7 @@ func Delete(dbPath string, id int64) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if n == 0 {
-		return false, nil
-	}
-	return true, tx.Commit()
+	return n > 0, nil
 }
 
 // Get returns the stored map for one analysis, or (nil, nil) when the id is
@@ -238,12 +172,4 @@ func Find(dbPath, repoURL string) (commit string, repoMap *graph.Map, err error)
 		return "", nil, fmt.Errorf("stored map for %s is corrupt: %w", repoURL, err)
 	}
 	return commit, repoMap, nil
-}
-
-func mustJSON(items []string) string {
-	if items == nil {
-		items = []string{}
-	}
-	b, _ := json.Marshal(items)
-	return string(b)
 }
