@@ -1,5 +1,25 @@
 # Contributing
 
+## Branching (staging-first)
+
+Terra uses **`staging` as the default integration branch** (same idea as sim):
+
+| Branch | Role |
+|---|---|
+| `staging` | Default branch. Branch from here; open PRs **into** `staging`. |
+| `main` | Release / promotion only. Do **not** open feature PRs against `main`. |
+
+```bash
+git fetch origin
+git checkout staging
+git pull origin staging
+git checkout -b issue/<n>-short-description   # or feat/…, fix/…
+# … commit, push …
+# Open a PR with base = staging (GitHub should default to this)
+```
+
+Keep your branch rebased onto (or merged with) the latest `staging` before asking for review.
+
 ## Prerequisites
 
 | Tool | Version | Notes |
@@ -63,9 +83,10 @@ Follow the checklist in [`contracts/README.md`](contracts/README.md), then
 
 ## PR expectations
 
-1. Run `make check`.
-2. Keep the PR to **one concern**.
-3. Reference the issue with `Fixes #N`.
-4. Merge gate requires `check` + `actionlint` (see `.github/workflows/merge-gate.yml` and the PR template).
+1. Target **`staging`** (not `main`).
+2. Run `make check`.
+3. Keep the PR to **one concern**.
+4. Reference the issue with `Fixes #N`.
+5. Merge gate requires `check` + `actionlint` (see `.github/workflows/merge-gate.yml` and the PR template).
 
 Commit messages in this repo are conventional-ish (`docs:`, `fix:`, `refactor(server):`). Match that style.

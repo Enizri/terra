@@ -32,7 +32,8 @@ so a laptop HF server, vLLM, or a hosted provider are drop-in replacements.
 
 `ARCHITECTURE.md` has the folder maps, the import rules between them, and what
 to add for a new product under this repo. See `CONTRIBUTING.md` for where new
-feature code goes, `make check`, and PR expectations.
+feature code goes, `make check`, and PR expectations — branch from **`staging`**
+and open PRs into **`staging`** (not `main`).
 
 ## Quickstart
 
