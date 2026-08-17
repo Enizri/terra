@@ -9,12 +9,13 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/Enizri/terra/backend/api/internal/analysis"
+	analyzepipeline "github.com/Enizri/terra/backend/api/internal/analyze"
 	"github.com/Enizri/terra/backend/api/internal/analyzerclient"
 	"github.com/Enizri/terra/backend/api/internal/config"
 	"github.com/Enizri/terra/backend/api/internal/preview"
 	"github.com/Enizri/terra/backend/api/internal/scan"
 	"github.com/Enizri/terra/backend/api/internal/server"
-	"github.com/Enizri/terra/backend/api/internal/store"
 )
 
 const usage = `usage:
@@ -62,29 +63,35 @@ func runMap(args []string) {
 	model := fs.String("model", "", "model for the analyzer to use (default: the analyzer's choice)")
 	url := parseArgs(fs, args)
 
-	res, err := scan.Scan(url)
+	cfg := config.FromEnv()
+	result, err := (&analyzepipeline.Runner{
+		Scan: func(url, commit string) (*scan.Result, error) {
+			if commit != "" {
+				return scan.ScanAt(url, commit)
+			}
+			return scan.Scan(url)
+		},
+		Analyze: func(ctx context.Context, res *scan.Result, opts analyzerclient.LLMOpts) (*analysis.Map, []string, error) {
+			return analyzerclient.Analyze(ctx, cfg.AnalyzerURL, res, opts)
+		},
+		DB: *db,
+	}).Run(context.Background(), url, analyzerclient.LLMOpts{Model: *model}, nil)
 	if err != nil {
 		fail(err)
 	}
-	fmt.Fprintf(os.Stderr, "scanned %d source files, asking the analyzer for a map (this takes a minute)...\n", res.Stats.SourceFiles)
-
-	m, warnings, err := analyzerclient.Analyze(context.Background(), config.FromEnv().AnalyzerURL, res, analyzerclient.LLMOpts{Model: *model})
-	if err != nil {
-		fail(err)
+	if result.Scan != nil {
+		fmt.Fprintf(os.Stderr, "scanned %d source files, asking the analyzer for a map (this takes a minute)...\n", result.Scan.Stats.SourceFiles)
 	}
-	for _, w := range warnings {
+	for _, w := range result.Warnings {
 		fmt.Fprintln(os.Stderr, "warning:", w)
 	}
 
-	write(*out, m)
+	write(*out, result.Map)
 	if *out != "" {
-		fmt.Fprintf(os.Stderr, "wrote %s (%d components, %d relationships)\n", *out, len(m.Components), len(m.Relationships))
+		fmt.Fprintf(os.Stderr, "wrote %s (%d components, %d relationships)\n", *out, len(result.Map.Components), len(result.Map.Relationships))
 	}
 	if *db != "" {
-		if err := store.Save(*db, res, m); err != nil {
-			fail(err)
-		}
-		fmt.Fprintf(os.Stderr, "stored %s in %s\n", res.RepositoryURL, *db)
+		fmt.Fprintf(os.Stderr, "stored %s in %s\n", result.Scan.RepositoryURL, *db)
 	}
 }
 

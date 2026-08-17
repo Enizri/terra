@@ -3,12 +3,14 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
 	"strings"
 
 	"github.com/Enizri/terra/backend/api/internal/analysis"
+	analyzepipeline "github.com/Enizri/terra/backend/api/internal/analyze"
 	"github.com/Enizri/terra/backend/api/internal/analyzerclient"
 	"github.com/Enizri/terra/backend/api/internal/job"
 	"github.com/Enizri/terra/backend/api/internal/scan"
@@ -60,40 +62,30 @@ func (s *Server) analyze(w http.ResponseWriter, r *http.Request) {
 	}
 	defer s.releaseAnalyze()
 
-	// Commit lookup before tarball: repeat visits skip the download.
-	var sha string
-	if canonical, _, commit, err := s.Resolve(req.RepoURL); err == nil {
-		sha = commit
-		if repoMap := s.cachedAt(canonical, sha); repoMap != nil {
-			writeJSON(w, repoMap)
-			return
+	result, err := (&analyzepipeline.Runner{
+		Resolve: s.Resolve,
+		Scan:    s.Scan,
+		Analyze: s.Analyze,
+		DB:      s.DB,
+	}).Run(r.Context(), req.RepoURL, analyzerclient.LLMOpts{Model: req.Model}, nil)
+	if err != nil {
+		status := http.StatusInternalServerError
+		var pipelineErr *analyzepipeline.Error
+		if errors.As(err, &pipelineErr) {
+			switch pipelineErr.Stage {
+			case "scan":
+				status = http.StatusBadRequest
+			case "analyze":
+				status = http.StatusBadGateway
+			}
 		}
-	}
-
-	res, err := s.Scan(req.RepoURL, sha)
-	if err != nil {
-		httpError(w, http.StatusBadRequest, err.Error())
+		httpError(w, status, err.Error())
 		return
 	}
-	if repoMap := s.cached(res); repoMap != nil {
-		writeJSON(w, repoMap)
-		return
-	}
-	repoMap, warnings, err := s.Analyze(r.Context(), res, analyzerclient.LLMOpts{Model: req.Model})
-	if err != nil {
-		httpError(w, http.StatusBadGateway, err.Error())
-		return
-	}
-	for _, warn := range warnings {
+	for _, warn := range result.Warnings {
 		fmt.Fprintln(os.Stderr, "warning:", warn)
 	}
-	if s.DB != "" {
-		if err := store.Save(s.DB, res, repoMap); err != nil {
-			httpError(w, http.StatusInternalServerError, err.Error())
-			return
-		}
-	}
-	writeJSON(w, repoMap)
+	writeJSON(w, result.Map)
 }
 
 // analyzeStream runs analyze as a job and writes NDJSON events on this response.
