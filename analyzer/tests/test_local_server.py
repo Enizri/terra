@@ -1,8 +1,13 @@
 """Unit tests for the local OpenAI-compatible server helpers (no model load)."""
 
-from terra_analyzer.local_server.server import (ChatCompletionRequest, ChatMessage,
-                                               JsonSchemaFormat, ResponseFormat,
-                                               _messages_for_generate, root)
+from terra_local_llm.server import (
+    ChatCompletionRequest,
+    ChatMessage,
+    JsonSchemaFormat,
+    ResponseFormat,
+    _messages_for_generate,
+    root,
+)
 
 
 def test_root():
@@ -69,9 +74,7 @@ import threading
 
 import pytest
 from fastapi import HTTPException
-
-from terra_analyzer.local_server import server as local
-
+from terra_local_llm import server as local
 
 SMALL = "Qwen/Qwen2.5-0.5B-Instruct-GGUF/qwen2.5-0.5b-instruct-q4_k_m.gguf"
 

@@ -5,7 +5,7 @@ import os
 import httpx
 
 DEFAULT_BASE_URL = "http://localhost:8020/v1"
-# Must match local_server.server.DEFAULT_MODEL: preflight compares the id it
+# Must match terra_local_llm.server.DEFAULT_MODEL: preflight compares the id it
 # asks for against what the sidecar reports serving.
 DEFAULT_MODEL = "Qwen/Qwen2.5-0.5B-Instruct-GGUF/qwen2.5-0.5b-instruct-q4_k_m.gguf"
 MAX_OUTPUT_TOKENS = 4096

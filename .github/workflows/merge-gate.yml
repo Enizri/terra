@@ -1,12 +1,9 @@
-# Fail the PR unless `make check` (workflow job "check") and Cursor Bugbot
+# Fail the PR unless `make check` (workflow job "check") and `actionlint`
 # both completed with conclusion "success".
 #
-# Bugbot reports findings as "neutral" by default, which GitHub required-checks
-# treat as non-blocking. This job turns missing / failure / neutral into a hard
-# fail so unresolved Bugbot findings cannot merge to main.
-#
-# Enable Bugbot for this repo: https://cursor.com/automations/from-cursor/bugbot
-# Manual trigger on a PR: comment `bugbot run` or `cursor review`.
+# actionlint is a temporary second required check while Cursor Bugbot is not
+# wired for this repo. Swap the second name here when Bugbot (or another
+# reviewer) is enabled again.
 name: merge-gate
 
 on:
@@ -29,14 +26,14 @@ jobs:
           github.event_name == 'check_run' &&
           (
             github.event.check_run.name == 'check' ||
-            github.event.check_run.name == 'Cursor Bugbot'
+            github.event.check_run.name == 'actionlint'
           )
         )
       )
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - name: Require check + Cursor Bugbot success
+      - name: Require check + actionlint success
         uses: actions/github-script@v7
         with:
           script: |
@@ -72,7 +69,7 @@ jobs:
 
             const required = [
               { name: "check", label: "make check (workflow job check)" },
-              { name: "Cursor Bugbot", label: "Cursor Bugbot" },
+              { name: "actionlint", label: "actionlint (workflow lint)" },
             ];
 
             // Poll until both required checks completed for this head SHA,
@@ -124,8 +121,8 @@ jobs:
               if (!run) {
                 failures.push(
                   `${want.label}: not found on ${pr.sha}. ` +
-                    (want.name === "Cursor Bugbot"
-                      ? "Enable Bugbot at https://cursor.com/automations/from-cursor/bugbot or comment `bugbot run` on the PR."
+                    (want.name === "actionlint"
+                      ? "Ensure .github/workflows/actionlint.yml ran on this PR."
                       : "Ensure the check workflow ran on this PR."),
                 );
                 continue;
@@ -136,13 +133,9 @@ jobs:
                 );
                 continue;
               }
-              // Only "success" is mergeable. Bugbot uses "neutral" for findings.
               if (run.conclusion !== "success") {
                 failures.push(
-                  `${want.label}: conclusion=${run.conclusion} (need success). ` +
-                    (want.name === "Cursor Bugbot" && run.conclusion === "neutral"
-                      ? "Resolve or address Bugbot findings, then re-run review."
-                      : ""),
+                  `${want.label}: conclusion=${run.conclusion} (need success).`,
                 );
               } else {
                 core.info(`${want.label}: success`);
@@ -155,5 +148,5 @@ jobs:
             }
 
             core.info(
-              `merge-gate OK for PR #${pr.number} @ ${pr.sha}: check + Cursor Bugbot success`,
+              `merge-gate OK for PR #${pr.number} @ ${pr.sha}: check + actionlint success`,
             );

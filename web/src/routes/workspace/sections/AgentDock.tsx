@@ -1,13 +1,12 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
-import type { Component, TerraMap } from "../../../shared/map/types";
-import type { Selection } from "../../../shared/api";
+import type { Component, TerraMap } from "../../../features/architecture-map";
+import type { Selection } from "../../../features/ask";
 import {
   liveSelectionId,
   selectionLabel,
-  useFloatingDrag,
-  useStreamingAskHint,
   type LiveSelection,
-} from "../../../shared/live";
+} from "../../../features/preview";
+import { useFloatingDrag, useStreamingAskHint } from "../../../shared/live";
 import { useAsk } from "../useAsk";
 import { MessageParts } from "./messages";
 

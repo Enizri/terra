@@ -1,18 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildFileTree, countLeaves } from "./fileTree.ts";
-import type { Component } from "./map/types.ts";
+import { buildFileTree, countLeaves, type FileTreeComponent } from "./fileTree.ts";
 
-function component(id: string, files: string[]): Component {
-  return {
-    id,
-    parent_id: null,
-    name: id,
-    purpose: "",
-    importance: "medium",
-    type: "backend",
-    files,
-  };
+function component(id: string, files: string[]): FileTreeComponent {
+  return { id, files };
 }
 
 test("nests paths under shared folders", () => {

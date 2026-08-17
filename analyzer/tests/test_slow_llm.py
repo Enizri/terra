@@ -7,8 +7,7 @@ import os
 
 import httpx
 import pytest
-
-from terra_analyzer.inference.client import chat, preflight
+from terra_analyzer.inference.client import LLMError, chat, preflight
 from terra_analyzer.inference.config import Config
 
 pytestmark = pytest.mark.slow
@@ -22,7 +21,7 @@ def live_cfg():
     cfg = Config(base_url=base, client=httpx.Client(timeout=120))
     try:
         preflight(cfg)
-    except Exception as e:
+    except (LLMError, httpx.HTTPError, OSError) as e:
         pytest.skip(f"local LLM not reachable at {cfg.base_url}: {e}")
     return cfg
 

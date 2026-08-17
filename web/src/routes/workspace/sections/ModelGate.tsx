@@ -1,14 +1,16 @@
 import { useEffect, useState } from "react";
-import { hostCapabilities, models as fetchModels } from "../../../shared/api";
-import { getApiKey, setApiKey } from "../../../shared/modelKeys";
 import {
+  hostCapabilities,
+  models as fetchModels,
+  getApiKey,
+  setApiKey,
   eligibility,
   fitNote,
   needsKey,
   type CatalogEntry,
   type HostCapabilities,
   type Recommendation,
-} from "../../../shared/models";
+} from "../../../features/analysis";
 import { ApiKeyModal } from "./ApiKeyModal";
 
 /** Hard gate between probe and analyze: nothing costs a token until the user

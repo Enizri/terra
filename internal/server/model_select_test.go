@@ -8,9 +8,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Enizri/terra/internal/analysis"
+	"github.com/Enizri/terra/internal/analyzerclient"
 	"github.com/Enizri/terra/internal/catalog"
 	"github.com/Enizri/terra/internal/config"
-	"github.com/Enizri/terra/internal/graph"
 	"github.com/Enizri/terra/internal/job"
 	"github.com/Enizri/terra/internal/scan"
 	"github.com/Enizri/terra/internal/store"
@@ -44,7 +45,7 @@ func TestResolveModel(t *testing.T) {
 	}
 
 	// No entry means no routing: the analyzer's own environment wins.
-	if zero := resolveModel(cfg, nil, leakKey); zero.Opts != (graph.LLMOpts{}) {
+	if zero := resolveModel(cfg, nil, leakKey); zero.Opts != (analyzerclient.LLMOpts{}) {
 		t.Errorf("nil entry produced routing: %+v", zero.Opts)
 	}
 }
@@ -95,13 +96,13 @@ func TestEnqueueAnalyzeRejectsLocalModelHostCannotRun(t *testing.T) {
 
 func TestAnalyzeWithoutAModelIDKeepsTheEnvFallback(t *testing.T) {
 	s, ts := testServer(t)
-	var got graph.LLMOpts
-	s.Analyze = func(ctx context.Context, res *scan.Result, opts graph.LLMOpts) (*graph.Map, []string, error) {
+	var got analyzerclient.LLMOpts
+	s.Analyze = func(ctx context.Context, res *scan.Result, opts analyzerclient.LLMOpts) (*analysis.Map, []string, error) {
 		got = opts
-		return &graph.Map{Components: []graph.Component{{ID: "a"}}}, nil, nil
+		return &analysis.Map{Components: []analysis.Component{{ID: "a"}}}, nil, nil
 	}
 	events := runJob(t, ts, "/jobs/analyze", `{"repo_url":"https://github.com/acme/notes"}`)
-	if got != (graph.LLMOpts{}) {
+	if got != (analyzerclient.LLMOpts{}) {
 		t.Errorf("unrouted analyze passed %+v, want zero options", got)
 	}
 	if want := "fetch,scan,analyze,store,done"; strings.Join(stages(events), ",") != want {
@@ -156,9 +157,9 @@ func TestLocalModelRunsEnsureModelFirst(t *testing.T) {
 		emit(job.Event{Stage: "ensure_model", Label: "Loading " + hfID})
 		return nil
 	}
-	s.Analyze = func(ctx context.Context, res *scan.Result, opts graph.LLMOpts) (*graph.Map, []string, error) {
+	s.Analyze = func(ctx context.Context, res *scan.Result, opts analyzerclient.LLMOpts) (*analysis.Map, []string, error) {
 		order = append(order, "analyze:"+opts.Model)
-		return &graph.Map{Components: []graph.Component{{ID: "a"}}}, nil, nil
+		return &analysis.Map{Components: []analysis.Component{{ID: "a"}}}, nil, nil
 	}
 	events := runJob(t, ts, "/jobs/analyze",
 		`{"repo_url":"https://github.com/acme/notes","model_id":"local-qwen2.5-1.5b"}`)
@@ -187,8 +188,8 @@ func TestRemoteModelSkipsEnsureModel(t *testing.T) {
 // into an event label.
 func TestAPIKeyNeverReachesJobEventsOrTheStore(t *testing.T) {
 	s, ts := testServer(t)
-	var seen graph.LLMOpts
-	s.Analyze = func(ctx context.Context, res *scan.Result, opts graph.LLMOpts) (*graph.Map, []string, error) {
+	var seen analyzerclient.LLMOpts
+	s.Analyze = func(ctx context.Context, res *scan.Result, opts analyzerclient.LLMOpts) (*analysis.Map, []string, error) {
 		seen = opts
 		// An unhelpful provider echoing the request back at us.
 		return nil, nil, fmt.Errorf("analyzer: 401 unauthorized for request %s", opts.APIKey)

@@ -4,14 +4,18 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
-import { hostCapabilities, models } from "../../../shared/api";
-import type { CatalogEntry, HostCapabilities, Recommendation } from "../../../shared/models";
+import { hostCapabilities, models } from "../../../features/analysis";
+import type { CatalogEntry, HostCapabilities, Recommendation } from "../../../features/analysis";
 import { ModelGate } from "./ModelGate";
 
-vi.mock("../../../shared/api", () => ({
-  models: vi.fn(),
-  hostCapabilities: vi.fn(),
-}));
+vi.mock("../../../features/analysis", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../features/analysis")>();
+  return {
+    ...actual,
+    models: vi.fn(),
+    hostCapabilities: vi.fn(),
+  };
+});
 
 const localEntry: CatalogEntry = {
   id: "local-a", kind: "local", display_name: "Local A", tier: "fast",

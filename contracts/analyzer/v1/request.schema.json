@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Enizri/terra/contracts/analyzer/v1/request.schema.json",
+  "title": "AnalyzerRequestV1",
+  "description": "POST /analyze body sent by Go to the Python analyzer.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "scan"
+  ],
+  "properties": {
+    "scan": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "repository_url",
+        "name",
+        "stats",
+        "languages",
+        "primary_languages",
+        "tree",
+        "dependencies"
+      ],
+      "properties": {
+        "schema_version": {
+          "type": "integer"
+        },
+        "repository_url": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "commit": {
+          "type": "string"
+        },
+        "scanned_at": {
+          "type": "string"
+        },
+        "stats": {
+          "type": "object"
+        },
+        "languages": {
+          "type": "array"
+        },
+        "primary_languages": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tree": {
+          "type": "array"
+        },
+        "dependencies": {
+          "type": "array"
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "files_note": {
+          "type": "string"
+        },
+        "dirs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "model": {
+      "type": "string"
+    },
+    "base_url": {
+      "type": "string"
+    },
+    "api_key": {
+      "type": "string"
+    }
+  }
+}

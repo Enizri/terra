@@ -1,8 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { TerraMap } from "../../shared/map/types";
-import { analyze, probe, type AnalyzeEvent } from "../../shared/api";
-import { clearApiKey, isAuthFailure } from "../../shared/modelKeys";
-import type { Recommendation } from "../../shared/models";
+import type { TerraMap } from "../../features/architecture-map";
+import {
+  analyze,
+  probe,
+  clearApiKey,
+  isAuthFailure,
+  type AnalyzeEvent,
+  type Recommendation,
+} from "../../features/analysis";
 import { wsCache } from "./cache";
 
 /**

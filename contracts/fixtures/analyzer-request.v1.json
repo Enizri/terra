@@ -1,0 +1,263 @@
+{
+  "scan": {
+    "schema_version": 1,
+    "repository_url": "https://github.com/usememos/memos",
+    "name": "memos",
+    "commit": "571e0a3ff6eb0da8f7832bb15d5553a932641b63",
+    "scanned_at": "2026-08-01T10:59:56.0626Z",
+    "stats": {
+      "source_files": 948,
+      "total_bytes": 5066346,
+      "top_level_dirs": [
+        "cmd",
+        "docs",
+        "internal",
+        "proto",
+        "scripts",
+        "server",
+        "store",
+        "web"
+      ]
+    },
+    "languages": [
+      {
+        "name": "Go",
+        "files": 355,
+        "bytes": 3178157
+      },
+      {
+        "name": "TypeScript",
+        "files": 456,
+        "bytes": 1644973
+      },
+      {
+        "name": "SQL",
+        "files": 111,
+        "bytes": 107453
+      },
+      {
+        "name": "Protocol Buffers",
+        "files": 15,
+        "bytes": 99899
+      },
+      {
+        "name": "Shell",
+        "files": 5,
+        "bytes": 23303
+      },
+      {
+        "name": "CSS",
+        "files": 5,
+        "bytes": 11493
+      },
+      {
+        "name": "HTML",
+        "files": 1,
+        "bytes": 1068
+      }
+    ],
+    "primary_languages": [
+      "Go",
+      "TypeScript"
+    ],
+    "tree": [
+      {
+        "path": "web",
+        "files": 462,
+        "languages": [
+          "TypeScript",
+          "CSS",
+          "HTML"
+        ]
+      },
+      {
+        "path": "store",
+        "files": 210,
+        "languages": [
+          "Go",
+          "SQL"
+        ]
+      },
+      {
+        "path": "server",
+        "files": 134,
+        "languages": [
+          "Go"
+        ]
+      },
+      {
+        "path": "internal",
+        "files": 78,
+        "languages": [
+          "Go"
+        ]
+      },
+      {
+        "path": "proto",
+        "files": 55,
+        "languages": [
+          "Go",
+          "Protocol Buffers"
+        ]
+      },
+      {
+        "path": "scripts",
+        "files": 6,
+        "languages": [
+          "Shell",
+          "Go"
+        ]
+      },
+      {
+        "path": "cmd",
+        "files": 3,
+        "languages": [
+          "Go"
+        ]
+      }
+    ],
+    "dependencies": [
+      {
+        "manifest": "go.mod",
+        "ecosystem": "go",
+        "names": [
+          "connectrpc.com/connect",
+          "github.com/at-wat/ebml-go",
+          "github.com/aws/aws-sdk-go-v2",
+          "github.com/aws/aws-sdk-go-v2/config",
+          "github.com/aws/aws-sdk-go-v2/credentials",
+          "github.com/aws/aws-sdk-go-v2/service/s3",
+          "github.com/disintegration/imaging",
+          "github.com/go-sql-driver/mysql",
+          "github.com/golang-jwt/jwt/v5",
+          "github.com/google/cel-go",
+          "github.com/google/jsonschema-go",
+          "github.com/google/uuid",
+          "github.com/gorilla/feeds",
+          "github.com/grpc-ecosystem/grpc-gateway/v2",
+          "github.com/joho/godotenv",
+          "github.com/labstack/echo/v5",
+          "github.com/lib/pq",
+          "github.com/lithammer/shortuuid/v4",
+          "github.com/moby/moby/api",
+          "github.com/modelcontextprotocol/go-sdk",
+          "github.com/openai/openai-go/v3",
+          "github.com/pion/opus",
+          "github.com/pkg/errors",
+          "github.com/spf13/cobra",
+          "github.com/spf13/viper",
+          "github.com/stretchr/testify",
+          "github.com/testcontainers/testcontainers-go",
+          "github.com/testcontainers/testcontainers-go/modules/mysql",
+          "github.com/testcontainers/testcontainers-go/modules/postgres",
+          "github.com/yuin/goldmark",
+          "golang.org/x/crypto",
+          "golang.org/x/mod",
+          "golang.org/x/net",
+          "golang.org/x/oauth2",
+          "golang.org/x/sync",
+          "golang.org/x/text",
+          "google.golang.org/genai",
+          "google.golang.org/genproto",
+          "google.golang.org/genproto/googleapis/api",
+          "google.golang.org/grpc",
+          "google.golang.org/protobuf",
+          "gopkg.in/yaml.v3",
+          "modernc.org/sqlite"
+        ]
+      },
+      {
+        "manifest": "web/package.json",
+        "ecosystem": "npm",
+        "names": [
+          "@babel/core",
+          "@babel/plugin-transform-runtime",
+          "@babel/runtime",
+          "@base-ui/react",
+          "@biomejs/biome",
+          "@bufbuild/protobuf",
+          "@codemirror/autocomplete",
+          "@codemirror/commands",
+          "@codemirror/lang-markdown",
+          "@codemirror/language",
+          "@codemirror/state",
+          "@codemirror/view",
+          "@connectrpc/connect",
+          "@connectrpc/connect-web",
+          "@github/relative-time-element",
+          "@lezer/highlight",
+          "@lezer/markdown",
+          "@rolldown/plugin-babel",
+          "@tailwindcss/vite",
+          "@tanstack/react-query",
+          "@tanstack/react-query-devtools",
+          "@testing-library/jest-dom",
+          "@testing-library/react",
+          "@types/babel__core",
+          "@types/d3",
+          "@types/hast",
+          "@types/katex",
+          "@types/leaflet",
+          "@types/lodash-es",
+          "@types/mdast",
+          "@types/node",
+          "@types/qs",
+          "@types/react",
+          "@types/react-dom",
+          "@types/unist",
+          "@vitejs/plugin-react",
+          "babel-plugin-react-compiler",
+          "baseline-browser-mapping",
+          "class-variance-authority",
+          "clsx",
+          "copy-to-clipboard",
+          "dayjs",
+          "fuse.js",
+          "highlight.js",
+          "html-to-image",
+          "i18next",
+          "jsdom",
+          "katex",
+          "leaflet",
+          "leaflet.markercluster",
+          "lodash-es",
+          "long",
+          "lucide-react",
+          "mdast-util-from-markdown",
+          "mdast-util-gfm",
+          "mermaid",
+          "micromark-extension-gfm",
+          "mime",
+          "react",
+          "react-dom",
+          "react-hot-toast",
+          "react-i18next",
+          "react-leaflet",
+          "react-leaflet-cluster",
+          "react-markdown",
+          "react-router-dom",
+          "rehype-katex",
+          "rehype-raw",
+          "rehype-sanitize",
+          "remark-breaks",
+          "remark-gfm",
+          "remark-math",
+          "tailwind-merge",
+          "tailwindcss",
+          "terser",
+          "tw-animate-css",
+          "typescript",
+          "unist-util-visit",
+          "uuid",
+          "vite",
+          "vitest"
+        ]
+      }
+    ],
+    "files": [],
+    "dirs": []
+  },
+  "model": "gpt-4o-mini",
+  "base_url": "",
+  "api_key": ""
+}

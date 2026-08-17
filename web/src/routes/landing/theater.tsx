@@ -14,11 +14,10 @@ import {
   LiveFrame,
   liveSelectionId,
   selectionLabel,
-  useFloatingDrag,
-  useStreamingAskHint,
   type LiveSelection,
-} from "../../shared/live";
-import { ask as askServer } from "../../shared/api";
+} from "../../features/preview";
+import { useFloatingDrag, useStreamingAskHint } from "../../shared/live";
+import { ask as askServer } from "../../features/ask";
 import { spring } from "../../shared/motion";
 import { LIVE_NODE_ID, REPO_URL, type DiagramNode } from "./data";
 

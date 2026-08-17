@@ -3,8 +3,10 @@
 __pycache__/
 *.egg-info/
 *.db
+!internal/store/testdata/*.db
 /terra
 .DS_Store
+.cache/
 .superpowers/
 .playwright-mcp/
 .playwright-cli/

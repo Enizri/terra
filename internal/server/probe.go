@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Enizri/terra/internal/analysis"
 	"github.com/Enizri/terra/internal/catalog"
-	"github.com/Enizri/terra/internal/graph"
 	"github.com/Enizri/terra/internal/job"
 	"github.com/Enizri/terra/internal/recommend"
 	"github.com/Enizri/terra/internal/scan"
@@ -157,7 +157,7 @@ func (s *Server) startProbeJob(repoURL string) *job.Job {
 			Stage: "scan",
 			Label: fmt.Sprintf("Read %d files across %d languages",
 				res.Stats.SourceFiles, len(res.Languages)),
-			Map: graph.FromScan(res),
+			Map: analysis.FromScan(res),
 		})
 		if err := ctx.Err(); err != nil {
 			emit(job.Event{Stage: "error", Label: stopLabel(ctx, timeout)})

@@ -10,9 +10,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Enizri/terra/internal/analysis"
+	"github.com/Enizri/terra/internal/analyzerclient"
 	"github.com/Enizri/terra/internal/catalog"
 	"github.com/Enizri/terra/internal/config"
-	"github.com/Enizri/terra/internal/graph"
 	"github.com/Enizri/terra/internal/job"
 	"github.com/Enizri/terra/internal/scan"
 )
@@ -207,7 +208,7 @@ func TestProbeCacheHoldsNoSecrets(t *testing.T) {
 }
 
 // Compile-time reminder that the analyze seam keeps its routing options.
-var _ func(context.Context, *scan.Result, graph.LLMOpts) (*graph.Map, []string, error) = (Server{}).Analyze
+var _ func(context.Context, *scan.Result, analyzerclient.LLMOpts) (*analysis.Map, []string, error) = (Server{}).Analyze
 
 func TestProbeRecommendationFollowsTheHost(t *testing.T) {
 	s, ts := testServer(t)

@@ -1,4 +1,4 @@
-import type { TerraMap } from "../../shared/map/types";
+import type { TerraMap } from "../../features/architecture-map";
 import type { HistoryEntry } from "./history";
 
 // ponytail: module-level cache so the workspace keeps its contents across

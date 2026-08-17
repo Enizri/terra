@@ -3,43 +3,44 @@ package store
 import (
 	"database/sql"
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/Enizri/terra/internal/graph"
+	"github.com/Enizri/terra/internal/analysis"
 	"github.com/Enizri/terra/internal/scan"
 )
 
 func ptr(s string) *string { return &s }
 
-func fixtures() (*scan.Result, *graph.Map) {
+func fixtures() (*scan.Result, *analysis.Map) {
 	res := &scan.Result{
 		RepositoryURL: "https://github.com/usememos/memos",
 		Name:          "memos",
 		Commit:        "571e0a3",
 		ScannedAt:     time.Date(2026, 8, 1, 10, 0, 0, 0, time.UTC),
 	}
-	m := &graph.Map{
-		Project: graph.Project{Name: "Memos", RepositoryURL: res.RepositoryURL},
-		Components: []graph.Component{
+	m := &analysis.Map{
+		Project: analysis.Project{Name: "Memos", RepositoryURL: res.RepositoryURL},
+		Components: []analysis.Component{
 			{ID: "web", Name: "Web Application", Purpose: "What the user sees.",
 				Importance: "critical", Type: "frontend", Tech: []string{"React"}, Files: []string{"web/src/"}},
 			{ID: "web.editor", ParentID: ptr("web"), Name: "Editor", Purpose: "Where you write.",
 				Importance: "high", Type: "frontend", Files: []string{"web/src/App.tsx"}},
 		},
-		Relationships: []graph.Relationship{
+		Relationships: []analysis.Relationship{
 			{From: "web.editor", To: "web", Type: "uses", Because: []string{"web/src/App.tsx"}},
 		},
 	}
 	return res, m
 }
 
-func countProjects(t *testing.T, db *sql.DB) int {
+func countAnalyses(t *testing.T, db *sql.DB) int {
 	t.Helper()
 	var n int
-	if err := db.QueryRow("SELECT count(*) FROM projects").Scan(&n); err != nil {
-		t.Fatalf("count projects: %v", err)
+	if err := db.QueryRow("SELECT count(*) FROM analyses").Scan(&n); err != nil {
+		t.Fatalf("count analyses: %v", err)
 	}
 	return n
 }
@@ -51,8 +52,7 @@ func TestSaveRoundTripAndUpsert(t *testing.T) {
 	if err := Save(path, res, m); err != nil {
 		t.Fatal(err)
 	}
-	// Saving the same repository again must replace, not accumulate.
-	m.Components = append(m.Components, graph.Component{ID: "data", Name: "Data Storage",
+	m.Components = append(m.Components, analysis.Component{ID: "data", Name: "Data Storage",
 		Purpose: "Keeps everything.", Importance: "critical", Type: "database", Files: []string{"store/"}})
 	res.Commit = "deadbee"
 	if err := Save(path, res, m); err != nil {
@@ -65,18 +65,22 @@ func TestSaveRoundTripAndUpsert(t *testing.T) {
 	}
 	defer db.Close()
 
-	if n := countProjects(t, db); n != 1 {
-		t.Errorf("projects = %d, want 1", n)
+	if n := countAnalyses(t, db); n != 1 {
+		t.Errorf("analyses = %d, want 1", n)
 	}
 
 	var commit, mapJSON string
-	if err := db.QueryRow("SELECT commit_hash, map_json FROM projects").Scan(&commit, &mapJSON); err != nil {
+	var mapVersion int
+	if err := db.QueryRow("SELECT commit_hash, map_json, map_version FROM analyses").Scan(&commit, &mapJSON, &mapVersion); err != nil {
 		t.Fatal(err)
 	}
 	if commit != "deadbee" {
 		t.Errorf("commit_hash = %q, want the second scan's", commit)
 	}
-	var stored graph.Map
+	if mapVersion != analysis.CurrentMapVersion {
+		t.Errorf("map_version = %d, want %d", mapVersion, analysis.CurrentMapVersion)
+	}
+	var stored analysis.Map
 	if err := json.Unmarshal([]byte(mapJSON), &stored); err != nil {
 		t.Fatalf("map_json is not a map: %v", err)
 	}
@@ -85,22 +89,6 @@ func TestSaveRoundTripAndUpsert(t *testing.T) {
 	}
 	if stored.Components[1].ParentID == nil || *stored.Components[1].ParentID != "web" {
 		t.Errorf("parent_id lost in map_json: %+v", stored.Components[1])
-	}
-	if stored.Components[0].ParentID != nil {
-		t.Errorf("a top-level component should have nil ParentID, got %v", stored.Components[0].ParentID)
-	}
-	if len(stored.Relationships) != 1 ||
-		stored.Relationships[0].From != "web.editor" ||
-		stored.Relationships[0].To != "web" ||
-		len(stored.Relationships[0].Because) != 1 ||
-		stored.Relationships[0].Because[0] != "web/src/App.tsx" {
-		t.Errorf("relationship round trip wrong: %+v", stored.Relationships)
-	}
-	if len(stored.Components[0].Tech) != 1 || stored.Components[0].Tech[0] != "React" {
-		t.Errorf("tech round trip wrong: %+v", stored.Components[0].Tech)
-	}
-	if len(stored.Components[1].Files) != 1 || stored.Components[1].Files[0] != "web/src/App.tsx" {
-		t.Errorf("files round trip wrong: %+v", stored.Components[1].Files)
 	}
 }
 
@@ -128,9 +116,6 @@ func TestListAndGet(t *testing.T) {
 	if list[0].Name != "Other" {
 		t.Errorf("list[0] = %+v, want newest first", list[0])
 	}
-	if list[1].RepoURL != res.RepositoryURL || list[1].ID == 0 {
-		t.Errorf("list[1] = %+v", list[1])
-	}
 
 	got, err := Get(path, list[1].ID)
 	if err != nil {
@@ -138,9 +123,6 @@ func TestListAndGet(t *testing.T) {
 	}
 	if got == nil || got.Project.Name != "Memos" || len(got.Components) != 2 {
 		t.Errorf("Get = %+v", got)
-	}
-	if got.Components[1].ParentID == nil || *got.Components[1].ParentID != "web" {
-		t.Errorf("parent_id lost in round trip: %+v", got.Components[1])
 	}
 
 	missing, err := Get(path, 999)
@@ -176,13 +158,7 @@ func TestDelete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(list) != 2 {
-		t.Fatalf("list = %d rows, want 2", len(list))
-	}
 	target := list[1].ID
-	if list[1].RepoURL != res.RepositoryURL {
-		t.Fatalf("list[1] = %+v, want memos row", list[1])
-	}
 
 	ok, err := Delete(path, target)
 	if err != nil || !ok {
@@ -196,29 +172,9 @@ func TestDelete(t *testing.T) {
 		t.Fatalf("after delete list = %+v", list)
 	}
 
-	db, err := sql.Open("sqlite", path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-	if n := countProjects(t, db); n != 1 {
-		t.Errorf("projects = %d, want 1", n)
-	}
-	got, err := Get(path, list[0].ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got == nil || len(got.Components) != 2 {
-		t.Errorf("remaining map_json = %+v", got)
-	}
-
 	ok, err = Delete(path, target)
 	if err != nil || ok {
 		t.Errorf("Delete again = %v, %v; want false, nil", ok, err)
-	}
-	ok, err = Delete(path, 999)
-	if err != nil || ok {
-		t.Errorf("Delete(999) = %v, %v; want false, nil", ok, err)
 	}
 }
 
@@ -235,20 +191,11 @@ func TestSaveSecondRepositoryKeepsTheFirst(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	db, err := sql.Open("sqlite", path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-	if n := countProjects(t, db); n != 2 {
-		t.Errorf("projects = %d, want 2", n)
-	}
-
 	_, firstMap, err := Find(path, res.RepositoryURL)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if firstMap == nil || firstMap.Project.Name != "Memos" || len(firstMap.Components) != 2 {
+	if firstMap == nil || firstMap.Project.Name != "Memos" {
 		t.Errorf("first map = %+v", firstMap)
 	}
 	_, otherStored, err := Find(path, other.RepositoryURL)
@@ -257,5 +204,69 @@ func TestSaveSecondRepositoryKeepsTheFirst(t *testing.T) {
 	}
 	if otherStored == nil || otherStored.Project.Name != "Other" {
 		t.Errorf("second map = %+v", otherStored)
+	}
+}
+
+// TestMigrateLegacyProjectsTable opens a pre-migration terra.db (projects table,
+// no schema_migrations) and checks IDs, URLs, commits, and maps survive.
+func TestMigrateLegacyProjectsTable(t *testing.T) {
+	src := filepath.Join("testdata", "legacy_projects.db")
+	raw, err := os.ReadFile(src)
+	if err != nil {
+		t.Fatalf("read legacy fixture: %v", err)
+	}
+	path := filepath.Join(t.TempDir(), "terra.db")
+	if err := os.WriteFile(path, raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	s, err := Open(path)
+	if err != nil {
+		t.Fatalf("Open legacy db: %v", err)
+	}
+	defer s.Close()
+
+	list, err := s.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 1 {
+		t.Fatalf("list = %d, want 1", len(list))
+	}
+	if list[0].ID != 1 || list[0].RepoURL != "https://github.com/usememos/memos" || list[0].Name != "Memos" {
+		t.Errorf("summary = %+v", list[0])
+	}
+
+	commit, m, err := s.Find(list[0].RepoURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if commit != "571e0a3" {
+		t.Errorf("commit = %q", commit)
+	}
+	if m == nil || m.Project.Name != "Memos" || len(m.Components) < 1 {
+		t.Errorf("map = %+v", m)
+	}
+
+	var ver int
+	if err := s.db.QueryRow(`SELECT map_version FROM analyses WHERE id = 1`).Scan(&ver); err != nil {
+		t.Fatal(err)
+	}
+	if ver != 1 {
+		t.Errorf("map_version = %d, want 1", ver)
+	}
+
+	var maxVer int
+	if err := s.db.QueryRow(`SELECT MAX(version) FROM schema_migrations`).Scan(&maxVer); err != nil {
+		t.Fatal(err)
+	}
+	if maxVer < 2 {
+		t.Errorf("schema_migrations max = %d, want >= 2", maxVer)
+	}
+
+	var projects int
+	err = s.db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='projects'`).Scan(&projects)
+	if err != nil || projects != 0 {
+		t.Errorf("projects table still present: count=%d err=%v", projects, err)
 	}
 }

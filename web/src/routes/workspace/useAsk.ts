@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ask as askServer, type Selection } from "../../shared/api";
-import { wsCache } from "./cache";
 import {
+  ask as askServer,
   buildProcess,
   advanceProcess,
   completeProcess,
@@ -9,9 +8,11 @@ import {
   hasMeaningfulSelection,
   type AskMessage,
   type AskPart,
-} from "./askProcess.ts";
+  type Selection,
+} from "../../features/ask";
+import { wsCache } from "./cache";
 
-export type { AskMessage, AskPart, ProcessStep, ProcessStepStatus } from "./askProcess.ts";
+export type { AskMessage, AskPart, ProcessStep, ProcessStepStatus } from "../../features/ask";
 
 const THINKING_COPY = "Considering the map and what you selected…";
 

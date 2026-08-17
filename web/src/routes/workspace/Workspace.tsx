@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
-import type { Component, TerraMap } from "../../shared/map/types";
-import type { LiveSelection } from "../../shared/live";
+import type { Component, TerraMap } from "../../features/architecture-map";
+import type { LiveSelection } from "../../features/preview";
 import memosFixture from "../../data/memos.map.json";
-import { analyses, analysis, deleteAnalysis } from "../../shared/api";
+import { analyses, analysis, deleteAnalysis } from "../../features/analysis";
 import { wsCache } from "./cache";
 import { useAnalyze } from "./useAnalyze";
 import { nextSelection } from "./selection";

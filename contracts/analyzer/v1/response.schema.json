@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Enizri/terra/contracts/analyzer/v1/response.schema.json",
+  "title": "AnalyzerResponseV1",
+  "description": "POST /analyze response: Draft judgement plus warnings.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["draft"],
+  "properties": {
+    "draft": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["description", "kind", "components", "relationships", "suggested_questions"],
+      "properties": {
+        "description": { "type": "string" },
+        "kind": { "type": "string" },
+        "components": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": ["id", "name", "purpose", "importance", "type", "files"],
+            "properties": {
+              "id": { "type": "string" },
+              "parent_id": { "type": ["string", "null"] },
+              "name": { "type": "string" },
+              "purpose": { "type": "string" },
+              "importance": { "type": "string" },
+              "type": { "type": "string" },
+              "tech": { "type": "array", "items": { "type": "string" } },
+              "files": { "type": "array", "items": { "type": "string" } },
+              "file_count": { "type": "integer" }
+            }
+          }
+        },
+        "relationships": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": ["from", "to", "type", "because"],
+            "properties": {
+              "from": { "type": "string" },
+              "to": { "type": "string" },
+              "type": { "type": "string" },
+              "because": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        },
+        "suggested_questions": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}
