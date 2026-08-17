@@ -1,0 +1,100 @@
+/* Components used by more than one route: buttons, chips, the repo diagram,
+   the live-preview frame and the Terra chat dock. Landing-scoped overrides of
+   these classes live in routes/landing/landing.css, which loads after. */
+
+.sh-root a.sh-btn {
+  color: #fff;
+}
+
+.sh-terra-mark {
+  display: block;
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  background: var(--sh-terra-wash);
+  -webkit-mask: var(--sh-star-mask-thick) center / contain no-repeat;
+  mask: var(--sh-star-mask-thick) center / contain no-repeat;
+  rotate: 2.5deg;
+  transition:
+    rotate 0.55s cubic-bezier(0.22, 1.35, 0.36, 1),
+    scale 0.55s cubic-bezier(0.22, 1.35, 0.36, 1),
+    opacity 0.4s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+.sh-terra-mark {
+    transition: none;
+  }
+}
+
+.sh-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  background: #e8400d;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 500;
+  font-family: inherit;
+  letter-spacing: -0.2px;
+  line-height: 1.4;
+  padding: 12px 24px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: filter 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sh-btn:hover {
+  filter: brightness(1.1);
+  color: #fff;
+}
+
+.sh-btn--nav {
+  font-size: 16px;
+  letter-spacing: -0.1px;
+  padding: 14px 22px;
+  margin-left: 8px;
+}
+
+.sh-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.sh-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  font-size: 13px;
+  font-weight: 500;
+  color: #171717;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.sh-chip--tint {
+  background: var(--color-tint);
+  color: #fff;
+  border-color: transparent;
+}
+
+.sh-chip__mark {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  background: var(--color-tint);
+  flex-shrink: 0;
+}
+
+.sh-chip svg {
+  width: 16px;
+  height: 16px;
+  opacity: 0.7;
+}
+

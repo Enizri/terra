@@ -1,0 +1,392 @@
+.sh-terra-chat {
+  display: flex;
+  flex-direction: column;
+  /* Narrower + taller than a composer strip — floating Ask-dock proportions. */
+  width: min(360px, calc(100cqw - 36px));
+  height: min(440px, calc(100cqh - 64px));
+  overflow: hidden;
+  border-radius: 10px;
+  background: #14120b;
+  color: #edecec;
+  font-family: var(--font-body);
+  font-size: 13px;
+  user-select: none;
+  box-shadow:
+    0 28px 70px rgba(0, 0, 0, 0.14),
+    0 14px 32px rgba(0, 0, 0, 0.1),
+    0 0 0 1px rgba(237, 236, 236, 0.1);
+}
+
+.sh-terra-chat--open {
+  width: min(360px, calc(100cqw - 36px));
+  height: min(440px, calc(100cqh - 64px));
+}
+
+.sh-terra-chat--full {
+  width: calc(100cqw - 36px);
+  height: calc(100cqh - 72px);
+  border-radius: 10px;
+}
+
+/* Keep thread + prompt left-aligned with the dock origin — don't float a
+   centered 720px column in the middle of the expanded panel. */
+.sh-terra-chat--full .sh-terra-chat__body,
+.sh-terra-chat--full .sh-terra-chat__prompt {
+  width: 100%;
+  max-width: none;
+  margin-inline: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+.sh-terra-chat {
+    transition:
+      width 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+      height 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+
+.sh-terra-chat__head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  height: 28px;
+  padding: 0 8px;
+  border-bottom: 1px solid rgba(237, 236, 236, 0.1);
+  cursor: grab;
+  touch-action: none;
+}
+
+.sh-terra-chat__lights {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 48px;
+}
+
+.sh-terra-chat__lights i {
+  display: block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(237, 236, 236, 0.2);
+}
+
+.sh-terra-chat__name {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(237, 236, 236, 0.55);
+  pointer-events: none;
+}
+
+.sh-terra-chat__tools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  touch-action: auto;
+}
+
+.sh-terra-chat__ctl {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(237, 236, 236, 0.45);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  touch-action: auto;
+}
+
+.sh-terra-chat__ctl:hover {
+  background: rgba(237, 236, 236, 0.08);
+  color: #edecec;
+}
+
+.sh-terra-chat__body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-height: 0;
+  padding: 10px 12px 0;
+}
+
+.sh-terra-chat__crumb {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: rgba(237, 236, 236, 0.4);
+}
+
+.sh-terra-chat__thread {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.sh-terra-chat__msg {
+  max-width: 92%;
+  margin: 0;
+  padding: 8px 11px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.45;
+  user-select: text;
+}
+
+.sh-terra-chat__msg--user {
+  align-self: flex-end;
+  background: rgba(237, 236, 236, 0.1);
+  color: #edecec;
+}
+
+.sh-terra-chat__msg--terra {
+  align-self: flex-start;
+  background: #1b1913;
+  border: 1px solid rgba(237, 236, 236, 0.08);
+  color: rgba(237, 236, 236, 0.85);
+}
+
+.sh-terra-chat__msg--error {
+  border-color: rgba(255, 100, 90, 0.35);
+  background: rgba(179, 38, 30, 0.18);
+  color: #ffb4a8;
+}
+
+.sh-terra-chat__thinking {
+  --think-wash:
+    radial-gradient(circle at 22% 28%, rgba(232, 64, 13, 0.95), transparent 55%),
+    radial-gradient(circle at 78% 72%, rgba(208, 178, 255, 1), transparent 58%),
+    radial-gradient(circle at 58% 38%, rgba(255, 238, 216, 0.9), transparent 50%),
+    linear-gradient(160deg, #e8400d 0%, #d0b2ff 55%, #ac7eff 100%);
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 92%;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background:
+    linear-gradient(#1b1913, #1b1913) padding-box,
+    var(--think-wash) border-box;
+  background-size: auto, 240% 240%;
+  animation: sh-terra-think-wash 2.8s ease-in-out infinite;
+}
+
+.sh-terra-chat__thinking-mark {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  background: var(--think-wash);
+  background-size: 240% 240%;
+  animation: sh-terra-think-wash 2.8s ease-in-out infinite;
+  box-shadow: 0 0 14px rgba(232, 64, 13, 0.4), 0 0 18px rgba(172, 126, 255, 0.25);
+}
+
+.sh-terra-chat__thinking-label {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.35;
+  background-image: linear-gradient(
+    110deg,
+    #e8400d 0%,
+    #ffc9a8 28%,
+    #d0b2ff 55%,
+    #ac7eff 78%,
+    #e8400d 100%
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: sh-terra-think-text 2.2s linear infinite;
+}
+
+@keyframes sh-terra-think-wash {
+  0%,
+  100% {
+    background-position: 0% 40%, 100% 60%, 50% 20%, 0% 50%;
+  }
+  50% {
+    background-position: 80% 20%, 10% 90%, 70% 70%, 100% 50%;
+  }
+}
+
+@keyframes sh-terra-think-text {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 220% 50%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+.sh-terra-chat__thinking,
+  .sh-terra-chat__thinking-mark,
+  .sh-terra-chat__thinking-label {
+    animation: none;
+  }
+}
+
+.sh-terra-chat__hints {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+  flex: none;
+  padding: 4px 0 4px;
+  overflow: visible;
+}
+
+.sh-terra-chat__hints-label {
+  margin: 0 0 2px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: rgba(237, 236, 236, 0.45);
+}
+
+.sh-terra-chat__hint {
+  display: block;
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(237, 236, 236, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(237, 236, 236, 0.88);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: -0.15px;
+  line-height: 1.35;
+  text-align: left;
+  text-wrap: balance;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.sh-terra-chat__hint:hover:not(:disabled) {
+  color: #fff;
+  border-color: rgba(245, 197, 24, 0.45);
+  background: rgba(245, 197, 24, 0.1);
+}
+
+.sh-terra-chat__hint:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* First pick only: chips lead, thread stays short. Once messages exist,
+   the thread flexes and remaining chips use --compact. */
+.sh-terra-chat__body:has(.sh-terra-chat__hints):not(:has(.sh-terra-chat__msg)) .sh-terra-chat__thread {
+  flex: 0 1 auto;
+  max-height: 120px;
+}
+
+.sh-terra-chat__hints--compact {
+  max-height: 88px;
+  overflow-y: auto;
+  gap: 4px;
+  padding-top: 0;
+}
+
+.sh-terra-chat__hints--compact .sh-terra-chat__hint {
+  padding: 6px 10px;
+  font-size: 11px;
+}
+
+.sh-terra-chat__prompt {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin: auto 12px 12px;
+  min-height: 40px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(237, 236, 236, 0.1);
+  background: #1b1913;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  font-size: 13px;
+  letter-spacing: -0.01em;
+  color: rgba(237, 236, 236, 0.45);
+  user-select: none;
+  overflow: hidden;
+}
+
+.sh-terra-chat__stream {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 13px;
+  color: rgba(237, 236, 236, 0.38);
+}
+
+.sh-terra-chat__caret {
+  display: inline-block;
+  width: 1.5px;
+  height: 0.95em;
+  margin-left: 1px;
+  border-radius: 1px;
+  background: linear-gradient(180deg, #e8400d, #ac7eff);
+  animation: sh-terra-caret 0.9s steps(1) infinite;
+  vertical-align: -0.1em;
+  flex-shrink: 0;
+}
+
+@keyframes sh-terra-caret {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+.sh-terra-chat__caret {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+@media (max-width: 640px) {
+.sh-terra-chat,
+  .sh-terra-chat--open,
+  .sh-terra-chat--full {
+    width: auto;
+  }
+
+.sh-terra-chat,
+  .sh-terra-chat--open {
+    height: min(440px, calc(100cqh - 64px));
+  }
+
+.sh-terra-chat--full {
+    height: calc(100cqh - 80px);
+  }
+}
+

@@ -1,0 +1,535 @@
+.sh-diagram {
+  --dg-bg: #101116;
+  --dg-grid: rgba(255, 255, 255, 0.07);
+  --dg-border: rgba(255, 255, 255, 0.12);
+  --dg-node-bg: #1c1e24;
+  --dg-text: rgba(255, 255, 255, 0.92);
+  --dg-muted: rgba(255, 255, 255, 0.45);
+  --dg-accent: var(--color-tint);
+  /* Railway vocabulary: violet selection ring, green verified dot. */
+  --dg-select: #8b7cf6;
+  --dg-ok: #12b886;
+  --dg-mono: "SF Mono", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo,
+    monospace;
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 14px 16px 12px;
+  gap: 10px;
+  box-sizing: border-box;
+  /* The card is the whole diagram — header, canvas and legend all sit inside
+     one border instead of floating on the window chrome. */
+  border-radius: 16px;
+  background: var(--dg-bg);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sh-diagram__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+}
+
+.sh-diagram__title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sh-diagram__repo {
+  font-family: var(--dg-mono);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--dg-text);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sh-diagram__meta {
+  font-size: 10.5px;
+  color: var(--dg-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sh-diagram__badge {
+  margin-left: auto;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--dg-border);
+  background: rgba(255, 255, 255, 0.03);
+  font-family: var(--dg-mono);
+  font-size: 10px;
+  color: var(--dg-muted);
+  white-space: nowrap;
+}
+
+.sh-diagram__badge::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #12b886;
+  box-shadow: 0 0 6px rgba(18, 184, 134, 0.8);
+}
+
+.sh-diagram__canvas {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  padding: 26px 22px;
+  box-sizing: border-box;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background-color: rgba(0, 0, 0, 0.18);
+  background-image: radial-gradient(var(--dg-grid) 1px, transparent 1px);
+  background-size: 20px 20px;
+  overflow: hidden;
+}
+
+.sh-diagram__scale {
+  position: absolute;
+  inset: 0;
+  padding: inherit;
+  box-sizing: border-box;
+  transform-origin: 50% 50%;
+}
+
+.sh-diagram__flow {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: clamp(34px, 7%, 90px);
+}
+
+.sh-diagram__col {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 22px;
+  min-width: 0;
+}
+
+.sh-diagram__group {
+  border: 1px solid var(--dg-border);
+  border-radius: 10px;
+  padding: 12px 14px 14px;
+  /* Left transparent on purpose: the arrows are painted underneath the flow
+     layer, so `web → api` and `memos/files → db` cross this box's padding on
+     their way to a card edge. Any fill tints them. */
+  background: transparent;
+}
+
+.sh-diagram__group-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-family: var(--dg-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.sh-diagram__group-title span {
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: rgba(255, 255, 255, 0.32);
+}
+
+.sh-diagram__group-body {
+  display: flex;
+  flex-direction: column;
+  /* 22px, not 10: a stacked vertical connector shorter than this is entirely
+     swallowed by its own arrowhead. */
+  gap: 22px;
+}
+
+.sh-diagram__node {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 196px;
+  max-width: 250px;
+  padding: 13px 14px 12px;
+  border-radius: 11px;
+  border: 1px solid var(--dg-border);
+  background: var(--dg-node-bg);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: var(--dg-text);
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    filter 0.25s ease;
+}
+
+.sh-diagram__node:hover,
+.sh-diagram__node.is-script-hover {
+  border-color: rgba(255, 255, 255, 0.28);
+  background: #21242a;
+}
+
+.sh-diagram__node--hover-only {
+  cursor: default;
+}
+
+.sh-diagram__node-top {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.sh-diagram__icon {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-family: var(--dg-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  user-select: none;
+}
+
+.sh-diagram__icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.sh-diagram__icon--fallback {
+  color: #fff;
+  font-size: 11px;
+}
+
+.sh-diagram__name {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--dg-text);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sh-diagram__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--dg-mono);
+  font-size: 10px;
+  color: var(--dg-muted);
+}
+
+.sh-diagram__status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--dg-ok);
+  box-shadow: 0 0 6px rgba(18, 184, 134, 0.8);
+}
+
+.sh-diagram__purpose {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--dg-muted);
+}
+
+.sh-diagram__foot {
+  display: block;
+  align-self: stretch;
+  margin-top: 3px;
+  padding-top: 8px;
+  border-top: 1px solid var(--dg-border);
+  min-width: 0;
+}
+
+.sh-diagram__hint {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--dg-mono);
+  font-size: 10.5px;
+  line-height: 16px;
+  color: var(--dg-muted);
+}
+
+.sh-diagram__edges {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.sh-diagram__edge {
+  stroke: rgba(255, 255, 255, 0.35);
+  stroke-width: 1.25;
+  stroke-linejoin: round;
+  stroke-linecap: butt;
+  transition:
+    stroke 0.25s ease,
+    filter 0.25s ease;
+}
+
+.sh-diagram__edge-flow {
+  stroke: var(--dg-accent);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 22 240;
+  filter: drop-shadow(0 0 5px var(--dg-accent));
+  animation: sh-edge-stream 1.5s linear infinite;
+}
+
+@keyframes sh-edge-stream {
+  from {
+    stroke-dashoffset: 262;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.sh-diagram__arrow {
+  fill: rgba(255, 255, 255, 0.35);
+}
+
+.sh-diagram__edge-label {
+  position: absolute;
+  z-index: 2;
+  padding: 3px 7px;
+  border-radius: 5px;
+  border: 1px solid var(--dg-border);
+  background: var(--dg-node-bg);
+  font-family: var(--dg-mono);
+  font-size: 11px;
+  line-height: 1.2;
+  white-space: nowrap;
+  color: var(--dg-muted);
+  pointer-events: none;
+  transition:
+    color 0.25s ease,
+    border-color 0.25s ease,
+    filter 0.25s ease;
+}
+
+/* ---- focus / dim states ---- */
+
+/* RepoDiagram toggles these classes; the rules live here (not in a route
+   sheet) so every route that renders the shared diagram gets them. */
+
+.sh-diagram__node.is-focus {
+  /* Railway's clean violet ring — border plus a 1px shadow so it reads as 2px
+     without shifting layout. */
+  border-color: var(--dg-select);
+  box-shadow: 0 0 0 1px var(--dg-select);
+}
+
+/* Never the `opacity` property — Motion writes that inline on every card. */
+
+.sh-diagram__node.is-dim {
+  filter: opacity(0.25) saturate(0.4);
+}
+
+/* A live request just crossed this component (see spanMatch + /traces). */
+.sh-diagram__node.is-pulse {
+  border-color: var(--dg-accent);
+  animation: sh-node-pulse 0.9s ease-out;
+}
+
+@keyframes sh-node-pulse {
+  0% {
+    box-shadow: 0 0 0 0 var(--dg-accent);
+  }
+  70% {
+    box-shadow: 0 0 18px 2px var(--dg-accent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sh-diagram__node.is-pulse {
+    animation: none;
+    box-shadow: 0 0 0 1px var(--dg-accent);
+  }
+}
+
+.sh-diagram__edge.is-lit {
+  stroke: var(--dg-accent);
+  stroke-width: 1.6;
+}
+
+.sh-diagram__edge.is-dim {
+  filter: opacity(0.25) saturate(0.4);
+}
+
+/* Back-routed edges are drawn end-to-start, so the light runs the other way. */
+
+.sh-diagram__edge-flow.is-back {
+  animation-direction: reverse;
+}
+
+.sh-diagram__arrow.is-lit {
+  fill: var(--dg-accent);
+}
+
+.sh-diagram__edge-label.is-lit {
+  color: var(--dg-text);
+  border-color: var(--dg-accent);
+}
+
+.sh-diagram__edge-label.is-dim {
+  filter: opacity(0.25) saturate(0.4);
+}
+
+.sh-diagram__legend {
+  flex: none;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  padding-top: 2px;
+  font-family: var(--dg-mono);
+  font-size: 9.5px;
+  color: var(--dg-muted);
+}
+
+.sh-diagram__legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.sh-diagram__legend-note {
+  margin-left: auto;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.sh-diagram__dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.sh-diagram__dot--frontend {
+  background: #ff6e37;
+}
+
+.sh-diagram__dot--backend {
+  background: #0077ff;
+}
+
+.sh-diagram__dot--service {
+  background: #7c5cff;
+}
+
+.sh-diagram__dot--data {
+  background: #12b886;
+}
+
+@media (max-width: 767px) {
+.sh-diagram {
+    padding: 12px 12px 10px;
+  }
+
+.sh-diagram__canvas {
+    padding: 16px 14px;
+    overflow-y: auto;
+  }
+
+.sh-diagram__flow {
+    height: auto;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+  }
+
+.sh-diagram__col {
+    gap: 14px;
+  }
+
+.sh-diagram__col + .sh-diagram__col::before {
+    content: "";
+    display: block;
+    width: 8px;
+    height: 8px;
+    margin: 14px auto;
+    border-right: 1.5px solid rgba(255, 255, 255, 0.3);
+    border-bottom: 1.5px solid rgba(255, 255, 255, 0.3);
+    transform: rotate(45deg);
+  }
+
+.sh-diagram__node {
+    min-width: 0;
+    max-width: none;
+    width: 100%;
+  }
+
+.sh-diagram__group-body {
+    gap: 12px;
+  }
+
+.sh-diagram__edges,
+  .sh-diagram__edge-label {
+    display: none;
+  }
+
+.sh-diagram__legend-note {
+    display: none;
+  }
+
+.sh-diagram__badge {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+.sh-diagram__node,
+  .sh-diagram__hint,
+  .sh-diagram__edge,
+  .sh-diagram__edge-label {
+    transition: none;
+  }
+
+.sh-diagram__edge-flow {
+    animation: none;
+  }
+}
+
