@@ -31,7 +31,8 @@ talks to the model only through the **OpenAI-compatible** Chat Completions API,
 so a laptop HF server, vLLM, or a hosted provider are drop-in replacements.
 
 `ARCHITECTURE.md` has the folder maps, the import rules between them, and what
-to add for a new product under this repo.
+to add for a new product under this repo. See `CONTRIBUTING.md` for where new
+feature code goes, `make check`, and PR expectations.
 
 ## Quickstart
 
@@ -227,6 +228,7 @@ make sync-fixtures      # copy case-studies/memos.map.json → web/src/data/
 
 The wire contract between Go and Python is the draft JSON in
 `analyzer/terra_analyzer/models.py` mirrored by `internal/graph/types.go`;
-the enums and model JSON schema live only in `analyzer/terra_analyzer/schema.py`.
+the enums and model JSON schema live only in
+`analyzer/terra_analyzer/agents/architecture/schema.py`.
 `case-studies/memos.map.json` is the golden answer key and is checked by
 `analyzer/tests/test_app.py` and `internal/graph/contract_test.go`.
