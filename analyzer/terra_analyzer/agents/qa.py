@@ -26,8 +26,18 @@ class QATask:
             raise ValueError('payload must include a non-empty "question"')
 
         parts = [f"Question: {question}"]
-        if payload.get("selection"):
-            parts.append("Selected component:\n" + json.dumps(payload["selection"], indent=2))
+        selections = payload.get("selections")
+        if isinstance(selections, list) and selections:
+            # Multi-select Ask: Go sends every pick in selections (and still
+            # mirrors the primary in selection). Prefer the full list so the
+            # prompt is not silently lossy.
+            parts.append(
+                "Selected components:\n" + json.dumps(selections, indent=2)
+            )
+        elif payload.get("selection"):
+            parts.append(
+                "Selected component:\n" + json.dumps(payload["selection"], indent=2)
+            )
         if payload.get("file_snippet"):
             parts.append("Source snippet:\n```\n" + str(payload["file_snippet"]) + "\n```")
         if payload.get("map"):
