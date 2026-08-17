@@ -10,3 +10,5 @@ export {
   type ProcessStep,
   type ProcessStepStatus,
 } from "./askProcess.ts";
+export { AskDock } from "./AskDock.tsx";
+export { useAsk } from "./useAsk.ts";

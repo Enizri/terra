@@ -15,7 +15,7 @@ User (CLI / HTTP)
         | POST /analyze  {scan, model}
         v
    Python analyzer (FastAPI, :8010)
-   agent tasks (architecture, …), validate, retry
+   analyzer tasks (architecture, …), validate, retry
         |
         | OpenAI-compatible POST /v1/chat/completions
         v
@@ -195,7 +195,7 @@ than that, analyze rescans and says so.
 |---|---|
 | `GET /healthz` | Status, model, whether the LLM `/v1/models` probe succeeded |
 | `POST /analyze` | Architecture map (Go wire contract) |
-| `GET /tasks` | Registered agent tasks |
+| `GET /tasks` | Registered analyzer tasks |
 | `POST /tasks/{name}` | Run a named task (`architecture`, …) |
 
 `POST /analyze` and `POST /tasks/qa` accept optional `base_url` and `api_key`

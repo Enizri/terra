@@ -1,4 +1,4 @@
-"""Named analyzer tasks (typed handlers, not autonomous agents)."""
+"""Named analyzer tasks with typed handlers."""
 
 from .registry import TaskRegistry, default_registry
 

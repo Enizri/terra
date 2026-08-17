@@ -198,7 +198,7 @@ export const diagramEdges: DiagramEdge[] = [
 
 export const evidence = [
   { path: "app.py", why: "FastAPI service on :8010" },
-  { path: "tasks/architecture.py", why: "agent task that builds the map" },
+  { path: "tasks/architecture.py", why: "analyzer task that builds the map" },
   { path: "schema.py", why: "enums + JSON schema, single source" },
   { path: "models.py", why: "Go wire contract" },
 ];

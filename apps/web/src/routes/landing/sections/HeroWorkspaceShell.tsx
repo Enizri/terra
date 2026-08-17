@@ -1,6 +1,6 @@
 // Embedded workspace for the hero film: the real product chrome at a fixed
 // logical resolution, scaled to fill the hero window. The map/preview/chat
-// states mirror MapStage and AgentDock so the film reads as the real
+// states mirror MapStage and AskDock so the film reads as the real
 // workspace. The pre-drop small screen lives in Hero.tsx, not here.
 
 import { useImperativeHandle, useLayoutEffect, useRef, useState, type Ref } from "react";
@@ -95,7 +95,7 @@ export function HeroWorkspaceShell({
     return () => ro.disconnect();
   }, [phase]);
 
-  // Real AgentDock greeting copy for the current state.
+  // Real AskDock greeting copy for the current state.
   const greeting =
     phase === "map"
       ? "Memos is mapped. Click any box for its purpose, tech and files — shift-click to ask about several at once."

@@ -4,13 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 
+	askcontext "github.com/Enizri/terra/backend/api/internal/ask"
 	"github.com/Enizri/terra/backend/api/internal/job"
-	"github.com/Enizri/terra/backend/api/internal/preview"
-	"github.com/Enizri/terra/backend/api/internal/scan"
 )
 
 type askRequest struct {
@@ -106,77 +103,10 @@ func (s *Server) decodeAsk(w http.ResponseWriter, r *http.Request) (askRequest, 
 }
 
 func (s *Server) askPayload(req askRequest, sel modelSelection) map[string]any {
-	sels := req.Selections
-	if len(sels) == 0 && req.Selection != nil {
-		sels = []map[string]any{req.Selection}
-	}
-	primary := req.Selection
-	if primary == nil && len(sels) > 0 {
-		primary = sels[len(sels)-1]
-	}
-	if primary == nil {
-		primary = map[string]any{}
-	}
-
-	payload := map[string]any{"question": req.Question, "selection": primary}
-	if sel.Opts.Model != "" {
-		payload["model"] = sel.Opts.Model
-		payload["base_url"] = sel.Opts.BaseURL
-		if sel.Opts.APIKey != "" {
-			payload["api_key"] = sel.Opts.APIKey
-		}
-	}
-	if len(sels) > 1 {
-		payload["selections"] = sels
-	}
-	if file, _ := primary["file"].(string); file != "" {
-		line := 0
-		if l, ok := primary["line"].(float64); ok {
-			line = int(l)
-		}
-		if snip := snippet(s.previewRunner(), s.Cfg.CheckoutDir, req.RepoURL, file, line); snip != "" {
-			payload["file_snippet"] = snip
-		}
-	}
-	if s.DB != "" {
-		if repoMap := storedMap(s.DB, req.RepoURL); repoMap != nil {
-			payload["map"] = repoMap
-		}
-	}
-	return payload
-}
-
-// snippet returns ~150 lines centered on line from an existing checkout.
-// checkoutBase is Cfg.CheckoutDir.
-func snippet(r preview.Runner, checkoutBase, repoURL, file string, line int) string {
-	if strings.Contains(file, "..") {
-		return ""
-	}
-	root, appDir, ok := r.Lookup(repoURL)
-	if !ok {
-		dir, err := scan.CheckoutDir(checkoutBase, repoURL)
-		if err != nil {
-			return ""
-		}
-		if _, err := os.Stat(dir); err != nil {
-			return ""
-		}
-		root, appDir = dir, dir
-	}
-	for _, base := range []string{appDir, root} {
-		data, err := os.ReadFile(filepath.Join(base, file))
-		if err != nil {
-			continue
-		}
-		lines := strings.Split(string(data), "\n")
-		lo, hi := 0, len(lines)
-		if line > 0 && hi > 150 {
-			lo = max(0, line-75)
-			hi = min(len(lines), line+75)
-		} else if hi > 150 {
-			hi = 150
-		}
-		return strings.Join(lines[lo:hi], "\n")
-	}
-	return ""
+	return askcontext.BuildPayload(askcontext.Input{
+		RepoURL: req.RepoURL, Question: req.Question,
+		Selection: req.Selection, Selections: req.Selections,
+		Model: sel.Opts, Preview: s.previewRunner(),
+		CheckoutBase: s.Cfg.CheckoutDir, DB: s.DB,
+	})
 }

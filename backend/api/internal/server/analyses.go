@@ -4,23 +4,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/Enizri/terra/backend/api/internal/analysis"
-	"github.com/Enizri/terra/backend/api/internal/scan"
 	"github.com/Enizri/terra/backend/api/internal/store"
 )
-
-// storedMap returns the saved analysis for repoURL, or nil.
-func storedMap(dbPath, repoURL string) *analysis.Map {
-	norm, _, err := scan.NormalizeURL(repoURL)
-	if err != nil {
-		return nil
-	}
-	_, repoMap, err := store.Find(dbPath, norm)
-	if err != nil {
-		return nil
-	}
-	return repoMap
-}
 
 func (s *Server) list(w http.ResponseWriter, r *http.Request) {
 	list, err := store.List(s.DB)
