@@ -38,8 +38,8 @@ this list:
 | Package | Does | Imports |
 |---|---|---|
 | `cmd/terra` | CLI: `scan`, `map`, `serve` | all of the below |
-| `internal/server` | HTTP API — jobs, analyses, preview, ask, files, models | graph, preview, store, job, catalog, recommend, llmlocal, config, … |
-| `internal/store` | SQLite persistence keyed by repo URL | graph, scan |
+| `internal/server` | HTTP API — `Handler` in `server.go`; feature handlers in `analyze.go`, `ask.go`, `probe.go`, `analyses.go`, `files.go`, `traces.go`, `model_select.go`, … | graph, preview, store, job, catalog, recommend, llmlocal, config, … |
+| `internal/store` | SQLite persistence keyed by repo URL (`projects.map_json` only) | graph, scan |
 | `internal/preview` | Clone a repo, boot its dev server, reverse-proxy it with `select.js` injected | scan, runfile, trace |
 | `internal/graph` | Wire types + the HTTP client to the analyzer | scan |
 | `internal/catalog` | Static model allowlist + host capability helpers | nothing domain-specific |
@@ -60,12 +60,13 @@ Rules:
 ```
 terra_analyzer/
   app.py              FastAPI app (:8010) — /healthz /tasks /tasks/{name} /analyze
-  agents/             one file per task; base.py is a 3-line Task protocol,
-                      registry.py maps name -> task
-  prompts/            system prompts and prompt building
-  schema.py           enums + the model's JSON schema — single source of truth
+  agents/             tasks + registry
+    base.py           3-line Task protocol
+    registry.py       name -> task (architecture, qa; runfile not registered)
+    architecture/     ArchitectureMapper + schema.py, prompt.py, validate.py
+    qa.py             QA task
+    runfile.py        parked/unregistered RunfileWriter (see Known warts)
   models.py           Pydantic mirrors of the Go wire types
-  validate.py         normalize / repair / build a retry message
   inference/          the OpenAI-compatible client and its config
   local_server/       an optional GGUF-backed /v1 server (:8020)
 ```
@@ -159,9 +160,11 @@ Nothing outside these three additions should need to change:
    genuinely new, and give it the smallest dependency set that works.
 2. **Frontend** — `web/src/routes/<name>/`, plus one route line in
    `app/App.tsx`. Import from `shared/` only.
-3. **AI capability** — `analyzer/terra_analyzer/agents/<name>.py` implementing
-   the `Task` protocol, plus one line in `default_registry()`. Go reaches it
-   generically through `graph.RunTask(name, payload)`; no Go change needed.
+3. **AI capability** — `analyzer/terra_analyzer/agents/<name>.py` (or a package
+   under `agents/<name>/` when schema/prompt/validate belong with the task)
+   implementing the `Task` protocol, plus one line in `default_registry()`.
+   Go reaches it generically through `graph.RunTask(name, payload)`; no Go
+   change needed.
 
 ## Known warts
 
@@ -178,9 +181,9 @@ is cheaper to fix when there is a real second case than to generalize now.
   seam, and the seam is a small interface, not a rewrite.
 - **The Go↔Python wire contract is mirrored by hand** in four places
   (`internal/scan.Result` ↔ `models.py::ScanResult`, `internal/graph/types.go`
-  ↔ `models.py::Draft`). The enums live only in `schema.py`. There is no
-  codegen; `internal/graph`'s contract test against `case-studies/memos.map.json`
-  is what catches drift.
+  ↔ `models.py::Draft`). The enums live only in
+  `agents/architecture/schema.py`. There is no codegen; `internal/graph`'s
+  contract test against `case-studies/memos.map.json` is what catches drift.
 - **`internal/store` is typed to `graph.Map`,** so it is Terra's schema rather
   than a generic store. Maps live only in `projects.map_json` (no normalized
   component/relationship tables). It has **no migrations** — the schema is
