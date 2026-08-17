@@ -166,47 +166,6 @@ func TestProbeShortCircuitsOnAStoredMap(t *testing.T) {
 	}
 }
 
-func TestProbeCacheExpires(t *testing.T) {
-	s := &Server{}
-	res := &scan.Result{RepositoryURL: "https://github.com/acme/notes"}
-	s.storeProbe("live", res)
-	if s.readProbe("live") != res {
-		t.Fatal("a fresh probe should be reusable")
-	}
-	// Reading must not consume: a failed analyze is exactly when the user
-	// retries, and the scan is still good.
-	if s.readProbe("live") != res {
-		t.Error("a second read must still hit so a retry does not rescan")
-	}
-	if s.readProbe("never-existed") != nil {
-		t.Error("unknown ids must miss")
-	}
-
-	s.storeProbe("stale", res)
-	s.probeMu.Lock()
-	s.probes["stale"] = probeEntry{res: res, expires: time.Now().Add(-time.Second)}
-	s.probeMu.Unlock()
-	if s.readProbe("stale") != nil {
-		t.Error("an expired probe must miss so analyze rescans")
-	}
-}
-
-func TestProbeCacheHoldsNoSecrets(t *testing.T) {
-	s := &Server{}
-	s.storeProbe("id", &scan.Result{RepositoryURL: "https://github.com/acme/notes"})
-	s.probeMu.Lock()
-	defer s.probeMu.Unlock()
-	// probeEntry is scan output plus a deadline, by construction. Marshalling
-	// it proves nothing key-shaped rides along.
-	data, err := json.Marshal(s.probes["id"].res)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Contains(strings.ToLower(string(data)), "api_key") {
-		t.Errorf("probe cache entry mentions a key: %s", data)
-	}
-}
-
 // Compile-time reminder that the analyze seam keeps its routing options.
 var _ func(context.Context, *scan.Result, analyzerclient.LLMOpts) (*analysis.Map, []string, error) = (Server{}).Analyze
 
@@ -247,7 +206,7 @@ func TestAnalyzeAtCapacityKeepsTheProbe(t *testing.T) {
 		t.Fatalf("status = %d, want 429", resp.StatusCode)
 	}
 	// A rejected request must not have eaten the user's probe.
-	if s.readProbe(probeID) == nil {
+	if s.Probes.Read(probeID) == nil {
 		t.Error("a 429 consumed the probe; the retry would rescan for no reason")
 	}
 	for len(s.analyzeSlots) > 0 {

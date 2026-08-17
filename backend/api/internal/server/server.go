@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/Enizri/terra/backend/api/internal/analysis"
+	analyzepipeline "github.com/Enizri/terra/backend/api/internal/analyze"
 	"github.com/Enizri/terra/backend/api/internal/analyzerclient"
 	"github.com/Enizri/terra/backend/api/internal/catalog"
 	"github.com/Enizri/terra/backend/api/internal/config"
@@ -57,9 +58,8 @@ type Server struct {
 	// analyzeSlots caps concurrent analyze work (Cfg.AnalyzeConcurrency).
 	analyzeSlots chan struct{}
 
-	// probes caches probe scans for the analyze that follows the model gate.
-	probeMu sync.Mutex
-	probes  map[string]probeEntry
+	// Probes caches scan-only probe results for the analyze after model selection.
+	Probes *analyzepipeline.ProbeCache
 
 	// initOnce guards Handler's lazy field assignments: two concurrent calls
 	// would otherwise race and split jobs across two hubs.
@@ -146,6 +146,9 @@ func (s *Server) Handler() http.Handler {
 		}
 		if s.analyzeSlots == nil {
 			s.analyzeSlots = make(chan struct{}, s.Cfg.AnalyzeConcurrency)
+		}
+		if s.Probes == nil {
+			s.Probes = analyzepipeline.NewProbeCache(analyzepipeline.ProbeTTL)
 		}
 	})
 	mux := http.NewServeMux()
