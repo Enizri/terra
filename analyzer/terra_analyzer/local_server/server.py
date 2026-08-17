@@ -23,7 +23,7 @@ MAX_OUTPUT_TOKENS = 4096
 
 # Context window. llama.cpp defaults to 512 and raises on overflow rather
 # than truncating, so this has to clear the worst case end to end. Measured
-# against the prompt budgets in prompts/architecture.py: 8.1k tokens for a
+# against the prompt budgets in agents/architecture/prompt.py: 8.1k tokens for a
 # maxed-out prompt, and a strict retry re-sends the rejected answer (up to
 # MAX_OUTPUT_TOKENS) plus a correction before asking for another one —
 # 8.1k + 4k + 4k ≈ 16.5k. Default sits just above that; a bigger window

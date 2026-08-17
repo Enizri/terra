@@ -1,6 +1,6 @@
 """Draft validation/repair (ported from internal/graph/validate.go)."""
 
-from .models import Draft, ScanResult
+from ...models import Draft, ScanResult
 from .schema import IMPORTANCE_VALUES, TYPE_VALUES
 
 

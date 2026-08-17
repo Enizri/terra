@@ -1,6 +1,7 @@
 from terra_analyzer.models import Draft
-from terra_analyzer.validate import (clean_path, count_files, known_paths,
-                                     retry_message, validate)
+from terra_analyzer.agents.architecture.validate import (
+    clean_path, count_files, known_paths, retry_message, validate,
+)
 
 KNOWN = {"web", "web/src", "web/src/app.tsx", "server", "server/main.go", "store", "store/db.go"}
 

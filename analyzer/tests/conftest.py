@@ -4,7 +4,7 @@ import httpx
 import pytest
 
 from terra_analyzer.models import Draft, ScanResult
-from terra_analyzer.validate import known_paths, validate
+from terra_analyzer.agents.architecture.validate import known_paths, validate
 
 
 @pytest.fixture

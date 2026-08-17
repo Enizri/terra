@@ -5,11 +5,13 @@ from typing import Any
 import httpx
 from pydantic import ValidationError
 
-from ..inference.client import LLMError, chat, preflight
-from ..inference.config import Config
-from ..models import Draft, ScanResult
-from ..prompts.architecture import SYSTEM_PROMPT, build_prompt
-from ..validate import count_files, known_paths, retry_message, validate
+from ...inference.client import LLMError, chat, preflight
+from ...inference.config import Config
+from ...models import Draft, ScanResult
+from .prompt import SYSTEM_PROMPT, build_prompt
+from .validate import count_files, known_paths, retry_message, validate
+
+__all__ = ["ArchitectureMapper"]
 
 
 class ArchitectureMapper:

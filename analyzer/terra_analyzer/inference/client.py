@@ -5,7 +5,7 @@ from urllib.parse import urlparse
 
 import httpx
 
-from ..schema import DRAFT_SCHEMA
+from ..agents.architecture.schema import DRAFT_SCHEMA
 from .config import MAX_OUTPUT_TOKENS, Config
 
 

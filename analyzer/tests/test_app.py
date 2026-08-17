@@ -8,7 +8,7 @@ from terra_analyzer import app as app_module
 from terra_analyzer.app import app
 from terra_analyzer.llm import LLMError
 from terra_analyzer.models import Draft
-from terra_analyzer.validate import validate
+from terra_analyzer.agents.architecture.validate import validate
 
 client = TestClient(app)
 CASE_STUDIES = Path(__file__).resolve().parents[2] / "case-studies"
@@ -67,8 +67,11 @@ def test_list_tasks():
 
 
 def test_analyze_happy_path(monkeypatch, scan, good_draft):
-    monkeypatch.setattr(app_module.llm, "generate",
-                        lambda res, model="", **kw: (good_draft, ["heads up"]))
+    def fake_run(name, payload):
+        assert name == "architecture"
+        return {"draft": good_draft.model_dump(by_alias=True), "warnings": ["heads up"]}
+
+    monkeypatch.setattr(app_module.registry, "run", fake_run)
     response = client.post("/analyze", json={"scan": scan.model_dump(), "model": ""})
     assert response.status_code == 200
     body = response.json()
@@ -80,13 +83,9 @@ def test_analyze_happy_path(monkeypatch, scan, good_draft):
 
 
 def test_tasks_architecture_happy_path(monkeypatch, scan, good_draft):
-    monkeypatch.setattr(app_module.llm, "generate",
-                        lambda res, model="", **kw: (good_draft, []))
-
     def fake_run(name, payload):
         assert name == "architecture"
-        draft, warnings = app_module.llm.generate(scan, model=payload.get("model", ""))
-        return {"draft": draft.model_dump(by_alias=True), "warnings": warnings}
+        return {"draft": good_draft.model_dump(by_alias=True), "warnings": []}
 
     monkeypatch.setattr(app_module.registry, "run", fake_run)
     monkeypatch.setattr(app_module.registry, "get", lambda name: object() if name == "architecture" else None)
@@ -101,9 +100,10 @@ def test_tasks_unknown_404():
 
 
 def test_analyze_llm_error_becomes_502(monkeypatch, scan):
-    def boom(res, model="", **kw):
+    def boom(name, payload):
         raise LLMError("cannot reach a model server at http://localhost:8020/v1")
-    monkeypatch.setattr(app_module.llm, "generate", boom)
+
+    monkeypatch.setattr(app_module.registry, "run", boom)
     response = client.post("/analyze", json={"scan": scan.model_dump()})
     assert response.status_code == 502
     assert "cannot reach a model server" in response.json()["detail"]
