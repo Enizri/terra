@@ -2,7 +2,7 @@
 
 import posixpath
 
-from ..models import ScanResult
+from ...models import ScanResult
 
 # Leave room for system prompt, retry, and answer inside context.
 MAX_PROMPT_PATHS = 1200

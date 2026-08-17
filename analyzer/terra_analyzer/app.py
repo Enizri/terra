@@ -101,12 +101,18 @@ def run_task(name: str, payload: dict) -> dict:
 
 @app.post("/analyze", response_model=AnalyzeResponse)
 def analyze(req: AnalyzeRequest) -> AnalyzeResponse:
-    """Go wire contract: architecture task facade."""
+    """Go wire contract: architecture task facade via TaskRegistry."""
     try:
-        draft, warnings = llm.generate(
-            req.scan, model=req.model, base_url=req.base_url, api_key=req.api_key
+        out = registry.run(
+            "architecture",
+            {
+                "scan": req.scan,
+                "model": req.model,
+                "base_url": req.base_url,
+                "api_key": req.api_key,
+            },
         )
     except llm.LLMError as e:
         # Go prints detail verbatim.
         raise HTTPException(status_code=502, detail=str(e)) from e
-    return AnalyzeResponse(draft=draft, warnings=warnings)
+    return AnalyzeResponse(draft=out["draft"], warnings=out["warnings"])

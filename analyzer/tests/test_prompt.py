@@ -1,6 +1,7 @@
 from terra_analyzer.models import Manifest, ScanResult
-from terra_analyzer.prompt import (MAX_FILES_CHARS, SYSTEM_PROMPT, build_prompt,
-                                   file_section, sample_paths)
+from terra_analyzer.agents.architecture.prompt import (
+    MAX_FILES_CHARS, SYSTEM_PROMPT, build_prompt, file_section, sample_paths,
+)
 
 
 def test_system_prompt_states_the_contract():
