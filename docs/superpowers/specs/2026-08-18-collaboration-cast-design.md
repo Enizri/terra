@@ -17,7 +17,7 @@ Replace the existing people shown in the landing-page collaboration playground w
 - Friendly, polished 3D head-and-shoulders characters.
 - Three clearly different fictional people with varied features and styling.
 - Simple pastel backgrounds matched to each cursor color.
-- Faces must remain recognizable in the 22 px presence avatars.
+- Faces must remain recognizable in the 48 px presence avatars.
 - No text, logos, watermarks, celebrity likenesses, or Apple Memoji assets.
 - Generate original artwork rather than using stock photography.
 
@@ -29,6 +29,7 @@ Each collaborator ships as matching PNG and WebP files under `apps/web/public/te
 - Update the animation cursor assignments so Evyatar, Maya, and Leo appear next to their respective cursors.
 - Keep the existing animation timing, paths, messages, and cursor colors unchanged.
 - Point the presence avatars at the new descriptive image bases.
+- Increase the presence avatars from 22 px to 48 px, enlarge the pill padding to fit, and keep a balanced 12 px overlap.
 - Remove old avatar files only after a repository-wide reference check proves they are unused.
 
 ## Verification
@@ -41,5 +42,5 @@ Each collaborator ships as matching PNG and WebP files under `apps/web/public/te
 ## Out of scope
 
 - Changing the collaboration animation choreography or messages.
-- Redesigning the playground layout or presence pill.
+- Redesigning the playground layout beyond sizing the existing presence pill for the larger avatars.
 - Changing avatars elsewhere unless they use the same now-unused files.
