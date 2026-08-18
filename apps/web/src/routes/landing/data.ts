@@ -19,9 +19,9 @@ export type User = {
 export const users: User[] = [
   {
     id: "1",
-    name: "Giel",
-    email: "giel@terra.app",
-    photo: `${IMG}/avatar-1`,
+    name: "Evyatar",
+    email: "evyatar@terra.app",
+    photo: `${IMG}/collaborator-evyatar`,
     permission: "Can edit",
     align: "tl",
     // Measured desktop user offsets
@@ -34,23 +34,9 @@ export const users: User[] = [
   },
   {
     id: "2",
-    name: "Jean",
-    email: "jean@terra.app",
-    photo: `${IMG}/avatar-2`,
-    permission: "Can read",
-    align: "tl",
-    offset: { desktop: { x: [400, 0], y: [-420, 0] } },
-    color: {
-      ring: "ring-orange",
-      background: "bg-orange",
-      arrow: "text-orange",
-    },
-  },
-  {
-    id: "3",
-    name: "Niels",
-    email: "niels@terra.app",
-    photo: `${IMG}/avatar-3`,
+    name: "Maya",
+    email: "maya@terra.app",
+    photo: `${IMG}/collaborator-maya`,
     permission: "Can read",
     align: "tl",
     offset: { desktop: { x: [500, 100], y: [400, 100] } },
@@ -61,10 +47,10 @@ export const users: User[] = [
     },
   },
   {
-    id: "4",
-    name: "Jeroen",
-    email: "jeroen@terra.app",
-    photo: `${IMG}/avatar-4`,
+    id: "3",
+    name: "Leo",
+    email: "leo@terra.app",
+    photo: `${IMG}/collaborator-leo`,
     permission: "Can edit",
     align: "tl",
     offset: { desktop: { x: [-1000, 0], y: [500, 0] } },
@@ -242,7 +228,7 @@ export const copy = {
     },
   ] as const,
   trust:
-    "Every claim links to the file that proves it. Inference runs against any OpenAI-compatible endpoint — including a model on your own laptop — so your code never has to leave.",
+    "Your whole team can change the live software together — same repo, same moment. Terra takes care of the conflicts so nobody overwrites anyone else.",
   bridge: ["Work with coworkers", "who aren't engineers."],
   // ≤ ~18 chars/line; .sh-final capped at 36rem.
   final: ["The map your team", "can actually read."],
