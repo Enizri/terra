@@ -12,7 +12,6 @@ import {
   type MotionValue,
 } from "motion/react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import HeroBackdrop from "../HeroBackdrop";
 import { rise, stagger } from "../../../shared/motion";
 import { copy, users } from "../data";
 import { ComponentTile, MacPointer, PENCIL_INK, WindowChrome } from "../primitives";
@@ -75,8 +74,8 @@ function useLerp(source: MotionValue<number>, factor = 0.1, frozen = false) {
 
 const HERO_FLIGHT_LERP = 0.15;
 
-/** Hero flight tile edge length — keep in sync with `.sh-tile--flight`. */
-const FLIGHT_TILE_PX = 148;
+/** Hero flight tile fallback — actual size comes from `--sh-flight-tile`. */
+const FLIGHT_TILE_PX_FALLBACK = 148;
 
 /** Shared graphite filter for trail and headline pencil marks. */
 function PencilDefs() {
@@ -96,11 +95,11 @@ const TRAIL_LEAD = 0.24;
 /** Fill speed relative to the drag — >1 so the pencil pulls further ahead. */
 const TRAIL_FILL_RATE = 0.95;
 
-/** Where the trail points: just above the drop window's label. */
-const TRAIL_END_Y = -170;
+/** Where the trail points: top-center of the Folk-sized video / drop frame. */
+const TRAIL_END_Y = -160;
 
 /** Sideways nudge on the trail's end so the arrow sits over the drop target. */
-const TRAIL_END_X = 6;
+const TRAIL_END_X = 0;
 
 /** Arrowhead at the trail's end — sketched open, like the line itself. */
 const ARROW_D =
@@ -108,24 +107,33 @@ const ARROW_D =
   ` L ${TRAIL_END_X} ${TRAIL_END_Y}` +
   ` L ${TRAIL_END_X + 12} ${TRAIL_END_Y - 19}`;
 
-/** Pencil trail from parked GitHub card into the repo window. */
+/** Pencil trail from the right-parked GitHub card into the video / drop frame. */
 function DragTrail({
   start,
   progress,
+  tilePx,
 }: {
   start: { x: number; y: number };
   progress: MotionValue<number>;
+  tilePx: number;
 }) {
   const reduced = useReducedMotion();
-  // Card bottom edge → a loop under it → long swoop into the window.
+  // Right-side park → soft loop → long swoop into the video top-center.
+  // Keep the doodle from going further right than the tile (card clips overflow).
   const sx = start.x;
-  const sy = start.y + FLIGHT_TILE_PX / 2 + 16;
+  // Bottom-centre of the parked tile, then a short gap so the stroke
+  // begins under the card rather than out of its middle.
+  const sy = start.y + tilePx / 2 + 8;
+  const midX = sx * 0.55;
+  const midY = (sy + TRAIL_END_Y) * 0.55;
   const d =
     `M ${sx} ${sy}` +
-    ` C ${sx + 62} ${sy + 54}, ${sx + 78} ${sy + 150}, ${sx + 4} ${sy + 158}` +
-    ` C ${sx - 62} ${sy + 165}, ${sx - 54} ${sy + 74}, ${sx + 22} ${sy + 104}` +
-    ` C ${sx + 96} ${sy + 133}, ${sx + 40} ${sy + 250}, ${sx * 0.45} ${sy + 300}` +
-    ` C ${sx * 0.12} ${TRAIL_END_Y - 150}, ${sx * 0.06 + TRAIL_END_X} ${TRAIL_END_Y - 60}, ${TRAIL_END_X} ${TRAIL_END_Y}`;
+    // Small hand-drawn loop under the tile — bias left so resize never clips it.
+    ` C ${sx + 18} ${sy + 40}, ${sx - 8} ${sy + 108}, ${sx - 36} ${sy + 122}` +
+    ` C ${sx - 68} ${sy + 138}, ${sx - 52} ${sy + 78}, ${sx - 10} ${sy + 96}` +
+    // Long swoop left and down into the video frame.
+    ` C ${sx + 36} ${sy + 150}, ${midX + 24} ${midY}, ${midX} ${midY + 40}` +
+    ` C ${sx * 0.22} ${TRAIL_END_Y - 90}, ${TRAIL_END_X + 18} ${TRAIL_END_Y - 36}, ${TRAIL_END_X} ${TRAIL_END_Y}`;
   // The line draws itself as the card travels, staying TRAIL_LEAD ahead so it
   // reads as leading the card in rather than trailing behind it.
   const drawn = useTransform(progress, (p) =>
@@ -148,15 +156,14 @@ function DragTrail({
       <g filter="url(#sh-pencil)">
         {/* Faint guide: the whole route — arrowhead included — is visible from
             the start, so the destination reads before anything is dragged. */}
-        <path d={d} {...stroke} strokeWidth={1.6} opacity={0.2} />
-        <path d={ARROW_D} {...stroke} strokeWidth={1.6} opacity={0.2} />
+        <path d={d} {...stroke} strokeWidth={1.8} opacity={0.28} />
+        <path d={ARROW_D} {...stroke} strokeWidth={1.8} opacity={0.28} />
         {/* Pencil fills that guide in as the card is dragged, running ahead of it. */}
-        <motion.path d={d} {...stroke} strokeWidth={5} opacity={0.14} style={{ pathLength: drawn }} />
-        <motion.path d={d} {...stroke} strokeWidth={2.4} opacity={0.68} style={{ pathLength: drawn }} />
+        <motion.path d={d} {...stroke} strokeWidth={5} opacity={0.16} style={{ pathLength: drawn }} />
+        <motion.path d={d} {...stroke} strokeWidth={2.6} opacity={0.72} style={{ pathLength: drawn }} />
         {/* Hand-drawn arrowhead, sketched twice like a real pencil stroke. */}
-        {/* Arrowhead only once the drawing has actually reached the window. */}
         <motion.g style={{ opacity: arrowOpacity }}>
-          <path d={ARROW_D} {...stroke} strokeWidth={2.4} />
+          <path d={ARROW_D} {...stroke} strokeWidth={2.6} />
           <path d={`M -10 ${TRAIL_END_Y - 20} L 1 ${TRAIL_END_Y - 3}`} {...stroke} strokeWidth={1.4} opacity={0.5} />
         </motion.g>
       </g>
@@ -273,9 +280,6 @@ function HeroTitle() {
     erase.set(1);
     write.set(1);
     setStage("done");
-    // Job done — the star glides a bit further left (CSS transition on
-    // `translate`, independent of the Motion-driven rotate).
-    document.querySelector(".sh-backdrop")?.classList.add("sh-backdrop--parked");
   }, [erase, write]);
 
   useEffect(() => {
@@ -410,11 +414,11 @@ function HeroTitle() {
 }
 
 /** Min top clearance when the framed card is taller than the viewport. */
-const LANDING_GAP_MIN = 56;
+const LANDING_GAP_MIN = 96;
 /** Extra scroll after the screen is framed that finishes the GitHub drag. */
 const HERO_DRAG_TAIL_PX = 380;
 /** Extra scroll while sticky after drop so the repo map can fully assemble. */
-const HERO_HOLD_PX = 720;
+const HERO_HOLD_PX = 240;
 
 /** Freeze drag geometry after this progress. */
 const FLIGHT_LOCK_PROGRESS = 0.04;
@@ -424,8 +428,7 @@ const FLIGHT_UNDROP_PROGRESS = 0.9;
 export function Hero() {
   const pinRef = useRef<HTMLDivElement>(null);
   const heroRef = useRef<HTMLElement>(null);
-  // Star spin is a pure-CSS animation on .sh-backdrop__spin (terra.css) —
-  // compositor-only, paused while the star is hidden. No JS per frame.
+  const cardRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   // Invisible slot beside the headline — flight parks here at progress 0.
   const flightAnchorRef = useRef<HTMLDivElement>(null);
@@ -435,52 +438,76 @@ export function Hero() {
   const [dragEndScroll, setDragEndScroll] = useState(1);
   // Stage-centered start so the card sits next to the title, not a fixed guess.
   const [flightStart, setFlightStart] = useState({ x: 400, y: -420 });
+  const [flightTilePx, setFlightTilePx] = useState(FLIGHT_TILE_PX_FALLBACK);
   // Once the drag is underway, ignore layout remeasures — the park anchor
   // leaves the viewport and would rewrite the trajectory every frame.
   const dragGeomLocked = useRef(false);
   // Sticky pin (not fixed/absolute swaps): native scroll blends through
   // free → framed → hold → release with no JS position thrashing.
   const { scrollY } = useScroll();
+  const scrollYProgress = useTransform(scrollY, [0, dragEndScroll], [0, 1]);
+  const progressRef = useRef(scrollYProgress);
+  progressRef.current = scrollYProgress;
 
   useLayoutEffect(() => {
     const measure = () => {
       const pin = pinRef.current;
       const hero = heroRef.current;
+      const card = cardRef.current;
       const stage = stageRef.current;
-      if (!pin || !hero || !stage) return;
+      if (!pin || !hero || !card || !stage) return;
 
-      // Mid-drag / post-drop: stage height flips when the map mounts, and the
-      // title-side park anchor has scrolled away. Updating stick/start here
-      // makes the GitHub card jitter right as it lands.
-      if (dragGeomLocked.current) return;
+      const progress = progressRef.current.get();
+      const parked = progress < FLIGHT_LOCK_PROGRESS;
+      // At the park (or after a resize that snapped us back), unlock so the
+      // GitHub tile + pencil trail reflow with the painting instead of
+      // vanishing off the right edge with a stale offset.
+      if (parked) dragGeomLocked.current = false;
 
-      const stageOffset = stage.offsetTop;
-      // Vertically center the repo window in the viewport once sticky frames.
-      const gap = Math.max(
-        LANDING_GAP_MIN,
-        Math.round((window.innerHeight - stage.offsetHeight) / 2),
-      );
-      // Negative sticky top pulls the hero up so the stage sits at `gap`
-      // once sticky engages — title scrolls away, screen card stays framed.
-      const stickTop = gap - stageOffset;
+      const cardOffset = card.offsetTop;
+      // Folk keeps the painting directly below the nav on tall screens too.
+      const gap = LANDING_GAP_MIN;
+      // Negative sticky top pulls the hero up so the painting sits at `gap`.
+      const stickTop = gap - cardOffset;
       hero.style.setProperty("--hero-stick-top", `${stickTop}px`);
 
       setHeroHeight(hero.offsetHeight);
 
-      // Sticky engages when the stage would sit at `gap`.
-      const frameAt = Math.max(1, pin.offsetTop + stageOffset - gap);
+      // Sticky engages when the painting would sit at `gap`.
+      const frameAt = Math.max(1, pin.offsetTop + cardOffset - gap);
       setDragEndScroll(frameAt + HERO_DRAG_TAIL_PX);
 
-      // Park the GitHub card on the title-side anchor (stage uses left/top 50%).
+      // Mid-drag: keep stick metrics fresh, but don't rewrite the flight path.
+      if (dragGeomLocked.current && !parked) return;
+
+      // Park on the right-edge anchor; Y matches the title on desktop so the
+      // tile sits at headline height instead of a vh guess that drifts.
       const anchor = flightAnchorRef.current;
+      const title = hero.querySelector(".sh-hero-title");
+      const tilePx = Math.round(
+        anchor?.offsetWidth ||
+          hero.querySelector(".sh-tile--flight")?.getBoundingClientRect().width ||
+          FLIGHT_TILE_PX_FALLBACK,
+      );
+      setFlightTilePx(tilePx);
       if (anchor) {
         const ar = anchor.getBoundingClientRect();
         const sr = stage.getBoundingClientRect();
+        const cr = card.getBoundingClientRect();
+        const titleRect = title?.getBoundingClientRect();
         const stageCx = sr.left + sr.width / 2;
         const stageCy = sr.top + sr.height / 2;
+        const inset = tilePx / 2 + 12;
+        const rawX = ar.left + ar.width / 2 - stageCx;
+        const rawY =
+          titleRect && window.innerWidth > 900
+            ? titleRect.top + tilePx / 2 - stageCy
+            : ar.top + ar.height / 2 - stageCy;
+        const maxX = cr.right - inset - stageCx;
+        const minX = Math.min(maxX, cr.left + inset - stageCx);
         setFlightStart({
-          x: Math.round(ar.left + ar.width / 2 - stageCx),
-          y: Math.round(ar.top + ar.height / 2 - stageCy),
+          x: Math.round(Math.min(maxX, Math.max(minX, rawX))),
+          y: Math.round(rawY),
         });
       }
     };
@@ -488,8 +515,13 @@ export function Hero() {
     const observer = new ResizeObserver(measure);
     observer.observe(document.body);
     if (heroRef.current) observer.observe(heroRef.current);
+    if (cardRef.current) observer.observe(cardRef.current);
     if (stageRef.current) observer.observe(stageRef.current);
     if (flightAnchorRef.current) observer.observe(flightAnchorRef.current);
+    const headEl = heroRef.current?.querySelector(".sh-hero-head");
+    if (headEl) observer.observe(headEl);
+    const titleEl = heroRef.current?.querySelector(".sh-hero-title");
+    if (titleEl) observer.observe(titleEl);
     window.addEventListener("resize", measure);
     return () => {
       observer.disconnect();
@@ -498,7 +530,7 @@ export function Hero() {
   }, []);
 
   // Continuous scrub — no phase cuts in the progress curve.
-  const scrollYProgress = useTransform(scrollY, [0, dragEndScroll], [0, 1]);
+  // (scrollYProgress declared above so measure() can read it on resize.)
 
   // Lock geometry once the drag leaves the park; hysteresis on the drop so
   // the map mount doesn't fight the flight card at the threshold.
@@ -532,35 +564,30 @@ export function Hero() {
         animate="show"
         variants={stagger}
       >
-        <HeroBackdrop />
-        <div className="sh-copy sh-copy--hero">
-          <div className="sh-hero-head">
-            <HeroTitle />
-            {/* Measured park for the flight card — sits just right of the title. */}
-            <div
-              ref={flightAnchorRef}
-              className="sh-flight-anchor"
-              style={{ width: FLIGHT_TILE_PX, height: FLIGHT_TILE_PX }}
-              aria-hidden
-            />
-          </div>
-          <motion.p className="sh-p1" variants={rise}>
-            {copy.heroSubtitle}
-          </motion.p>
-        </div>
-
         <LayoutGroup>
-          <div className="sh-stage" ref={stageRef}>
-            <motion.div className="sh-window-wrap" variants={rise}>
-              {/* Same scenic wallpaper frame as the Power of Terra card. */}
-              <div className="sh-power-theater sh-hero-theater">
-                <img
-                  className="sh-power-theater__wallpaper"
-                  src="/images/theater/power-wallpaper.jpg"
-                  alt=""
-                  aria-hidden
-                  draggable={false}
-                />
+          {/* Folk-style first screen: wallpaper, copy, and product share one card. */}
+          <div className="sh-power-theater sh-hero-theater sh-hero-card" ref={cardRef}>
+            <img
+              className="sh-power-theater__wallpaper"
+              src="/images/theater/power-wallpaper.jpg"
+              alt=""
+              aria-hidden
+              draggable={false}
+            />
+
+            <div className="sh-copy sh-copy--hero">
+              <div className="sh-hero-head">
+                <HeroTitle />
+                {/* Beside the headline — measured vs stage center for the drag. */}
+                <div ref={flightAnchorRef} className="sh-flight-anchor" aria-hidden />
+              </div>
+              <motion.p className="sh-p1" variants={rise}>
+                {copy.heroSubtitle}
+              </motion.p>
+            </div>
+
+            <div className="sh-stage sh-stage--hero" ref={stageRef}>
+              <motion.div className="sh-window-wrap" variants={rise}>
                 <div className="sh-power-theater__screen">
                   {/* Small static drop window pre-drop; the box expands into
                       the full workspace film once the GitHub card lands. */}
@@ -578,24 +605,26 @@ export function Hero() {
                     </WindowChrome>
                   </div>
                 </div>
-              </div>
-            </motion.div>
+              </motion.div>
 
-            {/* One right-side flight card flies with the scroll and fades out
-                the moment the drop lands and the window starts expanding. */}
-            {!filesDropped && <DragTrail start={flightStart} progress={scrollYProgress} />}
+              {/* One right-side flight card flies with the scroll and fades out
+                  the moment the drop lands and the window starts expanding. */}
+              {!filesDropped && (
+                <DragTrail start={flightStart} progress={scrollYProgress} tilePx={flightTilePx} />
+              )}
 
-            <AnimatePresence>
-              {users.slice(1, 2).map((u) => (
-                <FlightFile
-                  key={`f-${u.id}`}
-                  index={1}
-                  progress={scrollYProgress}
-                  dropped={filesDropped}
-                  start={flightStart}
-                />
-              ))}
-            </AnimatePresence>
+              <AnimatePresence>
+                {users.slice(1, 2).map((u) => (
+                  <FlightFile
+                    key={`f-${u.id}`}
+                    index={1}
+                    progress={scrollYProgress}
+                    dropped={filesDropped}
+                    start={flightStart}
+                  />
+                ))}
+              </AnimatePresence>
+            </div>
           </div>
         </LayoutGroup>
       </motion.section>
@@ -604,4 +633,3 @@ export function Hero() {
 }
 
 /* ---------- sections ---------- */
-

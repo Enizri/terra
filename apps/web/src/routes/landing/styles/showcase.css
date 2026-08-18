@@ -7,26 +7,74 @@
   max-width: none;
 }
 
-/* Hero window: sits lower so it rests on the coral wash, not above it. */
+/* Hero product — Folk video slot: outer 720×412 gray mat, hangs under the copy. */
 
-.sh-section--hero .sh-stage {
-  margin-top: 180px;
+.sh-section--hero .sh-stage--hero {
+  position: relative;
+  margin-top: 32px;
+  margin-bottom: 0;
+  width: 100%;
+  max-width: var(--sh-hero-window, 720px);
+  padding-inline: 0;
+  box-sizing: border-box;
+  /* Flight + pencil trail extend past the 720 mat — don't clip them. */
+  overflow: visible;
+  flex: 0 0 auto;
+  transition: max-width 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* After the GitHub drop: open up so the workspace is readable. */
+.sh-section--hero[data-dropped="1"] .sh-stage--hero {
+  max-width: min(98%, 1480px);
+  margin-bottom: 48px;
+  padding-inline: 16px;
 }
 
 .sh-section--hero .sh-window {
-  min-height: 480px;
+  min-height: 0;
+}
+
+/* Folk painting card: near-full-bleed, 40px corners.
+   Extra bottom padding grows the painting downward without lifting the copy. */
+
+.sh-power-theater.sh-hero-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: none;
+  min-height: min(calc(100svh - 20px), 980px);
+  padding: 88px 0 24px;
+  border-radius: 26px;
+  overflow: hidden;
+  isolation: isolate;
 }
 
 @media (min-width: 640px) {
-.sh-section--hero .sh-window {
-    min-height: 720px;
+.sh-power-theater.sh-hero-card {
+    /* Deliberately taller than the viewport: the painting reads big, and the
+       extra height is reachable because the section unpins around y=700.
+       The svh term is NOT tied to --sh-read — the viewport does not shrink
+       with the reading scale, so scaling it here would be double-counting. */
+    min-height: min(calc(110svh - 108px), 1450px);
+    border-radius: 40px;
+    padding: 56px 0 24px;
   }
 }
 
-/* Nudge only the white repo window up — stage/copy/flight layout stay put. */
+@media (min-width: 1024px) {
+.sh-power-theater.sh-hero-card {
+    /* Bottom-weighted: leaves painting visible below the product frame. */
+    padding: 64px 0 48px;
+  }
+}
 
-.sh-section--hero .sh-window-wrap {
-  transform: translateY(-56px);
+.sh-power-theater.sh-hero-card .sh-power-theater__wallpaper {
+  /* Lower crop: brings the painting's foreground (lake + shore) into the card
+     so its bottom reads on the first screen instead of only the sky. */
+  object-position: center 62%;
 }
 
 .sh-stage--wide {
@@ -35,13 +83,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 96px auto;
+  margin: 56px auto;
 }
 
 @media (min-width: 640px) {
 .sh-stage--wide {
     height: 760px;
-    margin: 128px auto;
+    margin: 72px auto;
   }
 }
 
@@ -55,36 +103,174 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  margin: 64px auto 96px;
+  margin: 32px auto 56px;
 }
 
 @media (min-width: 640px) {
 .sh-stage--ops {
-    margin: 80px auto 128px;
+    margin: 40px auto 72px;
   }
 }
 
-/* Power stage — wide wallpaper frame; the ops window stays capped below. */
+/* Power stage — title + list on the left, hero-sized demo card on the right. */
 
 .sh-stage--power {
-  width: var(--sh-screen-width);
+  /* list rail (~420) + gap (~64) + hero screen width, capped by the section
+     canvas so the right card never clips against `.sh-section--power`. */
+  width: 100%;
   max-width: none;
-  margin: 64px auto 96px;
+  margin: 48px auto 0;
   padding-inline: 0;
 }
 
 .sh-stage--power .sh-window {
-  min-height: 720px;
+  min-height: 980px;
 }
 
 @media (min-width: 640px) {
 .sh-stage--power {
-    margin: 80px auto 128px;
+    margin: 64px auto 0;
   }
 }
 
-/* Second theater: scenic wallpaper fills the wide frame; screen stays
-   centered at the previous product width so only the background expands. */
+.sh-power-stage {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: clamp(20px, 2vw, 36px);
+  width: 100%;
+}
+
+.sh-power-rail {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 clamp(260px, 21vw, 340px);
+  gap: 20px;
+  min-width: 0;
+  padding-top: 8px;
+}
+
+
+.sh-power-stage > .sh-window-wrap {
+  flex: 1 1 auto;
+  min-width: 0;
+  /* Power card runs to the right edge of the canvas — no hero width cap. */
+  max-width: none;
+  margin-left: auto;
+}
+
+@media (max-width: 900px) {
+.sh-power-stage {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 28px;
+  }
+
+.sh-power-rail {
+    flex-basis: auto;
+  }
+
+.sh-power-stage > .sh-window-wrap {
+    max-width: none;
+    margin-left: 0;
+  }
+}
+
+/* Capability list — replaces the old bottom pill tabs. */
+
+.sh-power-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 4px 0;
+}
+
+.sh-power-list__item {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  filter: blur(2px);
+  opacity: 0.45;
+  transition:
+    filter 0.25s ease,
+    opacity 0.25s ease;
+}
+
+.sh-power-list__item:hover {
+  filter: blur(0.6px);
+  opacity: 0.75;
+}
+
+.sh-power-list__item.is-active {
+  filter: none;
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+.sh-power-list__item {
+    filter: none;
+    opacity: 0.4;
+  }
+
+.sh-power-list__item:hover {
+    filter: none;
+    opacity: 0.7;
+  }
+
+.sh-power-list__item.is-active {
+    filter: none;
+    opacity: 1;
+  }
+}
+
+.sh-power-list__btn {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 14px 18px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  font-size: clamp(22px, 2.6vw, 34px);
+  font-weight: 560;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+  color: #171717;
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.sh-power-list__item.is-active .sh-power-list__btn {
+  color: #e8400d;
+  background: color-mix(in oklab, #e8400d 8%, transparent);
+}
+
+.sh-power-list__btn:hover {
+  color: #e8400d;
+}
+
+.sh-power-list__caption {
+  margin: 0;
+  padding: 0 18px 12px;
+  overflow: hidden;
+}
+
+.sh-power-list__caption span {
+  display: block;
+  font-size: 15px;
+  line-height: 1.45;
+  color: #525252;
+  text-wrap: balance;
+}
+
+/* Second theater: scenic wallpaper fills the wide frame; screen matches
+   the hero (28px pad, full stage width, 720px window). */
 
 .sh-power-theater {
   position: relative;
@@ -133,42 +319,30 @@
   justify-content: center;
   min-width: 0;
   min-height: 0;
-  /* Extra bottom pad = wallpaper strip where the tab bar sits. */
-  padding: 48px 32px 88px;
+  /* Match `.sh-hero-theater .sh-power-theater__screen`. */
+  padding: 28px;
 }
 
 @media (max-width: 720px) {
 .sh-power-theater__screen {
-    padding: 28px 16px 72px;
+    padding: 24px 14px;
   }
 }
 
-/* Tab bar on the scenic strip under the product screen. */
-
-.sh-power-theater__tabs {
-  position: absolute;
-  z-index: 4;
-  left: 50%;
-  right: auto;
-  bottom: 22px;
-  top: auto;
-  transform: translateX(-50%);
-}
-
-@media (max-width: 720px) {
-.sh-power-theater__tabs {
-    bottom: 16px;
-  }
-}
-
+/* Shared product window chrome inside the scenic frame (hero + power). */
 .sh-power-theater__screen .sh-window {
   width: 100%;
-  max-width: 1280px;
   border-radius: 10px;
   box-shadow:
     0 28px 70px rgba(0, 0, 0, 0.14),
     0 14px 32px rgba(0, 0, 0, 0.1),
     0 0 0 1px rgba(237, 236, 236, 0.1);
+}
+
+/* Power card: full hero width, no 1280 cap. */
+.sh-section--power .sh-power-theater__screen .sh-window {
+  max-width: none;
+  min-height: 980px;
 }
 
 /* Ops screen inside the Power of Terra window: dark diagram shell, header
@@ -194,6 +368,13 @@
   height: 100%;
   aspect-ratio: auto;
   border-radius: 0;
+}
+
+/* Collaborate tab: playground fills the ops pane. */
+.sh-ops__pane .sh-playground {
+  flex: 1;
+  height: 100%;
+  min-height: 0;
 }
 
 /* ---- ops states (tab-driven screens inside the frame) ---- */
@@ -563,85 +744,6 @@
   min-height: 2.9em;
 }
 
-/* Ops tabs — Railway segmented control (positioned by theater / frame). */
-
-.sh-ops__tabs {
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  justify-content: center;
-  gap: 0;
-  width: max-content;
-  max-width: calc(100% - 24px);
-  padding: 4px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(17, 16, 22, 0.92);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
-}
-
-.sh-ops__tabs::-webkit-scrollbar {
-  display: none;
-}
-
-.sh-ops__tab {
-  position: relative;
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 8px 16px;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: -0.15px;
-  color: rgba(247, 247, 248, 0.72);
-  cursor: pointer;
-  white-space: nowrap;
-  transition:
-    color 0.15s ease,
-    background-color 0.15s ease;
-}
-
-/* Hairline divider between segments — skip after the last tab. */
-
-.sh-ops__tab:not(:last-child)::after {
-  content: "";
-  position: absolute;
-  right: 0;
-  top: 22%;
-  bottom: 22%;
-  width: 1px;
-  background: rgba(255, 255, 255, 0.12);
-  pointer-events: none;
-}
-
-.sh-ops__tab:hover {
-  color: rgba(247, 247, 248, 0.95);
-}
-
-.sh-ops__tab.is-active {
-  color: #fff;
-  background: rgba(232, 64, 13, 0.88);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
-}
-
-/* Hide the divider on the active tab and the one before it so the pill reads clean. */
-
-.sh-ops__tab.is-active::after,
-.sh-ops__tab:has(+ .sh-ops__tab.is-active)::after {
-  opacity: 0;
-}
-
 .sh-window-wrap {
   position: relative;
   width: 100%;
@@ -774,3 +876,113 @@
   color: #404040;
 }
 
+/* "Try it yourself" pencil note above the Power card — sits in the section's
+   top gap, right of centre, and curls down onto the card's top edge. */
+
+.sh-power-note {
+  position: absolute;
+  /* Sits in the section's top gap, right of centre; the curl drops onto the
+     card's top edge. */
+  left: 52%;
+  bottom: calc(100% - 6px);
+  /* Narrow: the curl is tall now, so width sets how far it reaches down. */
+  width: clamp(200px, 17vw, 300px);
+  pointer-events: none;
+  z-index: 3;
+}
+
+.sh-power-note__text {
+  display: block;
+  font-size: clamp(30px, 2.6vw, 46px);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: rgba(122, 113, 106, 0.14);
+  -webkit-text-stroke: 2.2px #7a716a;
+  paint-order: stroke fill;
+  filter: url(#sh-pencil);
+  transform: rotate(-4deg);
+  transform-origin: left bottom;
+}
+
+.sh-power-note__line {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: 4px;
+}
+
+@media (max-width: 900px) {
+  .sh-power-note {
+    display: none;
+  }
+}
+
+/* Power keeps a heading for structure, but the capability list is the visible
+   title — so the h3 is read, not seen. */
+
+.sh-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Section title as a pencil drawing, scattered across the blank gap between
+   the hero and the Power card. Decorative — the real heading is `.sh-sr-only`. */
+
+.sh-power-gap-title {
+  position: absolute;
+  /* Right edge lands just left of the "Try it yourself" note; the last word
+     ("Terra") sits on that note's line, the earlier words step up from it. */
+  right: calc(50% + 24px);
+  /* Left bound keeps the sentence off the clipped section edge. */
+  left: 24px;
+  bottom: calc(100% + 318px);
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 0 20px;
+  pointer-events: none;
+}
+
+.sh-power-gap-title__word {
+  display: block;
+  font-size: clamp(46px, 5.4vw, 96px);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: rgba(122, 113, 106, 0.12);
+  -webkit-text-stroke: 2.6px #7a716a;
+  paint-order: stroke fill;
+  filter: url(#sh-pencil);
+  opacity: 0.9;
+}
+
+/* Staircase: each word drops a step, so the sentence walks down into the note. */
+
+.sh-power-gap-title__word:nth-child(1) {
+  transform: translateY(-1.35em) rotate(-4deg);
+}
+
+.sh-power-gap-title__word:nth-child(2) {
+  transform: translateY(-0.9em) rotate(2deg);
+}
+
+.sh-power-gap-title__word:nth-child(3) {
+  transform: translateY(-0.45em) rotate(-6deg);
+}
+
+.sh-power-gap-title__word:nth-child(4) {
+  transform: rotate(3deg);
+}
+
+@media (max-width: 900px) {
+  .sh-power-gap-title {
+    display: none;
+  }
+}

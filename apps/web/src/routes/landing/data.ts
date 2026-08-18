@@ -226,10 +226,18 @@ export const copy = {
       label: "Monitor with Terra",
       caption: "Watch what the map says is alive — components, calls, and the evidence behind them.",
     },
+    {
+      id: "map",
+      label: "Map",
+      caption: "The architecture of your repo, read straight from the code — every part linked to the files that prove it.",
+    },
+    {
+      id: "collaborate",
+      label: "Collaborate with Terra",
+      caption:
+        "Your whole team can change the live software together — same repo, same moment. Terra takes care of the conflicts so nobody overwrites anyone else.",
+    },
   ] as const,
-  trust:
-    "Your whole team can change the live software together — same repo, same moment. Terra takes care of the conflicts so nobody overwrites anyone else.",
-  bridge: ["Work with coworkers", "who aren't engineers."],
   // ≤ ~18 chars/line; .sh-final capped at 36rem.
   final: ["The map your team", "can actually read."],
 };

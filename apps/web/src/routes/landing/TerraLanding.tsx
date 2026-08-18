@@ -6,8 +6,7 @@ import "./landing.css";
 import { SiteNav } from "./sections/SiteNav";
 import { Hero } from "./sections/Hero";
 import { PowerSection } from "./sections/PowerSection";
-import { TrustSection } from "./sections/TrustSection";
-import { Final, useStarFinalApproach, useStarFinalDock } from "./sections/Final";
+import { Final } from "./sections/Final";
 
 const SMOOTH_SCROLL_EASE = 0.12;
 /** Wheel delta multiplier — under 1 so one flick covers less ground. */
@@ -97,17 +96,14 @@ export default function TerraLanding() {
   // No splash/loader — paint nav + hero immediately.
   // The theater opens inside whichever repo card was clicked, so each
   // RepoMapDiagram owns it — nothing to lift up here.
-  useStarFinalApproach();
-  useStarFinalDock();
   useSmoothWheelScroll();
   return (
     <MotionConfig reducedMotion="user">
-      <div className="sh-root">
+      <div className="sh-root sh-root--landing">
         <SiteNav />
 
         <Hero />
         <PowerSection />
-        <TrustSection />
         <Final />
       </div>
     </MotionConfig>

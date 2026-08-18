@@ -242,7 +242,7 @@
 
 .sh-stage--safe {
   max-width: 1180px;
-  margin: 128px auto;
+  margin: 72px auto;
 }
 
 .sh-person {
@@ -364,7 +364,7 @@
 /* ---- final ---- */
 
 .sh-final {
-  margin: 96px auto;
+  margin: 56px auto;
   /* 36rem of content plus the section's 16px gutters */
   max-width: calc(36rem + 32px);
   display: flex;
@@ -376,31 +376,31 @@
 
 @media (min-width: 640px) {
 .sh-final {
-    margin: 128px auto;
+    margin: 72px auto;
   }
 }
 
 .sh-final__glyph {
-  width: 60px;
-  height: 60px;
+  position: relative;
+  width: 120px;
+  height: 130px;
+  margin-bottom: 8px;
 }
 
 @media (min-width: 640px) {
 .sh-final__glyph {
-    width: 80px;
-    height: 80px;
+    width: 140px;
+    height: 152px;
   }
 }
 
-.sh-final__glyph .sh-terra-mark {
-  width: 100%;
-  height: 100%;
-  border-radius: 14px;
-}
-
 .sh-final h2 {
-  margin: 16px 0;
-  font-size: clamp(40px, 6vw, 62px);
+  margin: calc(16px * var(--sh-read, 1)) 0;
+  font-size: clamp(
+    calc(40px * var(--sh-read, 1)),
+    calc(6vw * var(--sh-read, 1)),
+    calc(62px * var(--sh-read, 1))
+  );
   line-height: 1;
   letter-spacing: -0.025em;
 }

@@ -1,9 +1,8 @@
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useState } from "react";
-import { inView, rise, stagger } from "../../../shared/motion";
-import { copy, users, type User } from "../data";
+import { users, type User } from "../data";
 import { MemosExploreReplica } from "../theater";
-import { Picture, WindowChrome } from "../primitives";
+import { Picture } from "../primitives";
 
 /** One beat of the loop, ms. */
 const PLAY_STEP_MS = 1400;
@@ -86,7 +85,8 @@ function PlayCursorSprite({ c, step }: { c: PlayCursor; step: number }) {
   );
 }
 
-function PlaygroundStage() {
+/** Live collaboration film: named cursors restyle the Memos replica. */
+export function PlaygroundStage() {
   const reduced = useReducedMotion();
   const [tick, setTick] = useState(0);
   useEffect(() => {
@@ -118,36 +118,5 @@ function PlaygroundStage() {
         <span>Live in the playground</span>
       </div>
     </div>
-  );
-}
-
-export function TrustSection() {
-  return (
-    <motion.section
-      className="sh-section sh-section--trust"
-      initial="hidden"
-      whileInView="show"
-      variants={stagger}
-      viewport={inView}
-    >
-      <div className="sh-copy sh-copy--section sh-copy--trust" style={{ position: "relative" }}>
-        <motion.h3 className="sh-section-title" variants={rise}>
-          {copy.bridge[0]}
-          <br />
-          {copy.bridge[1]}
-        </motion.h3>
-        <motion.p className="sh-p1" variants={rise}>
-          {copy.trust}
-        </motion.p>
-      </div>
-
-      <div className="sh-stage sh-stage--safe">
-        <motion.div className="sh-window-wrap" variants={rise}>
-          <WindowChrome>
-            <PlaygroundStage />
-          </WindowChrome>
-        </motion.div>
-      </div>
-    </motion.section>
   );
 }

@@ -317,8 +317,3 @@ export function RepoMapDiagram({
 
 /** Graphite ink for pencil trail/headline. */
 export const PENCIL_INK = "#3c3733";
-
-/** Star descent start offset (vh). */
-export const STAR_ENTRY_RISE_VH = 0.85;
-/** Dock glide ms — match `.sh-backdrop` transition. */
-export const STAR_DOCK_MS = 1600;

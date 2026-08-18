@@ -11,8 +11,9 @@
   position: sticky;
   top: 0;
   z-index: 50;
-  padding: 16px 16px;
-  font-size: 16px;
+  /* Folk first-screen chrome: 16px page inset, cream strip above the painting. */
+  padding: calc(16px * var(--sh-read, 1)) calc(16px * var(--sh-read, 1)) 0;
+  font-size: calc(16px * var(--sh-read, 1));
   /* Sticky already layers; keep nav compositing off the scrolling document. */
   transform: translateZ(0);
 }
@@ -23,8 +24,8 @@
   display: flex;
   align-items: center;
   gap: 0;
-  min-height: 68px;
-  padding: 8px;
+  min-height: calc(64px * var(--sh-read, 1));
+  padding: calc(8px * var(--sh-read, 1));
   border-radius: 999px;
   /* Slightly more opaque so a lighter blur still reads frosted. */
   background: rgba(255, 255, 255, 0.92);
@@ -36,9 +37,9 @@
 .sh-nav__logo {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 22px;
-  font-size: 21px;
+  gap: calc(8px * var(--sh-read, 1));
+  padding: 0 calc(22px * var(--sh-read, 1));
+  font-size: calc(21px * var(--sh-read, 1));
   font-weight: 600;
 }
 
@@ -65,7 +66,7 @@
 }
 
 .sh-nav__link {
-  padding: 12px 20px;
+  padding: calc(12px * var(--sh-read, 1)) calc(20px * var(--sh-read, 1));
   border-radius: 999px;
   color: #404040;
   font-weight: 500;
@@ -94,7 +95,7 @@
 /* ---- sections / copy ---- */
 
 .sh-section {
-  width: 100vw;
+  width: 100%;
   max-width: 100%;
   /* Clip horizontally only (hero flights fly in from ±360px); vertical must
      stay visible or the y:150 rise reveal gets a hard clip edge at the
@@ -119,8 +120,8 @@
   width: 100%;
 }
 
-/* Hero only: sticky pin + shader canvas positioning context.
-   --hero-stick-top frames the big screen card under the nav while stuck. */
+/* Hero only: sticky pin + Folk painting card positioning context.
+   --hero-stick-top frames the painting under the nav while stuck. */
 
 .sh-section--hero {
   position: sticky;
@@ -132,6 +133,8 @@
   background-color: var(--sh-bg);
   z-index: 1;
   overflow-x: clip;
+  /* Override .sh-section's 0 16px — Folk card uses its own 16px inset. */
+  padding: calc(16px * var(--sh-read, 1)) calc(16px * var(--sh-read, 1)) 0;
 }
 
 /* Skip painting offscreen sections while scrolling — design unchanged.
@@ -148,8 +151,7 @@
    (--sh-star-mask) and spins slowly behind the headline. */
 
 .sh-backdrop-wrap {
-  /* Fixed to the viewport so the star survives past the hero and glides
-     side to side as later sections come up. */
+  /* Legacy fixed layer (unused while Final owns the star inline). */
   position: fixed;
   top: 0;
   left: 0;
@@ -157,7 +159,6 @@
   height: 100vh;
   z-index: 0;
   pointer-events: none;
-  /* Own compositor layer; contain paint so scrolling siblings don't dirty it. */
   contain: layout style;
   transform: translateZ(0);
 }
@@ -165,28 +166,44 @@
 .sh-backdrop {
   display: block;
   position: absolute;
-  /* Same on-screen spot as before: hero wrap top (40px) minus the old -8vh. */
   top: calc(40px - 8vh);
   left: 0;
   right: 0;
   margin-inline: auto;
-  /* --sh-star-x/y: hero defaults closer/down so a spoke tip meets the E of
-     engineers; parked and the per-section observer override x, CSS eases. */
   translate: var(--sh-star-x, -12vw) var(--sh-star-y, 7vh);
   scale: var(--sh-star-scale, 1);
-  /* No translate/scale transition: past the hero the pose is written per frame
-     by the section tracker, so the star holds its spot inside a section while
-     the page scrolls and glides only on a section swap. */
-  transition: opacity 0.3s ease;
-  /* Hidden behind the hero screen; the section observer reveals it from the
-     "power of Terra" section onward. */
+  transition: none;
   opacity: 0;
-  /* Keep the travelling star responsive without letting tall/fullscreen
-     viewports grow it out of proportion with the capped hero headline.
-     Final docking measures the glyph, so the landed mark stays unchanged. */
   width: min(20vh, 30vw, 160px);
-  /* Star viewBox ratio (padded 1 unit each side for the rounding stroke). */
   aspect-ratio: 22.197 / 24.133;
+}
+
+/* In-flow Final star — must follow the fixed-layer rules so it wins. */
+
+.sh-backdrop-wrap--inline {
+  position: relative;
+  top: auto;
+  left: auto;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+  contain: none;
+  transform: none;
+}
+
+.sh-backdrop.sh-backdrop--inline {
+  position: relative;
+  top: auto;
+  left: auto;
+  right: auto;
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  translate: none;
+  scale: 1;
+  opacity: 1;
+  transition: none;
 }
 
 /* The spinning face: mask + wash live on a child so the rotation can be a
@@ -197,6 +214,7 @@
   position: absolute;
   inset: 0;
   background-color: #e8400d;
+  background-image: var(--sh-terra-wash);
   -webkit-mask-image: var(--sh-star-mask);
   mask-image: var(--sh-star-mask);
   -webkit-mask-size: 100% 100%;
@@ -217,9 +235,9 @@
   }
 }
 
-/* Hidden star = invisible work; park the animation too. */
+/* Hidden fixed star = invisible work; park the animation too. */
 
-.sh-backdrop:not(.sh-backdrop--revealed) .sh-backdrop__spin {
+.sh-backdrop:not(.sh-backdrop--inline):not(.sh-backdrop--revealed) .sh-backdrop__spin {
   animation-play-state: paused;
 }
 
@@ -231,25 +249,6 @@
 
 .sh-backdrop--revealed {
   opacity: 1;
-}
-
-/* After the word handoff the star drifts further left, clear of the headline. */
-
-.sh-backdrop--parked {
-  --sh-star-x: -28vw;
-}
-
-/* Docked into the Final glyph: it has arrived, so it now tracks the (scrolling)
-   glyph frame-exactly — a transition here would make it lag behind the page. */
-
-.sh-backdrop--docked {
-  transition: none;
-}
-
-/* The static mark steps aside while the big star occupies its slot. */
-
-.sh-final__glyph--handoff .sh-terra-mark {
-  opacity: 0;
 }
 
 .sh-backdrop-canvas {
@@ -273,121 +272,72 @@
 }
 
 .sh-copy--hero {
-  /* Hero header uses my-24 — keeps flight progress at 0 on load.
-     Bottom margin tightened so the product card sits higher once the map lands. */
-  margin: 72px auto 20px;
-  max-width: 36rem;
+  /* Overlay on the painting — Folk hero-on-painting column.
+     Vertical rhythm comes from the card padding + title margin. */
+  position: relative;
+  z-index: 10;
+  margin: 0 auto;
+  width: 100%;
+  max-width: 1024px;
+  padding: 0 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  text-wrap: balance;
 }
 
-/* Title + flight park: anchor is an invisible tile-sized slot to the right. */
+/* Title + flight park: tile sits beside the headline, not the painting edge. */
 
 .sh-hero-head {
   position: relative;
   width: 100%;
+  display: flex;
+  justify-content: center;
 }
 
 .sh-flight-anchor {
   position: absolute;
-  left: calc(100% + 214px);
-  top: 50%;
-  /* width/height set inline to match FLIGHT_TILE_PX */
-  transform: translateY(-50%);
+  /* Keep the larger desktop tile beside the headline, never over the words. */
+  top: 48px;
+  right: -160px;
+  z-index: 12;
+  width: var(--sh-flight-tile, 148px);
+  height: var(--sh-flight-tile, 148px);
   pointer-events: none;
   visibility: hidden;
 }
 
 @media (max-width: 900px) {
-/* Keep the card on-screen when the title column is narrow. */
-
 .sh-flight-anchor {
-    left: auto;
-    right: -12px;
+    right: 0;
     top: auto;
-    bottom: -12px;
-    transform: none;
+    bottom: -120px;
   }
 }
 
 .sh-copy--section {
-  margin: 96px auto;
+  margin: 56px auto 24px;
   max-width: 980px;
 }
 
-/* Pencil "Try it" curl: hangs off the right edge of the Power title block and
-   points down into the demo. Purely decorative — hidden when it would crowd. */
-
-/* Anchor box for the note: shrink-wraps the headline so the curl can hang off
-   the last letter instead of off the (much wider) copy column. */
-
-.sh-section-title--note {
-  position: relative;
-  width: fit-content;
-  margin-inline: auto;
-}
-
-.sh-tryit {
-  position: absolute;
-  top: 4px;
-  left: calc(100% + 10px);
-  width: 176px;
-  height: 320px;
-  pointer-events: none;
-}
-
-.sh-tryit__word {
-  font-family: var(--font-display);
-  font-size: 26px;
-  fill: rgba(122, 113, 106, 0.14);
-  stroke: #7a716a;
-  stroke-width: 1.1px;
-  paint-order: stroke fill;
-}
-
-@media (max-width: 1180px) {
-.sh-tryit {
-    display: none;
+@media (min-width: 640px) {
+.sh-copy--section {
+    margin: 72px auto 32px;
   }
 }
 
-/* Safe uses sm:my-32 where the other sections use my-24 */
+/* Power sits after `.sh-hero-pin`, not after `.sh-section--hero` (the pin wraps
+   the sticky hero). Padding on the section itself cannot collapse or miss. */
+
+.sh-section--power {
+  /* Breathing room so Power reads as its own act, not a tail of the hero. */
+  padding-top: clamp(320px, 28vw, 540px);
+  padding-bottom: 280px;
+}
 
 .sh-copy--lg {
-  margin: 128px auto;
-}
-
-/* Trust: headline + proof copy + logos + stage read as one unit. */
-
-.sh-copy--trust {
-  margin: 96px auto 0;
-  max-width: 720px;
-  gap: 0;
-}
-
-.sh-copy--trust .sh-section-title {
-  margin-bottom: 20px;
-  line-height: 1.05;
-}
-
-.sh-copy--trust .sh-copy__cta {
-  margin-top: 24px;
-}
-
-.sh-section--trust .sh-logos {
-  margin-top: 40px;
-}
-
-.sh-section--trust .sh-stage--safe {
-  margin: 48px auto 96px;
-}
-
-@media (min-width: 640px) {
-.sh-copy--trust {
-    margin-top: 128px;
-  }
-
-.sh-section--trust .sh-stage--safe {
-    margin: 56px auto 128px;
-  }
+  margin: 72px auto;
 }
 
 .sh-copy__cta {
@@ -397,12 +347,35 @@
   margin-top: 16px;
 }
 
-.sh-hero-title {
-  margin: 8px 0 16px;
-  font-size: clamp(40px, 6vw, 62px);
-  letter-spacing: -0.025em;
-  font-weight: 500;
+.sh-root h2.sh-hero-title {
+  /* Folk display: clamp(36px, 5.2vw, 60px) / 600 / 1.05 / -0.028em / 20ch
+     Beats `.sh-root h2` token defaults for weight / tracking / leading. */
+  margin: 48px 0 0;
+  max-width: 20ch;
+  font-size: clamp(
+    calc(36px * var(--sh-read, 1)),
+    calc(5.2vw * var(--sh-read, 1)),
+    calc(60px * var(--sh-read, 1))
+  );
+  letter-spacing: -0.028em;
+  font-weight: 600;
+  line-height: 1.05;
   color: #000;
+}
+
+.sh-section--hero .sh-p1 {
+  margin-top: calc(20px * var(--sh-read, 1));
+  max-width: 44ch;
+  font-size: calc(15px * var(--sh-read, 1));
+  font-weight: 500;
+  line-height: 1.5;
+  color: #000;
+}
+
+@media (min-width: 640px) {
+.sh-section--hero .sh-p1 {
+    font-size: calc(17px * var(--sh-read, 1));
+  }
 }
 
 .sh-hero-title span {
@@ -525,17 +498,24 @@
 .sh-section-title {
   margin-bottom: 16px;
   padding: 0 16px;
-  font-size: clamp(40px, 6vw, 62px);
+  font-size: clamp(
+    calc(40px * var(--sh-read, 1)),
+    calc(6vw * var(--sh-read, 1)),
+    calc(62px * var(--sh-read, 1))
+  );
   letter-spacing: -0.025em;
   font-weight: 500;
 }
 
 .sh-p1 {
-  font-size: clamp(20px, 2.2vw, 24px);
+  font-size: clamp(
+    calc(20px * var(--sh-read, 1)),
+    calc(2.2vw * var(--sh-read, 1)),
+    calc(24px * var(--sh-read, 1))
+  );
   line-height: 1.375;
   font-weight: 400;
   color: #404040;
   text-wrap: balance;
   max-width: 620px;
 }
-
