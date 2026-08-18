@@ -23,24 +23,24 @@
   width: fit-content;
   display: flex;
   align-items: center;
-  gap: 0;
-  min-height: calc(64px * var(--sh-read, 1));
-  padding: calc(8px * var(--sh-read, 1));
+  gap: calc(4px * var(--sh-read, 1));
+  padding: calc(6px * var(--sh-read, 1));
+  border: 2px solid #000;
   border-radius: 999px;
-  /* Slightly more opaque so a lighter blur still reads frosted. */
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  background: #fff;
+  box-shadow: 0 8px 30px rgba(28, 29, 24, 0.12);
 }
 
 .sh-nav__logo {
   display: flex;
   align-items: center;
   gap: calc(8px * var(--sh-read, 1));
-  padding: 0 calc(22px * var(--sh-read, 1));
-  font-size: calc(21px * var(--sh-read, 1));
+  padding: calc(6px * var(--sh-read, 1)) calc(12px * var(--sh-read, 1));
+  border-radius: 999px;
+  font-size: calc(16px * var(--sh-read, 1));
   font-weight: 600;
+  letter-spacing: -0.025em;
+  color: #141510;
 }
 
 /* Eight-point star cut out of the brand gradient; spins 60deg on hover with a
@@ -49,6 +49,20 @@
 .sh-nav__logo:hover .sh-terra-mark,
 .sh-terra-mark:hover {
   rotate: 62.5deg;
+}
+
+/* No coloured halo: on a white pill only the shading can carry the shine, so
+   hover sweeps the highlight band across the star and lifts it off the pill.
+   Outline is repeated in the hover chain — filter replaces, it doesn't merge. */
+
+.sh-nav__logo:hover .sh-terra-mark::before {
+  background-position: 100% 100%;
+}
+
+.sh-nav__logo:hover .sh-terra-mark {
+  filter:
+    var(--sh-mark-outline) drop-shadow(0 2px 4px rgba(20, 21, 16, 0.3))
+    brightness(1.06);
 }
 
 /* Star spins with the nav collapse/expand — same overshoot as the hover spin. */
@@ -62,19 +76,45 @@
 .sh-nav__links {
   display: flex;
   align-items: center;
+  gap: calc(4px * var(--sh-read, 1));
   overflow: hidden;
 }
 
 .sh-nav__link {
-  padding: calc(12px * var(--sh-read, 1)) calc(20px * var(--sh-read, 1));
+  padding: calc(6px * var(--sh-read, 1)) calc(12px * var(--sh-read, 1));
   border-radius: 999px;
-  color: #404040;
-  font-weight: 500;
+  font-size: calc(14px * var(--sh-read, 1));
+  font-weight: 400;
+  color: rgba(20, 21, 16, 0.75);
   white-space: nowrap;
+  transition:
+    color 120ms ease,
+    background-color 120ms ease;
 }
 
 .sh-nav__link:hover {
-  color: #000;
+  background: rgba(0, 0, 0, 0.05);
+  color: #141510;
+}
+
+/* hilos nav CTA: black pill, not the shared orange rect. Loads after ui.css. */
+
+.sh-root .sh-btn--nav {
+  margin-left: calc(4px * var(--sh-read, 1));
+  padding: calc(6px * var(--sh-read, 1)) calc(16px * var(--sh-read, 1));
+  border: 0;
+  border-radius: 999px;
+  background: #141510;
+  color: #f1f2ee;
+  font-size: calc(14px * var(--sh-read, 1));
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.sh-root .sh-btn--nav:hover {
+  /* Near-black needs far more than the shared 1.1 to read as a hover. */
+  filter: brightness(1.35);
+  color: #f1f2ee;
 }
 
 /* Railway-style CTAs: clear rounded rects, solid fill, hairline border —
@@ -213,7 +253,7 @@
 .sh-backdrop__spin {
   position: absolute;
   inset: 0;
-  background-color: #e8400d;
+  background-color: #141510;
   background-image: var(--sh-terra-wash);
   -webkit-mask-image: var(--sh-star-mask);
   mask-image: var(--sh-star-mask);
@@ -300,10 +340,10 @@
   position: absolute;
   /* Keep the larger desktop tile beside the headline, never over the words. */
   top: 48px;
-  right: -160px;
+  right: -210px;
   z-index: 12;
-  width: var(--sh-flight-tile, 148px);
-  height: var(--sh-flight-tile, 148px);
+  width: var(--sh-flight-tile, 128px);
+  height: var(--sh-flight-tile, 128px);
   pointer-events: none;
   visibility: hidden;
 }
@@ -347,6 +387,14 @@
   margin-top: 16px;
 }
 
+.sh-root h2.sh-hero-title,
+.sh-section-title,
+.sh-final h2 {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  font-variation-settings: "SOFT" 40, "WONK" 0;
+}
+
 .sh-root h2.sh-hero-title {
   /* Display type: clamp(36px, 5.2vw, 60px) / 600 / 1.05 / -0.028em / 20ch
      Beats `.sh-root h2` token defaults for weight / tracking / leading. */
@@ -358,7 +406,8 @@
     calc(60px * var(--sh-read, 1))
   );
   letter-spacing: -0.028em;
-  font-weight: 600;
+  /* Fraunces at 400 — the serif already carries the weight a 600 sans needed. */
+  font-weight: 400;
   line-height: 1.05;
   color: #000;
 }
@@ -504,7 +553,7 @@
     calc(62px * var(--sh-read, 1))
   );
   letter-spacing: -0.025em;
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .sh-p1 {

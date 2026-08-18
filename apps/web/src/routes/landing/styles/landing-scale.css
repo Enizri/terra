@@ -2,7 +2,7 @@
 
 .sh-root--landing {
   --sh-hero-window: 720px;
-  --sh-flight-tile: 148px;
+  --sh-flight-tile: 128px;
   --sh-section-canvas-max: min(calc(100vw - 32px), 1400px);
   /* Power runs wider than the copy sections — the demo card is the subject. */
   --sh-power-canvas-max: calc(100vw - 32px);
@@ -13,13 +13,7 @@
 @media (min-width: 901px) {
   .sh-root--landing {
     --sh-read: 1.5;
-    --sh-flight-tile: 192px;
-  }
-
-  .sh-root--landing .sh-btn--nav {
-    margin-left: 12px;
-    padding: 21px 33px;
-    font-size: 24px;
+    --sh-flight-tile: 164px;
   }
 
   .sh-root--landing .sh-caption {
