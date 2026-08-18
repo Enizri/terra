@@ -308,16 +308,12 @@ export function TheaterPanel({
       </div>
 
       {/* Implement screen carries no hint pill — the redesign speaks for itself. */}
-      {!designMode && (
+      {!designMode && scripted && (
         <div className="sh-theater__chrome">
           <span className="sh-chip sh-theater__label">
             <span className="sh-chip__mark" />
             {demoReplica ? "Memos" : node.label}
-            <span className="sh-theater__hint">
-              {scripted
-                ? "Terra picks a component and redesigns it"
-                : "Click a piece of UI, then pick a question"}
-            </span>
+            <span className="sh-theater__hint">Terra picks a component and redesigns it</span>
           </span>
         </div>
       )}
