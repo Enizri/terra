@@ -30,6 +30,7 @@ Each collaborator ships as matching PNG and WebP files under `apps/web/public/te
 - Keep the existing animation timing, paths, messages, and cursor colors unchanged.
 - Point the presence avatars at the new descriptive image bases.
 - Increase the presence avatars from 22 px to 48 px, enlarge the pill padding to fit, and keep a balanced 12 px overlap.
+- Replace the three empty author circles in the playground memo cards with the matching Evyatar, Maya, and Leo avatars and names.
 - Remove old avatar files only after a repository-wide reference check proves they are unused.
 
 ## Verification
@@ -37,6 +38,7 @@ Each collaborator ships as matching PNG and WebP files under `apps/web/public/te
 - Add one small test asserting the three visible cursor names and collaborator assignments.
 - Run the focused web test, `npm run build`, and `make check`.
 - Review the playground at desktop and narrow widths, confirming avatar crops and cursor labels remain readable.
+- Confirm all three visible playground memo cards show a real collaborator image rather than an empty placeholder circle.
 - Confirm no removed avatar filename is referenced anywhere in tracked source.
 
 ## Out of scope
