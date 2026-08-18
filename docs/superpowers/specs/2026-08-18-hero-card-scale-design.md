@@ -2,13 +2,14 @@
 
 ## Goal
 
-Make the landing hero card large and readable before the GitHub card finishes its drag, then expand it further after the drop. Match the intended large-screen presence without applying global CSS zoom or changing the page width.
+Make the landing hero card large and readable before the GitHub card finishes its drag, then expand it further after the drop. Keep the painting directly below the navigation instead of vertically centering it on tall screens. Match the intended large-screen presence without applying global CSS zoom or changing the page width.
 
 ## Approved behavior
 
 - On wide screens, the pre-drop product frame grows from 720 x 412 px to 1280 x 732 px.
 - After the GitHub card is fully dropped, the workspace expands up to 2400 x 1350 px.
 - Both states remain capped by the available viewport width so narrower windows do not clip horizontally.
+- At the top of the page, the painting starts about 100 px from the viewport top instead of moving down as the viewport gets taller.
 - Existing narrow-screen layout and breakpoints remain unchanged.
 - The current drag, drop, sticky-scroll, and workspace-demo behavior remains unchanged.
 
@@ -17,11 +18,13 @@ Make the landing hero card large and readable before the GitHub card finishes it
 - Reuse the landing page's existing `--sh-hero-window` sizing seam for the pre-drop width.
 - Add only the minimum wide-screen overrides needed for the matching pre-drop height and inner frame.
 - Reuse the existing `[data-dropped="1"]` and `.is-expanded` states for the larger post-drop width and height.
+- Remove the viewport-height centering calculation from the sticky hero measurement and reuse the existing minimum landing gap.
 - Keep all rules scoped to the landing hero; do not scale the root, body, navigation, Power section, or workspace route.
 
 ## Verification
 
 - At a 2728 x 1745 viewport, assert that the pre-drop screen is 1280 x 732 px and fully inside the hero card.
+- At that viewport, assert that the painting begins about 100 px from the top rather than the current 323 px.
 - Complete the drag and assert that the expanded workspace is no wider than 2400 px, targets 1350 px tall when space allows, and remains fully inside the hero card.
 - Check one narrower desktop viewport to confirm the viewport cap prevents horizontal clipping.
 - Run the existing web build.
