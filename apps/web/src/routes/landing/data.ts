@@ -203,6 +203,8 @@ export const copy = {
     to: "humans",
     tail: "can understand",
   },
+  heroEyebrow: "Built for agentic development.",
+  heroHeadline: "Software that only humans can understand.",
   heroSubtitle:
     "Terra maps your repo, then runs it in the cloud so you can change the live software — no local setup.",
   /** Wrapped around the hero globe as one glyph per cell. Away from the

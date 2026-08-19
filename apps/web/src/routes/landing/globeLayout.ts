@@ -25,10 +25,12 @@ import { copy } from "./data.ts";
 /** Rings in the stack, and cells around the widest ring. Narrow rings get
  *  proportionally fewer cells so the glyph density stays even instead of
  *  caking up at the poles. */
-export const RINGS = 36;
-export const COLS_EQ = 156;
+export const RINGS = 42;
+export const COLS_EQ = 200;
 /** Box width the cell count is tuned for; smaller globes thin out with it. */
 const COLS_REF_PX = 560;
+/** Cap on how tightly a large pane packs — 1 is the 560px look. */
+const DENSITY_MAX = 1.6;
 /** How far the sentence advances from one ring to the next. A prime keeps
  *  rings from lining up into vertical stripes of the same word. */
 const TEXT_ROW_STEP = 37;
@@ -54,7 +56,7 @@ const HIGHLIGHT_LEAN = 0.06;
 /** Camera distance in sphere radii — drives the perspective spread. */
 const CAM_Z = 4;
 /** Sphere size inside its box. */
-const SPHERE_FILL = 0.96;
+const SPHERE_FILL = 0.9;
 /** Highlight bands: centre, width and edge softness, in turns. */
 const HL_POS = 0.35;
 const HL_SIZE = 0.18;
@@ -67,26 +69,25 @@ const AMBIENT_RATE = 0.5;
 const HOVER_RATE = 24;
 /** Lens radius, as a share of the globe radius. Wide enough that whole words
  *  land inside it — a small lens resolves single letters and reads as noise. */
-const HOVER_R = 0.58;
+const HOVER_R = 0.4;
 /** Lens strength needed to resolve a cell, and the per-cell jitter on it. */
 const RESOLVE_MIN = 0.12;
 const RESOLVE_JITTER = 0.4;
 /** Monospace cell size at the sphere's equator. */
-const FONT_PX = 9;
+const FONT_PX = 12;
 /** Solid enough to read, not a wash. */
 const REST_ALPHA = 1;
 const PEAK_ALPHA = 1;
 /** How far the back of the globe fades behind the front. */
-const BACK_ALPHA = 0.5;
+const BACK_ALPHA = 0.68;
 /** Inside the lens the depth fade lifts, so the far side shows through. */
 const LENS_SEE_THROUGH = 0.92;
 /** How hard the lens punches out the front face (their hover × 2.5 dissolve). */
-const HOLE_GAIN = 2.4;
-/** Discrete inks — true black, a darker gray, and white. Spread so all three
- *  read on the gray-pastel floor. */
+const HOLE_GAIN = 1.55;
+/** Discrete inks — dim, mid, white on charcoal (#232323), matching CA's field. */
 const INK = [
-  [0, 0, 0],
-  [0.3, 0.3, 0.29],
+  [0.72, 0.72, 0.7],
+  [0.9, 0.9, 0.88],
   [1, 1, 1],
 ] as const;
 /** Below this a cell is invisible; drawing it is pure cost. */
@@ -99,8 +100,11 @@ export const INSTANCE_FLOATS = 8;
 export const MAX_INSTANCES = RINGS * COLS_EQ * 3;
 
 export type GlobeFrame = {
-  /** Canvas box side in CSS px. */
+  /** Sphere diameter in CSS px — may be larger than the pane so it clips. */
   size: number;
+  /** Canvas CSS size. Defaults to a square of `size`. */
+  width?: number;
+  height?: number;
   /** Seconds since the globe mounted. */
   t: number;
   /** Cursor in canvas px; far away when the pointer has left. */
@@ -118,14 +122,16 @@ export type GlobeFrame = {
 export function layoutGlobe(f: GlobeFrame, out: Float32Array, glyphsOut?: string[]): number {
   const text = copy.heroGlobeText;
   const slice = f.reduced ? 1 : easeInOutQuad(f.t / INTRO_S);
-  const cx = f.size / 2;
-  const cy = f.size / 2;
+  const paneW = f.width ?? f.size;
+  const paneH = f.height ?? f.size;
+  const cx = paneW / 2;
+  const cy = paneH / 2;
   const R = (f.size / 2) * SPHERE_FILL;
   const spin = f.reduced ? 0 : f.t * UV_SPEED;
   const phase = f.reduced ? 0.5 / RINGS : f.t * SHAPE_SPEED;
   const bandOffset = spin + (f.yaw + f.pitch) * HIGHLIGHT_LEAN;
   const hoverR = R * HOVER_R;
-  const density = Math.min(1, f.size / COLS_REF_PX);
+  const density = Math.min(DENSITY_MAX, f.size / COLS_REF_PX);
   const px = f.pointerX;
   const py = f.pointerY;
   const reduced = f.reduced;
@@ -205,14 +211,15 @@ export function layoutGlobe(f: GlobeFrame, out: Float32Array, glyphsOut?: string
       if (tile === undefined) continue;
 
       const ink = INK[toneAt(i, c, step)];
+      const lift = heat * 0.55;
       const o = n * INSTANCE_FLOATS;
       out[o] = sx;
       out[o + 1] = sy;
       out[o + 2] = FONT_PX * persp;
       out[o + 3] = tile;
-      out[o + 4] = ink[0];
-      out[o + 5] = ink[1];
-      out[o + 6] = ink[2];
+      out[o + 4] = ink[0] + (1 - ink[0]) * lift;
+      out[o + 5] = ink[1] + (1 - ink[1]) * lift;
+      out[o + 6] = ink[2] + (1 - ink[2]) * lift;
       out[o + 7] = alpha;
       n++;
       if (glyphsOut) glyphsOut.push(glyph);

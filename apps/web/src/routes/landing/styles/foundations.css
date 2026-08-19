@@ -378,12 +378,10 @@
   }
 }
 
-/* Power sits after `.sh-hero-pin`, not after `.sh-section--hero` (the pin wraps
-   the sticky hero). Padding on the section itself cannot collapse or miss. */
+/* Power sits after the hero split. */
 
 .sh-section--power {
-  /* Breathing room so Power reads as its own act, not a tail of the hero. */
-  padding-top: clamp(320px, 28vw, 540px);
+  padding-top: clamp(80px, 8vw, 140px);
   padding-bottom: 280px;
 }
 

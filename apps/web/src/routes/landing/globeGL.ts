@@ -15,7 +15,7 @@ const ATLAS_FONT_PX = 32;
 const ATLAS_TILE = 48;
 /** Quad side per unit of font size, from the tile's own proportions. */
 const QUAD_SCALE = ATLAS_TILE / ATLAS_FONT_PX;
-const MONO = "ui-monospace, SFMono-Regular, Menlo, monospace";
+const MONO = '"Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace';
 
 const VERT = `#version 300 es
 in vec2 a_corner;
@@ -84,7 +84,7 @@ export type GlobeRenderer = {
    *  webfont lands after that the globe would keep the fallback glyphs (or
    *  nothing) forever — there is no per-frame redraw to correct it. */
   refreshAtlas: () => void;
-  resize: (cssSize: number, dpr: number) => void;
+  resize: (cssW: number, cssH: number, dpr: number) => void;
   render: (count: number) => void;
   dispose: () => void;
 };
@@ -178,17 +178,24 @@ export function createGlobeRenderer(
   return {
     data,
     refreshAtlas: uploadAtlas,
-    resize(cssSize, dpr) {
-      // Density is already capped in layout. Bound fill-rate so a retina
-      // 680px orb does not become a 2k framebuffer.
-      const px = Math.max(1, Math.min(900, Math.round(cssSize * Math.min(dpr, 1.5))));
-      if (canvas.width !== px || canvas.height !== px) {
-        canvas.width = px;
-        canvas.height = px;
+    resize(cssW, cssH, dpr) {
+      const scale = Math.min(dpr, 1.5);
+      let pxW = Math.max(1, Math.round(cssW * scale));
+      let pxH = Math.max(1, Math.round(cssH * scale));
+      const cap = 1200;
+      const m = Math.max(pxW, pxH);
+      if (m > cap) {
+        const k = cap / m;
+        pxW = Math.max(1, Math.round(pxW * k));
+        pxH = Math.max(1, Math.round(pxH * k));
+      }
+      if (canvas.width !== pxW || canvas.height !== pxH) {
+        canvas.width = pxW;
+        canvas.height = pxH;
       }
       gl.useProgram(program);
-      gl.viewport(0, 0, px, px);
-      gl.uniform2f(uRes, cssSize, cssSize);
+      gl.viewport(0, 0, pxW, pxH);
+      gl.uniform2f(uRes, cssW, cssH);
     },
     render(count) {
       gl.bindVertexArray(vao);

@@ -21,7 +21,7 @@ test("glyphAt is deterministic per cell and churns with step", () => {
   assert.ok(steps.size > 5, "glyph should change as step advances");
 });
 
-test("toneAt walks black gray and white as the cell churns", () => {
+test("toneAt walks dim mid and white as the cell churns", () => {
   assert.equal(toneAt(3, 7, 0), toneAt(3, 7, 0));
   const tones = new Set(Array.from({ length: 40 }, (_, s) => toneAt(3, 7, s)));
   assert.equal(tones.size, TONE_COUNT);

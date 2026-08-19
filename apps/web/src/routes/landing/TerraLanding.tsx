@@ -1,5 +1,7 @@
 import { MotionConfig, useReducedMotion } from "motion/react";
 import { useEffect } from "react";
+import "@fontsource-variable/geist";
+import "@fontsource-variable/geist-mono";
 import "../../shared/styles/tokens.css";
 import "../../shared/styles/ui.css";
 import "./landing.css";

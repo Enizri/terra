@@ -48,10 +48,11 @@ test("the field stays dense but inside the instance budget", () => {
   assert.ok(n <= MAX_INSTANCES, "never overruns the buffer");
 });
 
-test("a larger canvas does not spawn more glyphs", () => {
+test("a larger canvas packs more glyphs, still inside the budget", () => {
   const atTune = layoutGlobe(frame({ size: SIZE }), buf);
   const huge = layoutGlobe(frame({ size: SIZE * 2 }), buf);
-  assert.equal(huge, atTune, "density is capped at the tune size");
+  assert.ok(huge > atTune, "density scales with the pane");
+  assert.ok(huge <= MAX_INSTANCES, "never overruns the buffer");
 });
 
 test("the cursor lens decodes the scramble into readable copy", () => {
@@ -93,16 +94,16 @@ test("reduced motion still lays out a full globe, with no lens", () => {
   assert.ok(!glyphs.join("").includes(" "), "the lens is off");
 });
 
-test("glyphs flip between black, gray and white", () => {
+test("glyphs flip between dim, mid and white", () => {
   const n = layoutGlobe(frame(), buf);
-  const tones = { black: 0, gray: 0, white: 0 };
+  const tones = { dim: 0, mid: 0, white: 0 };
   for (let i = 0; i < n; i++) {
     const r = buf[i * INSTANCE_FLOATS + 4];
-    if (r < 0.2) tones.black++;
-    else if (r < 0.75) tones.gray++;
+    if (r < 0.8) tones.dim++;
+    else if (r < 0.96) tones.mid++;
     else tones.white++;
   }
-  assert.ok(tones.black > 100, `black ${tones.black}`);
-  assert.ok(tones.gray > 100, `gray ${tones.gray}`);
+  assert.ok(tones.dim > 100, `dim ${tones.dim}`);
+  assert.ok(tones.mid > 100, `mid ${tones.mid}`);
   assert.ok(tones.white > 100, `white ${tones.white}`);
 });

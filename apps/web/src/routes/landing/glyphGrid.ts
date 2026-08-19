@@ -20,7 +20,7 @@ export function glyphAt(col: number, row: number, step: number) {
   return GLYPHS[hash2(col, row + step * 7919) % GLYPHS.length];
 }
 
-/** Black / gray / white — flips with the same churn as the glyph. */
+/** Dim / mid / white — flips with the same churn as the glyph. */
 export const TONE_COUNT = 3;
 export function toneAt(col: number, row: number, step: number) {
   return hash2(col, row + step * 104729) % TONE_COUNT;

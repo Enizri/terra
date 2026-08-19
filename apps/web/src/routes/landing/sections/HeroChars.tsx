@@ -1,11 +1,7 @@
-import { motion, useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
-import { rise, stagger } from "../../../shared/motion";
 import { copy } from "../data";
 import { createGlobeRenderer } from "../globeGL";
 import { layoutGlobe } from "../globeLayout";
-import { ArrowIcon } from "../primitives";
-import { HeroTitle } from "./Hero";
 
 /** Mouse-look: max lean toward the cursor, radians. */
 const MOUSE_LOOK = 0.22;
@@ -17,11 +13,7 @@ function GlyphOrb() {
   // Pointer and its smoothed follower live in refs: state here would
   // re-render the hero 60x/sec.
   const pointer = useRef({ x: -1e4, y: -1e4, nx: 0, ny: 0, sx: 0, sy: 0 });
-  const reduced = useReducedMotion();
-  // Keep WebGL off the `reduced` effect dep — null→false would dispose the
-  // context on the same canvas and the second getContext can come back empty.
-  const reducedRef = useRef(reduced === true);
-  reducedRef.current = reduced === true;
+  const reducedRef = useRef(false);
   // A lost context (Strict Mode / HMR after loseContext) cannot be reused;
   // bumping this mounts a fresh <canvas>.
   const [surface, setSurface] = useState(0);
@@ -38,17 +30,22 @@ function GlyphOrb() {
 
     let disposed = false;
     let size = 0;
+    let paneW = 0;
+    let paneH = 0;
     let frame = 0;
     let visible = true;
     let start = -1;
     let last = 0;
-    // 0.1 per 60fps frame, stable on 120Hz displays.
     const mouseFollow = (dt: number) => 1 - Math.pow(0.9, dt * 60);
 
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const syncReduced = () => {
+      reducedRef.current = media.matches;
+    };
+    syncReduced();
+
     const draw = (now: number, dt: number) => {
-      // A ResizeObserver can fire before layout has a box; drawing then would
-      // lay the globe out at zero scale.
-      if (size <= 0) return;
+      if (paneW <= 0 || paneH <= 0) return;
       if (start < 0) start = now;
       const t = (now - start) / 1000;
       const p = pointer.current;
@@ -58,6 +55,8 @@ function GlyphOrb() {
       const count = layoutGlobe(
         {
           size,
+          width: paneW,
+          height: paneH,
           t,
           pointerX: p.x,
           pointerY: p.y,
@@ -90,15 +89,16 @@ function GlyphOrb() {
     };
 
     const resize = () => {
-      const rect = canvas.getBoundingClientRect();
-      size = Math.min(rect.width, rect.height);
-      if (size <= 0) return;
-      renderer.resize(size, Math.min(1.5, window.devicePixelRatio || 1));
+      const host = canvas.parentElement;
+      const rect = host?.getBoundingClientRect() ?? canvas.getBoundingClientRect();
+      paneW = rect.width;
+      paneH = rect.height;
+      if (paneW <= 0 || paneH <= 0) return;
+      size = Math.max(paneW, paneH) * 0.82;
+      renderer.resize(paneW, paneH, Math.min(1.5, window.devicePixelRatio || 1));
       draw(performance.now(), 1 / 60);
     };
 
-    // Mouse-look tracks the window — the globe answers the
-    // cursor anywhere on the hero, not only when it is over the disc.
     const onWindowMove = (e: PointerEvent) => {
       const p = pointer.current;
       p.nx = (e.clientX / window.innerWidth) * 2 - 1;
@@ -118,7 +118,6 @@ function GlyphOrb() {
     const observer = new ResizeObserver(resize);
     observer.observe(canvas);
     if (canvas.parentElement) observer.observe(canvas.parentElement);
-    // Nothing below the fold needs a running rAF — the page is long.
     const io = new IntersectionObserver(([entry]) => {
       visible = entry.isIntersecting;
       if (visible) play();
@@ -131,13 +130,11 @@ function GlyphOrb() {
       else if (visible) play();
     };
     document.addEventListener("visibilitychange", onVisibility);
+    media.addEventListener("change", syncReduced);
 
     window.addEventListener("pointermove", onWindowMove, { passive: true });
     document.addEventListener("pointerleave", onLeave);
     resize();
-    // The atlas is rasterised once. If the mono webfont is still loading at
-    // mount, those tiles are fallback glyphs (or empty) and nothing would ever
-    // redraw them — so re-bake once the font lands.
     if (document.fonts && document.fonts.status !== "loaded") {
       void document.fonts.ready.then(() => {
         if (!disposed) renderer.refreshAtlas();
@@ -151,6 +148,7 @@ function GlyphOrb() {
       renderer.dispose();
       observer.disconnect();
       io.disconnect();
+      media.removeEventListener("change", syncReduced);
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("pointermove", onWindowMove);
       document.removeEventListener("pointerleave", onLeave);
@@ -162,35 +160,26 @@ function GlyphOrb() {
 
 export function HeroChars() {
   return (
-    <div className="sh-hero-pin">
-      <motion.section
-        className="sh-section sh-section--hero sh-section--herochars"
-        initial="hidden"
-        animate="show"
-        variants={stagger}
-      >
-        <div className="hx-grid">
-          <div className="hx-copy">
-            <HeroTitle />
-            <motion.p className="sh-p1" variants={rise}>
-              {copy.heroSubtitle}
-            </motion.p>
-            <motion.div className="hx-cta" variants={rise}>
-              <a className="hx-cta__primary" href={copy.heroCta.primary.href}>
-                {copy.heroCta.primary.label}
-              </a>
-              <a className="hx-cta__secondary" href={copy.heroCta.secondary.href}>
-                {copy.heroCta.secondary.label}
-                <ArrowIcon />
-              </a>
-            </motion.div>
+    <section className="sh-section sh-section--hero sh-section--herochars" aria-label="Hero">
+      <div className="hx-grid">
+        <div className="hx-copy">
+          <p className="hx-eyebrow">{copy.heroEyebrow}</p>
+          <h1 className="hx-title">{copy.heroHeadline}</h1>
+          <p className="hx-body">{copy.heroSubtitle}</p>
+          <div className="hx-cta">
+            <a className="hx-cta__btn" href={copy.heroCta.primary.href}>
+              {copy.heroCta.primary.label}
+            </a>
+            <a className="hx-cta__btn" href={copy.heroCta.secondary.href}>
+              {copy.heroCta.secondary.label}
+            </a>
           </div>
-
-          <motion.div className="hx-orb" variants={rise}>
-            <GlyphOrb />
-          </motion.div>
         </div>
-      </motion.section>
-    </div>
+
+        <div className="hx-orb">
+          <GlyphOrb />
+        </div>
+      </div>
+    </section>
   );
 }
