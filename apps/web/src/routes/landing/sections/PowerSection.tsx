@@ -48,7 +48,7 @@ function MonitorDemo() {
       <header className="sh-monitor__head">
         <span className="sh-monitor__live" aria-hidden />
         <b>Live on the map</b>
-        <em>usememos/memos</em>
+        <em>terra/terra</em>
       </header>
       <div className="sh-monitor__body">
         <ul className="sh-monitor__nodes" aria-label="Active components">

@@ -15,7 +15,7 @@ test("landing hero keeps the full-card geometry", () => {
 
 test("tall viewports do not vertically center the hero painting", () => {
   assert.doesNotMatch(heroSource, /window\.innerHeight\s*-\s*card\.offsetHeight/);
-  assert.match(heroSource, /const LANDING_GAP_MIN = 96/);
+  assert.match(heroSource, /const stickTop = Math\.max\(0, pin\.offsetTop\)/);
 });
 
 test("desktop landing content keeps the requested 150 percent reading scale", () => {

@@ -4,8 +4,9 @@ import "../../shared/styles/tokens.css";
 import "../../shared/styles/ui.css";
 import "./landing.css";
 import { SiteNav } from "./sections/SiteNav";
-import { Hero } from "./sections/Hero";
+import { HeroChars } from "./sections/HeroChars";
 import { PowerSection } from "./sections/PowerSection";
+import { Faq } from "./sections/Faq";
 import { Final } from "./sections/Final";
 
 const SMOOTH_SCROLL_EASE = 0.12;
@@ -102,8 +103,9 @@ export default function TerraLanding() {
       <div className="sh-root sh-root--landing">
         <SiteNav />
 
-        <Hero />
+        <HeroChars />
         <PowerSection />
+        <Faq />
         <Final />
       </div>
     </MotionConfig>

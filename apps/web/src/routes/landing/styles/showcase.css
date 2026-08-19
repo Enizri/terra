@@ -11,6 +11,11 @@
 
 .sh-section--hero .sh-stage--hero {
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 auto;
+  min-height: 0;
   margin-top: 32px;
   margin-bottom: 0;
   width: 100%;
@@ -19,12 +24,11 @@
   box-sizing: border-box;
   /* Flight + pencil trail extend past the 720 mat — don't clip them. */
   overflow: visible;
-  flex: 0 0 auto;
   transition: max-width 0.9s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* On drop the film grows into the card's own padding first: the deep bottom
-   padding collapses, so the wallpaper stretches as little as possible. */
+/* The painting box never resizes; its padding does, so the film gets the deep
+   bottom mat as real layout height on drop. */
 .sh-section--hero[data-dropped="1"] .sh-power-theater.sh-hero-card {
   padding-top: 16px;
   padding-bottom: 24px;
@@ -40,17 +44,53 @@
 .sh-section--hero[data-dropped="1"] .sh-copy--hero {
   transform: scale(0.86);
   transform-origin: top center;
+  /* The scale is visual only — claw back the 14% it frees so the film
+     actually receives the height, instead of it staying dead space. */
+  margin-bottom: -6%;
 }
 
-.sh-section--hero[data-dropped="1"] .sh-power-theater__screen {
-  transform: translateY(-40px);
+/* On drop the subtitle steps aside: its rows are the cheapest height to hand
+   to the film, and the headline still carries the claim. */
+.sh-section--hero .sh-copy--hero .sh-p1 {
+  overflow: hidden;
+  transition:
+    max-height 0.9s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.5s ease,
+    margin-top 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+  max-height: 12em;
 }
+
+.sh-section--hero[data-dropped="1"] .sh-copy--hero .sh-p1 {
+  max-height: 0;
+  margin-top: 0;
+  opacity: 0;
+}
+
+/* No lift on drop: the film now gets real layout height, so nudging it up
+   would only open a gap under it. */
 
 /* After the GitHub drop: open up so the workspace is readable. */
 .sh-section--hero[data-dropped="1"] .sh-stage--hero {
   max-width: min(98%, 1480px);
-  margin-bottom: 100px;
+  margin-top: 8px;
+  margin-bottom: 0;
   padding-inline: 16px;
+  /* Film height derives from the card's leftover space — one source of truth,
+     so browser zoom can't flip card and film onto different thresholds. */
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+}
+
+/* Always flex, both states: the mat's `height: 100%` needs a definite parent,
+   and pre-drop that parent is this wrap. Block-level here collapsed the
+   412 slot to its content height. */
+.sh-section--hero .sh-stage--hero > .sh-window-wrap {
+  display: flex;
+  flex: 1 1 auto;
+  align-self: stretch;
+  min-height: 0;
 }
 
 .sh-section--hero .sh-window {
@@ -676,7 +716,7 @@
   }
 }
 
-/* Ask / Implement tabs embed the theater (static Memos + Terra chat). Permanent
+/* Ask / Implement tabs embed the theater (static app + Terra chat). Permanent
    screen here, not a popover — no close/fullscreen chrome. */
 
 .sh-ops__state .sh-theater__panel--inline {
@@ -1035,4 +1075,28 @@
   .sh-section--hero .sh-copy--hero {
     --sh-read: 1.28;
   }
+}
+
+/* Pinned hero: the painting is a fixed wrapper — it fills the pinned section
+   and never resizes. One unit (the section's own height), so browser zoom
+   cannot flip it onto a different branch than the film inside it. */
+.sh-section--hero .sh-power-theater.sh-hero-card {
+  height: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+  /* Card padding is layout budget now — animate it with the drop. */
+  transition:
+    padding-top 0.9s cubic-bezier(0.22, 1, 0.36, 1),
+    padding-bottom 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Copy is intrinsic; the stage takes everything else. */
+.sh-section--hero .sh-copy--hero {
+  flex: 0 0 auto;
+}
+
+/* The hero section is the pinned viewport box; the card fills it. */
+.sh-section--hero {
+  display: flex;
+  flex-direction: column;
 }

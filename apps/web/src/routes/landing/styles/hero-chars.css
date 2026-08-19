@@ -1,0 +1,127 @@
+/* Hero: copy left, glyph circle right. Shares .sh-section--hero so the
+   existing :not() spacing rules across the landing keep behaving. */
+
+.sh-section--herochars {
+  /* Beats the pinned hero's flex column from showcase.css (same specificity,
+     imported later) — one centred grid child, no inherited direction. */
+  display: grid;
+  place-items: center;
+}
+
+.hx-grid {
+  width: min(100%, var(--sh-section-canvas-max, 1400px));
+  margin-inline: auto;
+  display: grid;
+  gap: calc(32px * var(--sh-read, 1));
+  align-items: center;
+  padding-inline: calc(24px * var(--sh-read, 1));
+}
+
+@media (min-width: 901px) {
+  .hx-grid {
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    gap: calc(48px * var(--sh-read, 1));
+  }
+}
+
+.hx-copy {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  text-wrap: balance;
+  /* Local reading scale: the copy shares the row with the orb, so it runs
+     under the 1.5 desktop scale the full-width sections use. */
+  --sh-read: 1;
+}
+
+@media (min-width: 901px) {
+  .hx-copy {
+    --sh-read: 1.15;
+  }
+}
+
+/* Type selector needed: `.sh-root h2.sh-hero-title` in foundations.css sets
+   `margin: 48px 0 0`, which outranks a plain class here. */
+.hx-copy h2.sh-hero-title {
+  margin-top: 0;
+  max-width: 16ch;
+}
+
+.hx-copy .sh-p1 {
+  max-width: 42ch;
+}
+
+.hx-cta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(12px * var(--sh-read, 1));
+  margin-top: calc(28px * var(--sh-read, 1));
+}
+
+.hx-cta__primary,
+.hx-cta__secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(8px * var(--sh-read, 1));
+  padding: calc(11px * var(--sh-read, 1)) calc(20px * var(--sh-read, 1));
+  border-radius: 999px;
+  font-size: calc(15px * var(--sh-read, 1));
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  transition: transform 160ms ease, background-color 160ms ease;
+}
+
+.hx-cta__primary {
+  border: 2px solid #000;
+  background: #000;
+  color: #fff;
+}
+
+.hx-cta__secondary {
+  border: 2px solid #000;
+  background: #fff;
+  color: #141510;
+}
+
+.hx-cta__primary:hover,
+.hx-cta__secondary:hover {
+  transform: translateY(-2px);
+}
+
+.hx-orb {
+  position: relative;
+  justify-self: center;
+  aspect-ratio: 1;
+  /* Hero disc: CSS size is visual only — glyph count stays capped in layout. */
+  width: min(100%, 78vh, 680px);
+  border-radius: 50%;
+}
+
+.hx-orb__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  /* Sits above the copy's optical centre — tune with one number. Lives on the
+     canvas, not on .hx-orb: that element's transform belongs to the entrance
+     animation, which would overwrite anything set here. */
+  transform: translateY(var(--hx-orb-lift, -7%));
+  /* Soft gray-pastel disc — same family as the floor, no purple. */
+  background: radial-gradient(
+    circle at 50% 46%,
+    rgba(196, 198, 204, 0.55),
+    rgba(196, 198, 204, 0.12) 58%,
+    transparent 74%
+  );
+}
+
+@media (max-width: 900px) {
+  .hx-orb {
+    width: min(100%, 86vw);
+  }
+}

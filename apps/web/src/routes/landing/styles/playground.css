@@ -1,5 +1,5 @@
 /* ---- Terra playground (last screen) ----
-   The Memos replica played like a film: named cursors point at UI pieces and
+   The replica played like a film: named cursors point at UI pieces and
    the pieces restyle. The state machine lives in TerraLanding; everything
    visual here is a transition off its data-* attributes. */
 
@@ -153,7 +153,7 @@
   background: #ff7a45;
 }
 
-/* Hero screen = the 720px video slot.
+/* Hero screen = video slot.
    Outer mat: 720×412, #f3f3f3, 8px pad, 24px radius.
    Inner: aspect-video 704×396, 17px radius. */
 
@@ -163,8 +163,11 @@
   justify-content: center;
   width: var(--sh-hero-window, 720px);
   max-width: 100%;
-  height: 412px;
-  min-height: 412px;
+  /* The 412 mat is a ceiling, not a floor: on a short pinned viewport it
+     shrinks rather than pushing the card's bottom below the fold. */
+  height: 100%;
+  max-height: 412px;
+  min-height: 0;
   padding: 8px;
   margin-inline: auto;
   border-radius: 24px;
@@ -186,13 +189,15 @@
 }
 
 .sh-section--hero[data-dropped="1"] .sh-power-theater__screen {
-  width: 100%;
   max-width: none;
-  height: auto;
-  /* Room for the expanded film — taller + wider than the preview slot,
-     but held back from the card edges so the mat still reads. */
+  /* Room for the expanded film — wider than the preview slot, but held
+     back from the card edges so the mat still reads. */
   width: min(100%, 1220px);
-  min-height: 760px;
+  /* Fills the wrap, which fills the card's leftover height. */
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
   padding: 20px;
   border-radius: 28px;
 }
@@ -207,23 +212,27 @@
   display: flex;
   width: 100%;
   max-width: 704px;
-  height: 396px;
-  aspect-ratio: 16 / 9;
+  height: 100%;
+  max-height: 396px;
   transition:
     max-width 0.9s cubic-bezier(0.22, 1, 0.36, 1),
-    height 0.9s cubic-bezier(0.22, 1, 0.36, 1),
-    aspect-ratio 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+    max-height 0.9s cubic-bezier(0.22, 1, 0.36, 1),
+    height 0.9s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .sh-hero-screen.is-expanded {
   max-width: none;
+  /* The 396 pre-drop cap must lift, or the clip stays letterboxed inside a
+     mat that already grew around it. */
+  max-height: none;
   width: 100%;
-  height: 720px;
-  aspect-ratio: auto;
+  height: 100%;
+  min-height: 0;
 }
 
 .sh-hero-screen .sh-window {
   width: 100%;
+  height: 100%;
   min-height: 0;
   transition: border-radius 0.9s cubic-bezier(0.22, 1, 0.36, 1);
 }

@@ -98,7 +98,7 @@ export function HeroWorkspaceShell({
   // Real AskDock greeting copy for the current state.
   const greeting =
     phase === "map"
-      ? "Memos is mapped. Click any box for its purpose, tech and files — shift-click to ask about several at once."
+      ? "Terra is mapped. Click any box for its purpose, tech and files — shift-click to ask about several at once."
       : "Drop a repo and I'll answer questions about it — what talks to what, where a change lands, why a part exists.";
 
   return (
@@ -110,8 +110,8 @@ export function HeroWorkspaceShell({
         {/* is-preview collapses the rail so the replica gets the width. */}
         <div className={`sh-root sh-ws${preview ? " is-preview" : ""}`}>
           <WorkspaceHeader
-            slug="usememos/memos"
-            title={phase === "map" ? "Memos" : undefined}
+            slug="terra/terra"
+            title={phase === "map" ? "Terra" : undefined}
             busy={phase === "scan"}
           />
           <Sidebar
@@ -135,8 +135,8 @@ export function HeroWorkspaceShell({
               <>
                 {/* Mirrors MapStage's mapbar: stats, preview toggle, find box. */}
                 <div className="sh-ws__mapbar">
-                  <b>Memos</b>
-                  <em>A privacy-first note-taking service</em>
+                  <b>Terra</b>
+                  <em>One map of your repo</em>
                   <span className="sh-chip">6 components</span>
                   <span className="sh-chip">8 relationships</span>
                   <span className="sh-chip">Go · TypeScript</span>
@@ -170,7 +170,7 @@ export function HeroWorkspaceShell({
                     header={
                       <header className="sh-diagram__header">
                         <div className="sh-diagram__title">
-                          <div className="sh-diagram__repo">github.com/usememos/memos</div>
+                          <div className="sh-diagram__repo">github.com/terra/terra</div>
                           <div className="sh-diagram__meta">
                             {diagramNodes.length} parts · read straight from the code
                           </div>
