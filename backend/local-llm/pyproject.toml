@@ -1,0 +1,20 @@
+[project]
+name = "terra-local-llm"
+version = "0.1.0"
+description = "Terra's optional local OpenAI-compatible model server"
+requires-python = ">=3.11"
+dependencies = ["fastapi", "uvicorn", "pydantic>=2"]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff"]
+local = [
+    "llama-cpp-python>=0.3.34",
+    "huggingface_hub",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["terra_local_llm*"]

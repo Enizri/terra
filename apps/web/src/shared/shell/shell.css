@@ -1,0 +1,7 @@
+/* Workspace shell import order preserves the original cascade. */
+@import "./styles/layout.css";
+@import "./styles/sidebar.css";
+@import "./styles/stage.css";
+@import "./styles/ask.css";
+@import "./styles/responsive.css";
+@import "./styles/model-gate.css";

@@ -1,4 +1,4 @@
-# Style aligned with https://github.com/usememos/memos — gofmt + goimports, no custom column padding.
+# Terra Go style: gofmt + goimports, no custom column padding.
 version: "2"
 
 linters:
@@ -23,7 +23,7 @@ linters:
             - "**/internal/**"
             - "!**/internal/server/**"
           deny:
-            - pkg: github.com/Enizri/terra/internal/server
+            - pkg: github.com/Enizri/terra/backend/api/internal/server
               desc: only cmd/ may import internal/server (see ARCHITECTURE.md)
     staticcheck:
       checks:
@@ -71,4 +71,4 @@ formatters:
   settings:
     goimports:
       local-prefixes:
-        - github.com/Enizri/terra
+        - github.com/Enizri/terra/backend/api

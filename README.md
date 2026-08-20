@@ -15,7 +15,7 @@ User (CLI / HTTP)
         | POST /analyze  {scan, model}
         v
    Python analyzer (FastAPI, :8010)
-   agent tasks (architecture, …), validate, retry
+   analyzer tasks (architecture, …), validate, retry
         |
         | OpenAI-compatible POST /v1/chat/completions
         v
@@ -32,7 +32,8 @@ so a laptop HF server, vLLM, or a hosted provider are drop-in replacements.
 
 `ARCHITECTURE.md` has the folder maps, the import rules between them, and what
 to add for a new product under this repo. See `CONTRIBUTING.md` for where new
-feature code goes, `make check`, and PR expectations.
+feature code goes, `make check`, and PR expectations — branch from **`staging`**
+and open PRs into **`staging`** (not `main`).
 
 ## Quickstart
 
@@ -48,7 +49,7 @@ make dev
 # backend only (no web): make dev-api
 
 # then, in another terminal:
-go run ./cmd/terra map https://github.com/usememos/memos -o memos.map.json
+(cd backend/api && go run ./cmd/terra map https://github.com/usememos/memos -o ../../memos.map.json)
 # or hit the HTTP API:
 curl -X POST localhost:8080/analyze -d '{"repo_url":"https://github.com/usememos/memos"}'
 curl localhost:8080/analyses
@@ -122,7 +123,7 @@ Supports `package.json` frontends only; runfile/Go-only repos need `make dev`
 | `make down` | Docker Compose: stop and remove containers |
 | `make check` | Fixtures + Go/Python/web tests + lint (CI entry point) |
 | `make test` | Fixtures + Go/Python/web tests |
-| `make sync-fixtures` | Copy `case-studies/memos.map.json` → `web/src/data/` |
+| `make sync-fixtures` | Copy `case-studies/memos.map.json` → `apps/web/src/data/` |
 | `terra scan <url>` | Clone + deterministic scan, JSON to stdout |
 | `terra map <url>` | Scan, ask the analyzer for a map, store in `terra.db` |
 | `terra serve` | HTTP API: `POST /jobs/probe`, `POST /jobs/analyze`, `GET /models`, `GET /host/capabilities`, `GET /analyses`, `POST /preview`, `POST /ask`, `GET /files` |
@@ -167,7 +168,7 @@ POST /jobs/analyze {repo_url, probe_id, model_id, api_key?}
 ```
 
 - **Catalog** — `GET /models` (open, no token) is a static allowlist shipped in
-  `internal/catalog`: local Hugging Face weights and curated remote
+  `backend/api/internal/catalog`: local Hugging Face weights and curated remote
   OpenAI-compatible endpoints. IDs are provisional; the shape is not.
 - **Host fit** — `GET /host/capabilities` (open) reports this machine's RAM and
   accelerator. Local models that cannot fit stay visible but disabled.
@@ -194,7 +195,7 @@ than that, analyze rescans and says so.
 |---|---|
 | `GET /healthz` | Status, model, whether the LLM `/v1/models` probe succeeded |
 | `POST /analyze` | Architecture map (Go wire contract) |
-| `GET /tasks` | Registered agent tasks |
+| `GET /tasks` | Registered analyzer tasks |
 | `POST /tasks/{name}` | Run a named task (`architecture`, …) |
 
 `POST /analyze` and `POST /tasks/qa` accept optional `base_url` and `api_key`
@@ -213,22 +214,22 @@ Local model sidecar (`make run-llm`, port 8020):
 make check              # fixtures + Go + Python + web + lint (CI entry point)
 make test               # fixtures + Go + Python + web (no lint)
 make test-integration   # opt-in live suites (needs TERRA_INTEGRATION=1)
-make sync-fixtures      # copy case-studies/memos.map.json → web/src/data/
+make sync-fixtures      # copy case-studies/memos.map.json → apps/web/src/data/
 ```
 
 | Suite | Location | Default command |
 |---|---|---|
-| Go unit/integration | `internal/*/*_test.go` (colocated) | `make test-go` |
-| Python | `analyzer/tests/` | `make test-py` (excludes `@pytest.mark.slow`) |
-| Web logic | `web/src/**/*.test.ts` | `make test-web` (`node --test`) |
-| Web components | `web/src/**/*.test.tsx` | part of `make test-web` (vitest) |
-| Fixture sync | `case-studies/` ↔ `web/src/data/` | `make test-fixtures` |
-| Live GitHub | `internal/scan/live_test.go` | `TERRA_INTEGRATION=1 make test-integration` |
-| Live LLM | `analyzer/tests/test_slow_llm.py` | same (`TERRA_SLOW=1` still works alone) |
+| Go unit/integration | `backend/api/internal/*/*_test.go` (colocated) | `make test-go` |
+| Python | `backend/analyzer/tests/` | `make test-py` (excludes `@pytest.mark.slow`) |
+| Web logic | `apps/web/src/**/*.test.ts` | `make test-web` (`node --test`) |
+| Web components | `apps/web/src/**/*.test.tsx` | part of `make test-web` (vitest) |
+| Fixture sync | `case-studies/` ↔ `apps/web/src/data/` | `make test-fixtures` |
+| Live GitHub | `backend/api/internal/scan/live_test.go` | `TERRA_INTEGRATION=1 make test-integration` |
+| Live LLM | `backend/analyzer/tests/test_slow_llm.py` | same (`TERRA_SLOW=1` still works alone) |
 
 The wire contract between Go and Python is the draft JSON in
-`analyzer/terra_analyzer/models.py` mirrored by `internal/analysis/types.go`;
+`backend/analyzer/terra_analyzer/contracts/models.py` mirrored by `backend/api/internal/analysis/types.go`;
 the enums and model JSON schema live only in
-`analyzer/terra_analyzer/tasks/architecture/schema.py`.
+`backend/analyzer/terra_analyzer/tasks/architecture/schema.py`.
 `case-studies/memos.map.json` is the golden answer key and is checked by
-`analyzer/tests/test_app.py` and `internal/analysis/contract_test.go`.
+`backend/analyzer/tests/test_app.py` and `backend/api/internal/analysis/contract_test.go`.

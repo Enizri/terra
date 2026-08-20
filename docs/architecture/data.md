@@ -17,11 +17,11 @@ Plus `schema_migrations (version, name, applied_at)`.
 
 Legacy databases with a `projects` table (no `schema_migrations`) are
 bootstrapped and migrated in place — row IDs, URLs, commits, and maps are
-preserved. Fixture: `internal/store/testdata/legacy_projects.db`.
+preserved. Fixture: `backend/api/internal/store/testdata/legacy_projects.db`.
 
 ## What lives in `map_json`
 
-The full Architecture Map (`contracts/analysis-map/v1`): project metadata,
+The full Architecture Map (`packages/contracts/analysis-map/v1`): project metadata,
 components, relationships, suggested questions. Components and relationships
 are **not** normalized into separate tables.
 

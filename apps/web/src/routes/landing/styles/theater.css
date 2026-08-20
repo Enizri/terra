@@ -1,0 +1,1039 @@
+/* ---- architecture diagram (hero drop + Map section) ----
+   A left→right flow on a dark architecture canvas: the app people touch, a boxed
+   group of the things that do the work, and where it all gets remembered. */
+
+/* With a toolbar the window is a positioned box whose height is set by chrome:
+   the diagram's `height: 100%` resolves to auto and the canvas collapses. Fill
+   by flex instead, and inset past the absolutely-positioned bar and zoom pill. */
+
+.sh-window:not(.sh-window--bare) > .sh-diagram {
+  flex: 1;
+  align-self: stretch;
+  min-height: 0;
+  padding-top: 60px;
+  padding-bottom: 54px;
+}
+
+/* `.sh-tile` centers itself with auto margins; in the header it belongs in the
+   left group next to the repo title (the badge that balanced it is gone). */
+
+.sh-diagram__header .sh-tile {
+  margin: 0;
+}
+
+.sh-tile--diagram-hub {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  border-radius: 9px;
+  flex: none;
+  background: #23262c;
+  border: 1px solid var(--dg-border);
+  box-shadow: none;
+}
+
+.sh-tile--diagram-hub.sh-tile--github::before {
+  border-radius: 8px;
+}
+
+.sh-tile--diagram-hub .sh-tile__github {
+  width: 19px;
+  height: 19px;
+}
+
+/* ---- canvas ---- */
+
+/* The content layer RepoDiagram scales down when a column outgrows the canvas.
+   `padding: inherit` keeps the flow inside the same padding box it had as a
+   direct child, so the measured offsets don't move. */
+
+/* ---- group box ---- */
+
+/* ---- node ---- */
+
+/* The tech tile: brand colours arrive inline from TechIcon. */
+
+/* Railway's attached-volume row: the card's evidence path lives in a footer
+   sub-row under its own rule. Always visible — static card heights keep the
+   measured arrows honest. */
+
+/* ---- connections ---- */
+
+/* Streak of light running along a lit wire, source → target. Dash lengths are
+   user units, so on a short route it reads as one pulse rather than a train. */
+
+/* Focus / dim / lit state rules moved to shared/styles/ui.css — RepoDiagram is
+   shared, so its interaction states must not live in a route sheet. */
+
+/* ---- legend ---- */
+
+/* ---- stacked fallback ---- */
+
+@media (max-width: 767px) {
+/* A down-chevron stands in for the arrows the stacked layout drops. */
+}
+
+/* ---- theater ---- */
+
+.sh-theater {
+  /* Portalled to <body>, outside .sh-root — redeclare the vars it needs. */
+  --color-tint: #0077ff;
+  --sh-window: #fafafa;
+  --sh-muted: #525252;
+  --sh-muted-2: #737373;
+  --sh-border: rgba(0, 0, 0, 0.08);
+  /* Nav/glyph star: same path, stroked so the spokes read thicker at small sizes. */
+  --sh-star-mask-thick:
+    url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 21.397 23.333'%3E%3Cpath d='M 21.397 6.601 L 21.397 6.601 M 20.498 5.066 L 21.397 6.601 L 13.749 11.458 C 13.587 11.551 13.587 11.782 13.749 11.874 L 21.397 16.732 L 20.498 18.268 L 12.495 14.11 C 12.333 14.017 12.13 14.133 12.13 14.318 L 11.598 23.333 L 9.799 23.333 L 9.521 16.357 C 9.521 16.332 9.521 16.307 9.521 16.28 C 9.521 14.922 10.812 13.505 11.135 13.151 L 8.876 14.318 L 8.877 14.326 L 0.899 18.268 L 0 16.732 L 7.707 12.108 C 7.869 12.016 7.869 11.785 7.707 11.692 L 0 6.601 L 0.899 5.066 L 8.902 9.223 C 9.064 9.316 9.267 9.2 9.267 9.016 L 9.8 0 L 11.598 0 L 12.19 9.074 C 12.19 9.259 12.392 9.374 12.555 9.282 Z' fill='%23000' stroke='%23000' stroke-width='0.9' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --sh-star-mask:
+    url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-0.4 -0.4 22.197 24.133'%3E%3Cpath d='M 20.768 5.527 L 21.127 6.141 L 13.749 11.458 C 13.587 11.551 13.587 11.782 13.749 11.874 L 21.127 17.193 L 20.768 17.807 L 12.495 14.11 C 12.333 14.017 12.13 14.133 12.13 14.318 L 11.058 23.333 L 10.339 23.333 L 9.521 16.357 C 9.521 16.332 9.521 16.307 9.521 16.28 C 9.521 14.922 10.812 13.505 11.135 13.151 L 8.876 14.318 L 8.877 14.326 L 0.629 17.807 L 0.27 17.193 L 7.707 12.108 C 7.869 12.016 7.869 11.785 7.707 11.692 L 0.27 6.141 L 0.629 5.527 L 8.902 9.223 C 9.064 9.316 9.267 9.2 9.267 9.016 L 10.339 0 L 11.059 0 L 12.19 9.074 C 12.19 9.259 12.392 9.374 12.555 9.282 Z' fill='%23000' stroke='%23000' stroke-width='0.7' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E");
+  --sh-terra-wash:
+    radial-gradient(circle at 22% 28%, rgba(232, 64, 13, 0.95), transparent 55%),
+    radial-gradient(circle at 78% 72%, rgba(208, 178, 255, 1), transparent 58%),
+    radial-gradient(circle at 58% 38%, rgba(255, 238, 216, 0.9), transparent 50%),
+    linear-gradient(160deg, #e8400d 0%, #d0b2ff 55%, #ac7eff 100%);
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+}
+
+.sh-theater--windowed {
+  background: rgba(24, 17, 10, 0.5);
+}
+
+.sh-theater--full {
+  background: var(--ivory);
+}
+
+.sh-theater__panel {
+  position: relative;
+  overflow: hidden;
+  background: var(--ivory);
+  container-type: size;
+  width: min(1200px, 94vw);
+  height: 90vh;
+  border-radius: 20px;
+  box-shadow:
+    0 32px 90px rgba(36, 26, 16, 0.35),
+    0 0 1px #00000040;
+}
+
+.sh-theater--full .sh-theater__panel {
+  width: 100vw;
+  height: 100vh;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* Inline: the panel covers the whole diagram card at its full size — header,
+   canvas and legend included — rather than standing in for the canvas. */
+
+.sh-theater__panel--inline {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  width: auto;
+  height: auto;
+  border-radius: 16px;
+  box-shadow: none;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* The panel owns the frame while open: the window's own toolbar and zoom pill
+   would otherwise collide with the panel's chips. */
+
+.sh-window:has(.sh-theater__panel--inline) > .sh-window__bar,
+.sh-window:has(.sh-theater__panel--inline) > .sh-zoom {
+  display: none;
+}
+
+/* Edge-to-edge: project owns the card; chrome/dock float on top. */
+
+.sh-theater__panel--inline .sh-replica {
+  padding: 0;
+}
+
+.sh-theater__panel--inline .sh-replica--live {
+  padding: 0;
+  overflow: hidden;
+}
+
+/* Implement explore — designed app shell fills the stage. */
+
+.sh-theater__panel--inline .sh-replica--explore {
+  padding: 0;
+  overflow: hidden;
+  background: #1a1b1e;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+.sh-theater__panel {
+    transition:
+      width 0.32s cubic-bezier(0.16, 1, 0.3, 1),
+      height 0.32s cubic-bezier(0.16, 1, 0.3, 1),
+      border-radius 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+
+/* Edge-to-edge stage: the demo owns the whole panel, chrome floats on top. */
+
+.sh-theater__stage {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--ivory);
+}
+
+.sh-theater__chrome {
+  position: absolute;
+  inset: 14px 14px auto 14px;
+  z-index: 2;
+  display: flex;
+  align-items: flex-start;
+  /* Label chip only, parked top-right where the "Map ready" badge used to sit. */
+  justify-content: flex-end;
+  gap: 8px;
+  /* Only the chips take clicks — the stage (live iframe) keeps the pointer. */
+  pointer-events: none;
+}
+
+.sh-theater__chrome > * {
+  pointer-events: auto;
+}
+
+.sh-theater__chrome .sh-chip {
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 2px 12px rgba(36, 26, 16, 0.16);
+}
+
+.sh-theater__chrome button.sh-chip {
+  cursor: pointer;
+}
+
+.sh-theater__chrome .sh-chip--tint {
+  background: var(--color-tint);
+}
+
+.sh-theater__label {
+  min-width: 0;
+}
+
+.sh-theater__hint {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  color: #8a8378;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sh-theater__close,
+.sh-theater__expand {
+  line-height: 1;
+}
+
+/* ---- replica ---- */
+
+.sh-replica {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  /* Top clears the floating chrome, bottom clears the chat dock. */
+  padding: 76px 28px 132px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--ink);
+}
+
+/* Designed Explore: dark shell matching the icon rail. */
+
+.sh-replica .rp-shell {
+  display: grid;
+  grid-template-columns: 64px 240px minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+  background: #1a1b1e;
+  color: #e6e7ea;
+}
+
+/* Home demo: rail + feed only (no explore sidebar). */
+.sh-replica .rp-shell--home {
+  grid-template-columns: 64px minmax(0, 1fr);
+}
+
+.sh-replica .rp-home {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 20px 28px 96px;
+  background: #1a1b1e;
+}
+
+.sh-replica .rp-home__title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.sh-replica .rp-home__title b {
+  font-size: 18px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.sh-replica .rp-home__title span {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.sh-replica .rp-home__composer {
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  gap: 12px;
+  align-items: start;
+  padding: 14px;
+  border-radius: 14px;
+  background: #222327;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.sh-replica .rp-home__composer textarea {
+  width: 100%;
+  min-height: 64px;
+  resize: none;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #e6e7ea;
+  font: inherit;
+  line-height: 1.45;
+}
+
+.sh-replica .rp-home__composer textarea::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.sh-replica .rp-home__composer .rp-btn {
+  align-self: end;
+}
+
+/* Board wraps composer + feed so the film can select the whole card stack. */
+
+.sh-replica .rp-home__board {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sh-replica .rp-home__feed {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Dark icon rail — matches the live app sidebar. */
+
+.sh-replica .rp-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 8px 18px;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  background: #1a1b1e;
+  color: #b8bcc4;
+}
+
+.sh-replica .rp-rail__top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.sh-replica .rp-rail__logo {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  margin-bottom: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: #2a2b30;
+}
+
+.sh-replica .rp-rail__logo img {
+  width: 36px;
+  height: 36px;
+  object-fit: cover;
+  border-radius: 999px;
+  display: block;
+}
+
+.sh-replica .rp-rail__item {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  border: 1px solid transparent;
+  color: #b8bcc4;
+}
+
+.sh-replica .rp-rail__item svg {
+  width: 22px;
+  height: 22px;
+}
+
+.sh-replica .rp-rail__item.is-active {
+  color: #f2f3f5;
+  background: #2f3136;
+  border-color: rgba(255, 255, 255, 0.04);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.28);
+}
+
+.sh-replica .rp-rail__user {
+  margin-top: auto;
+}
+
+.sh-replica .rp-explorer {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 20px 14px 96px;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  background: #1a1b1e;
+  color: #e6e7ea;
+}
+
+.sh-replica .rp-explorer__search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #2a2b30;
+  color: #8b909a;
+}
+
+.sh-replica .rp-explorer__search svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.sh-replica .rp-explorer__search input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  color: #e6e7ea;
+}
+
+.sh-replica .rp-explorer__search input::placeholder {
+  color: #7a808c;
+}
+
+.sh-replica .rp-explorer__stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.sh-replica .rp-explorer__stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
+  border-radius: 10px;
+  background: #2a2b30;
+}
+
+.sh-replica .rp-explorer__stat b {
+  font-size: 15px;
+  letter-spacing: -0.02em;
+  color: #f2f3f5;
+}
+
+.sh-replica .rp-explorer__stat span {
+  font-size: 11px;
+  color: #8b909a;
+}
+
+.sh-replica .rp-explorer__heat {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+
+.sh-replica .rp-explorer__heat i {
+  aspect-ratio: 1;
+  border-radius: 3px;
+  background: #66bb6a;
+}
+
+.sh-replica .rp-explorer__section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sh-replica .rp-explorer__label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #8b909a;
+}
+
+.sh-replica .rp-explorer__section ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sh-replica .rp-explorer__section li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #c8ccd4;
+}
+
+.sh-replica .rp-explorer__section li:hover {
+  background: #2f3136;
+}
+
+.sh-replica .rp-explorer__section em {
+  font-style: normal;
+  font-size: 11px;
+  color: #7a808c;
+}
+
+.sh-replica .rp-feed {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 20px 120px;
+  background: #1a1b1e;
+}
+
+.sh-replica .rp-memo {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #2a2b30;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
+  color: #e6e7ea;
+}
+
+.sh-replica .rp-memo > header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sh-replica .rp-memo > header > div {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.sh-replica .rp-memo > header b {
+  font-size: 13px;
+  letter-spacing: -0.01em;
+  color: #f2f3f5;
+}
+
+.sh-replica .rp-memo > header time {
+  font-size: 11px;
+  color: #8b909a;
+}
+
+.sh-replica .rp-memo__vis {
+  margin-left: auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 10px;
+  color: #8b909a;
+}
+
+.sh-replica .rp-memo p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  letter-spacing: -0.01em;
+  color: #e6e7ea;
+}
+
+.sh-replica .rp-memo footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sh-replica .rp-shell .rp-avatar {
+  background: #3a3c44;
+}
+
+.sh-replica .rp-shell .rp-tag {
+  background: rgba(255, 255, 255, 0.06);
+  color: #b8bcc4;
+}
+
+@media (max-width: 900px) {
+.sh-replica .rp-shell:not(.rp-shell--home) {
+    grid-template-columns: 56px minmax(0, 1fr);
+  }
+
+.sh-replica .rp-shell--home {
+    grid-template-columns: 56px minmax(0, 1fr);
+  }
+
+.sh-replica .rp-explorer {
+    display: none;
+  }
+}
+
+.sh-replica .rp-app,
+.sh-replica .rp-dash {
+  max-width: 640px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Theater: mock content fills the stage (no centered 640 column). */
+
+.sh-theater__stage .sh-replica:not(.sh-replica--live):not(.sh-replica--explore) {
+  padding: 16px;
+}
+
+.sh-theater__stage .sh-replica--explore {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.sh-theater__stage .sh-replica .rp-app,
+.sh-theater__stage .sh-replica .rp-dash {
+  max-width: none;
+}
+
+.sh-replica .rp-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.sh-replica .rp-head__sub {
+  margin-left: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  color: #8a8378;
+}
+
+.sh-replica .rp-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--yellow), #ff8a3d);
+  flex-shrink: 0;
+}
+
+.sh-replica img.rp-avatar {
+  display: block;
+  object-fit: cover;
+}
+
+.sh-replica .rp-avatar--lg {
+  width: 40px;
+  height: 40px;
+  margin: 0 auto;
+}
+
+.sh-replica .rp-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.sh-replica .rp-composer textarea {
+  border: none;
+  outline: none;
+  resize: none;
+  min-height: 56px;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+}
+
+.sh-replica .rp-btn {
+  align-self: flex-end;
+  padding: 7px 16px;
+  border: none;
+  border-radius: 999px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sh-replica .rp-btn--wide {
+  align-self: stretch;
+  padding: 10px 16px;
+}
+
+.sh-replica .rp-btn--ghost {
+  background: #fff;
+  color: var(--ink);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.sh-replica .rp-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sh-replica .rp-note {
+  padding: 14px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.sh-replica .rp-note p {
+  margin: 0 0 10px;
+  line-height: 1.5;
+}
+
+.sh-replica .rp-note footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sh-replica .rp-note time {
+  margin-left: auto;
+  font-size: 11px;
+  color: #8a8378;
+}
+
+.sh-replica .rp-tag {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #f4efe6;
+  font-size: 11px;
+  font-weight: 600;
+  color: #7a6c52;
+}
+
+.sh-replica .rp-auth {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100%;
+  padding: 24px 0;
+}
+
+.sh-replica .rp-auth__card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 320px;
+  padding: 28px;
+  border-radius: 16px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 8px 30px rgba(36, 26, 16, 0.08);
+}
+
+.sh-replica .rp-auth__card h4 {
+  margin: 0;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 20px;
+}
+
+.sh-replica .rp-auth__card label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #7a6c52;
+}
+
+.sh-replica .rp-auth__card input {
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  font: inherit;
+  font-weight: 400;
+  color: var(--ink);
+  background: #fff;
+  outline: none;
+}
+
+.sh-replica .rp-auth__card input:focus {
+  border-color: var(--yellow);
+}
+
+.sh-replica .rp-stats {
+  display: flex;
+  gap: 10px;
+}
+
+.sh-replica .rp-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.sh-replica .rp-stat b {
+  font-size: 20px;
+  font-family: var(--font-display);
+}
+
+.sh-replica .rp-stat span {
+  font-size: 11px;
+  color: #8a8378;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.sh-replica .rp-table {
+  width: 100%;
+  border-collapse: collapse;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.sh-replica .rp-table th,
+.sh-replica .rp-table td {
+  padding: 10px 14px;
+  text-align: left;
+  font-size: 13px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.sh-replica .rp-table th {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #8a8378;
+}
+
+.sh-replica .rp-table code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+
+/* ---- selection ---- */
+
+.sh-replica [data-sel] {
+  cursor: pointer;
+}
+
+/* Pointer-tracked hover (one element) — not CSS :hover, which lights ancestors. */
+.sh-replica [data-sel].is-hover {
+  outline: 2px solid var(--yellow);
+  outline-offset: 3px;
+}
+
+/* Same hover color stays on Terra's focused picks (up to 3). */
+
+.sh-replica [data-sel].is-selected {
+  outline: 2px solid var(--yellow);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 6px rgba(255, 197, 61, 0.22);
+}
+
+.sh-replica [data-sel].is-selected.is-hover {
+  outline: 2px solid var(--yellow);
+  outline-offset: 3px;
+}
+
+/* ---- terra chat dock — floating editor chrome ---- */
+
+.sh-theater__dock {
+  position: absolute;
+  left: 18px;
+  bottom: 56px;
+  z-index: 3;
+  /* Compositor layer: drag is translate3d only — never left/top. */
+  transform: translate3d(0, 0, 0);
+  contain: layout style;
+  transition: opacity 0.18s ease;
+}
+
+.sh-theater__dock.is-dragging {
+  will-change: transform;
+  transition: none;
+  z-index: 4;
+}
+
+/* Opaque dark shell — never backdrop-filter over live UI; it smears the frame. */
+
+@media (prefers-reduced-motion: no-preference) {
+.sh-theater__dock.is-dragging .sh-terra-chat {
+    transition: none;
+  }
+}
+
+/* Title bar — 28px traffic lights + title */
+
+.sh-theater__dock .sh-terra-chat__head:active,
+.sh-theater__dock.is-dragging .sh-terra-chat__head {
+  cursor: grabbing;
+}
+
+/* Thinking — brand wash gradients (coral → lilac), shimmer while waiting */
+
+/* Design options — stacked in the chat, all visible (no chip scroll). */
+
+/* When design options are showing, keep the message thread compact so the
+   full option list stays on screen without its own scrollbar. */
+
+/* Read-only prompt — free typing is off; idle streams suggestion animation. */
+
+@media (max-width: 640px) {
+.sh-theater__dock {
+    left: 12px;
+    right: 12px;
+    bottom: 48px;
+  }
+}
+
+/* ---- scripted transforms ---- */
+
+.sh-replica .tf-space {
+  padding: 24px !important;
+  gap: 16px !important;
+}
+
+.sh-replica .tf-accent {
+  background: #fff9ea !important;
+  border-color: var(--yellow) !important;
+}
+
+.sh-replica .tf-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 26px rgba(36, 26, 16, 0.14);
+}
+
+.sh-replica .tf-hover:active {
+  transform: translateY(0);
+}
+
+.sh-replica .tf-type {
+  font-size: 16px !important;
+}
+
+.sh-replica .tf-type b,
+.sh-replica .tf-type h4,
+.sh-replica .tf-type p {
+  font-family: var(--font-display) !important;
+  font-size: 1.15em;
+}
+
+.sh-replica .tf-round {
+  border-radius: 20px !important;
+}
+
+.sh-replica .tf-polish {
+  padding: 20px !important;
+  border-radius: 16px !important;
+  box-shadow: 0 8px 24px rgba(36, 26, 16, 0.1) !important;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+.sh-replica [data-sel] {
+    transition:
+      padding 0.45s,
+      gap 0.45s,
+      background 0.45s,
+      color 0.45s,
+      border-color 0.45s,
+      border-radius 0.45s,
+      box-shadow 0.45s,
+      font-size 0.45s,
+      transform 0.45s;
+    transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+.sh-replica .tf-pulse {
+    animation: tf-pulse 0.6s ease-out;
+  }
+}
+
+@keyframes tf-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 197, 61, 0.55);
+  }
+  100% {
+    box-shadow: 0 0 0 18px rgba(255, 197, 61, 0);
+  }
+}
+
+/* ---------- live preview iframe ---------- */
+
+.sh-replica--live {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* Inline panel is shorter than 420px — don't force overflow. */
+
+.sh-theater__panel--inline .sh-live {
+  min-height: 0;
+}

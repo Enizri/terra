@@ -1,0 +1,462 @@
+/* ---- overlays / panels ---- */
+
+.sh-panel {
+  position: absolute;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.92);
+  /* Lighter blur — same frosted look, less scroll compositing cost. */
+  backdrop-filter: blur(8px) saturate(160%);
+  -webkit-backdrop-filter: blur(8px) saturate(160%);
+  border-radius: 16px;
+  box-shadow:
+    0 0 1px rgba(0, 0, 0, 0.25),
+    0 4px 16px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  min-width: 280px;
+  max-width: 320px;
+  transform: translateZ(0);
+}
+
+.sh-panel--share {
+  right: -8px;
+  top: auto;
+  bottom: auto;
+  width: min(320px, 90%);
+}
+
+.sh-panel--storage {
+  left: -8px;
+  bottom: -32px;
+  top: auto;
+  width: min(320px, 90%);
+  height: fit-content;
+}
+
+@media (min-width: 640px) {
+.sh-panel--share {
+    right: 16px;
+    top: 53px;
+  }
+
+.sh-panel--storage {
+    left: 32px;
+    top: 50%;
+    bottom: auto;
+  }
+}
+
+.sh-panel__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  color: #a3a3a3;
+  font-size: 14px;
+}
+
+.sh-panel__head b {
+  flex: 1;
+  font-weight: 700;
+  color: #171717;
+}
+
+.sh-panel__body {
+  padding: 16px;
+}
+
+.sh-field {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: #a3a3a3;
+  font-size: 14px;
+  margin-bottom: 12px;
+  background: rgba(245, 245, 245, 0.7);
+}
+
+.sh-people-label {
+  font-weight: 500;
+  color: #525252;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+/* Intuitive preview overlay — large centered panel */
+
+.sh-preview-shell {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 30;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  cursor: grab;
+  /* Full-stage invisible shell must not swallow clicks meant for the
+     diagram cards underneath — only the visible panel is interactive. */
+  pointer-events: none;
+}
+
+.sh-preview-shell .sh-preview-panel {
+  pointer-events: auto;
+}
+
+@media (min-width: 640px) {
+.sh-preview-shell {
+    width: 540px;
+  }
+}
+
+.sh-preview-panel {
+  position: relative;
+  left: auto;
+  top: auto;
+  width: 100%;
+  /* Sized by its citation list, not by the stage: the cloned panel held a
+     full-bleed screenshot, this one holds four rows. */
+  height: auto;
+  max-height: 100%;
+  max-width: none;
+  min-width: 0;
+}
+
+.sh-preview-panel__body {
+  flex: 1;
+  min-height: 0;
+  padding: 8px;
+}
+
+/* Smart command palette */
+
+.sh-cmd {
+  position: relative;
+  z-index: 20;
+  margin: 0 auto;
+  width: 100%;
+  max-width: 540px;
+  display: flex;
+  flex-direction: column-reverse;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow:
+    0 0 1px rgba(0, 0, 0, 0.25),
+    0 8px 28px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.sh-cmd__body {
+  padding: 4px;
+}
+
+.sh-menu__label {
+  display: flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #a3a3a3;
+}
+
+.sh-menu__item {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 8px;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #171717;
+}
+
+.sh-menu__sep {
+  height: 1px;
+  margin: 4px 0;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.sh-ask {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 45px;
+  padding: 0 12px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  color: #a3a3a3;
+  font-size: 14px;
+}
+
+.sh-smart {
+  position: relative;
+  height: 350px;
+  margin: 0 auto 96px;
+  max-width: 1180px;
+}
+
+.sh-smart__window {
+  display: none;
+  pointer-events: none;
+  position: absolute;
+  inset: auto 0 -32px 0;
+  z-index: 0;
+  height: 700px;
+  margin: 0 auto;
+  width: 100%;
+  max-width: 1180px;
+}
+
+@media (min-width: 640px) {
+.sh-smart__window {
+    display: flex;
+  }
+}
+
+.sh-smart__window .sh-window-wrap {
+  width: 100%;
+}
+
+.sh-smart__fade {
+  position: absolute;
+  inset: -8px;
+  z-index: 10;
+  background: linear-gradient(to bottom, #f5f5f5 30%, transparent);
+  pointer-events: none;
+}
+
+.sh-smart__cmd-wrap {
+  position: relative;
+  z-index: 20;
+  display: flex;
+  height: 100%;
+  align-items: flex-end;
+  margin: 96px 0 48px;
+}
+
+@media (min-width: 640px) {
+.sh-smart__cmd-wrap {
+    margin-bottom: 48px;
+  }
+}
+
+.sh-stage--safe {
+  max-width: 1180px;
+  margin: 72px auto;
+}
+
+.sh-person {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.sh-person img {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  object-fit: cover;
+}
+
+.sh-person b {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.sh-person small {
+  display: block;
+  font-size: 12px;
+  color: #737373;
+  line-height: 1.2;
+}
+
+.sh-person__perm {
+  margin-left: auto;
+  font-size: 12px;
+  color: #525252;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  white-space: nowrap;
+}
+
+.sh-source {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 0;
+  background: none;
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.sh-source__icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: #f5f5f5;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.sh-source__radio {
+  margin-left: auto;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  border: 1.5px solid #d4d4d4;
+}
+
+.sh-source__radio--on {
+  border-color: var(--color-tint);
+  background: radial-gradient(circle at center, var(--color-tint) 45%, transparent 48%);
+}
+
+.sh-source b {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.sh-source small {
+  display: block;
+  font-size: 12px;
+  color: #737373;
+}
+
+.sh-logos {
+  margin: 64px auto 0;
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  flex-wrap: wrap;
+  color: #171717;
+  list-style: none;
+  padding: 0;
+}
+
+.sh-logos li {
+  /* Inline (not flex) SVGs so the row keeps the baseline leading below each
+     mark, which is what sets the row's height in the reference layout. */
+  display: block;
+  padding: 0 24px;
+  opacity: 0.85;
+}
+
+@media (min-width: 640px) {
+.sh-logos li {
+    padding: 0 48px;
+  }
+}
+
+/* ---- final ---- */
+
+.sh-final {
+  margin: 56px auto;
+  /* 36rem of content plus the section's 16px gutters */
+  max-width: calc(36rem + 32px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 0 16px;
+}
+
+@media (min-width: 640px) {
+.sh-final {
+    margin: 72px auto;
+  }
+}
+
+.sh-final__glyph {
+  position: relative;
+  width: 120px;
+  height: 130px;
+  margin-bottom: 8px;
+}
+
+@media (min-width: 640px) {
+.sh-final__glyph {
+    width: 140px;
+    height: 152px;
+  }
+}
+
+.sh-final h2 {
+  margin: calc(16px * var(--sh-read, 1)) 0;
+  font-size: clamp(
+    calc(40px * var(--sh-read, 1)),
+    calc(6vw * var(--sh-read, 1)),
+    calc(62px * var(--sh-read, 1))
+  );
+  line-height: 1;
+  letter-spacing: -0.025em;
+}
+
+.sh-final h2 span {
+  display: inline-block;
+}
+
+.sh-footer-links {
+  margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 20px;
+  color: #525252;
+}
+
+.sh-footer-links div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* color helpers used by data */
+
+.bg-amber {
+  background: #f59e0b;
+}
+
+.bg-orange {
+  background: #f97316;
+}
+
+.bg-red {
+  background: #ef4444;
+}
+
+.bg-indigo {
+  background: #6366f1;
+}
+
+.text-amber {
+  color: #f59e0b;
+}
+
+.text-orange {
+  color: #f97316;
+}
+
+.text-red {
+  color: #ef4444;
+}
+
+.text-indigo {
+  color: #6366f1;
+}
+

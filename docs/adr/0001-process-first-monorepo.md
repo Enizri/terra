@@ -13,7 +13,7 @@ languages in one feature directory.
 ## Decision
 
 Keep one repository, three deployable processes, and organize *inside* each
-process by feature/module. Share vocabulary via root `contracts/` and
+process by feature/module. Share vocabulary via root `packages/contracts/` and
 `CONTEXT.md`.
 
 ## Consequences

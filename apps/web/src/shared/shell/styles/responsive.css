@@ -1,0 +1,26 @@
+/* ---- narrow ---- */
+
+@media (max-width: 1100px) {
+  .sh-ws {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
+  .sh-ws__rail {
+    display: none;
+  }
+
+  .sh-ws__dock {
+    border-left: 0;
+    border-top: 1px solid var(--sh-border);
+  }
+
+  .sh-ws__dock .sh-terra-chat,
+  .sh-ws__dock .sh-terra-chat--open {
+    height: 320px;
+  }
+}
+

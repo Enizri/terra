@@ -1,0 +1,1102 @@
+/* ---- window ---- */
+
+.sh-stage {
+  position: relative;
+  margin: 0 auto;
+  width: var(--sh-screen-width);
+  max-width: none;
+}
+
+/* Hero product — video slot: outer 720×412 gray mat, hangs under the copy. */
+
+.sh-section--hero .sh-stage--hero {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-top: 32px;
+  margin-bottom: 0;
+  width: 100%;
+  max-width: var(--sh-hero-window, 720px);
+  padding-inline: 0;
+  box-sizing: border-box;
+  /* Flight + pencil trail extend past the 720 mat — don't clip them. */
+  overflow: visible;
+  transition: max-width 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* The painting box never resizes; its padding does, so the film gets the deep
+   bottom mat as real layout height on drop. */
+.sh-section--hero[data-dropped="1"] .sh-power-theater.sh-hero-card {
+  padding-top: 16px;
+  padding-bottom: 24px;
+}
+
+/* Copy shrinks visually on drop and the film slides up into the slack. Both
+   are transforms — layout height never changes, so the scroll mapping that
+   drives the drag stays stable and scrolling back up un-drops cleanly. */
+.sh-section--hero .sh-copy--hero {
+  transition: transform 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.sh-section--hero[data-dropped="1"] .sh-copy--hero {
+  transform: scale(0.86);
+  transform-origin: top center;
+  /* The scale is visual only — claw back the 14% it frees so the film
+     actually receives the height, instead of it staying dead space. */
+  margin-bottom: -6%;
+}
+
+/* On drop the subtitle steps aside: its rows are the cheapest height to hand
+   to the film, and the headline still carries the claim. */
+.sh-section--hero .sh-copy--hero .sh-p1 {
+  overflow: hidden;
+  transition:
+    max-height 0.9s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.5s ease,
+    margin-top 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+  max-height: 12em;
+}
+
+.sh-section--hero[data-dropped="1"] .sh-copy--hero .sh-p1 {
+  max-height: 0;
+  margin-top: 0;
+  opacity: 0;
+}
+
+/* No lift on drop: the film now gets real layout height, so nudging it up
+   would only open a gap under it. */
+
+/* After the GitHub drop: open up so the workspace is readable. */
+.sh-section--hero[data-dropped="1"] .sh-stage--hero {
+  max-width: min(98%, 1480px);
+  margin-top: 8px;
+  margin-bottom: 0;
+  padding-inline: 16px;
+  /* Film height derives from the card's leftover space — one source of truth,
+     so browser zoom can't flip card and film onto different thresholds. */
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+}
+
+/* Always flex, both states: the mat's `height: 100%` needs a definite parent,
+   and pre-drop that parent is this wrap. Block-level here collapsed the
+   412 slot to its content height. */
+.sh-section--hero .sh-stage--hero > .sh-window-wrap {
+  display: flex;
+  flex: 1 1 auto;
+  align-self: stretch;
+  min-height: 0;
+}
+
+.sh-section--hero .sh-window {
+  min-height: 0;
+}
+
+/* Painting card: near-full-bleed, 40px corners.
+   Extra bottom padding grows the painting downward without lifting the copy. */
+
+.sh-power-theater.sh-hero-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: min(100%, 1560px);
+  max-width: none;
+  margin-inline: auto;
+  min-height: min(calc(80svh - 20px), 730px);
+  padding: 48px 0 72px;
+  border-radius: 26px;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+@media (min-width: 640px) {
+.sh-power-theater.sh-hero-card {
+    /* Deliberately taller than the viewport: the painting reads big, and the
+       extra height is reachable because the section unpins around y=700.
+       The svh term is NOT tied to --sh-read — the viewport does not shrink
+       with the reading scale, so scaling it here would be double-counting. */
+    min-height: min(calc(80svh - 108px), 1020px);
+    border-radius: 40px;
+    padding: 40px 0 110px;
+  }
+}
+
+@media (min-width: 1024px) {
+.sh-power-theater.sh-hero-card {
+    /* Bottom-weighted: leaves painting visible below the product frame. */
+    padding: 40px 0 140px;
+  }
+}
+
+.sh-power-theater.sh-hero-card .sh-power-theater__wallpaper {
+  /* Lower crop: brings the painting's foreground (lake + shore) into the card
+     so its bottom reads on the first screen instead of only the sky. */
+  object-position: center 62%;
+}
+
+.sh-stage--wide {
+  max-width: 1180px;
+  height: 640px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 56px auto;
+}
+
+@media (min-width: 640px) {
+.sh-stage--wide {
+    height: 760px;
+    margin: 72px auto;
+  }
+}
+
+/* Ops stage — near full-bleed card. Frame ratio matches ask-terra.mp4
+   (2330×1390) so the whole clip fills the card with no crop. */
+
+.sh-stage--ops {
+  width: 100%;
+  max-width: 1100px;
+  height: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  margin: 32px auto 56px;
+}
+
+@media (min-width: 640px) {
+.sh-stage--ops {
+    margin: 40px auto 72px;
+  }
+}
+
+/* Power stage — title + list on the left, hero-sized demo card on the right. */
+
+.sh-stage--power {
+  /* list rail (~420) + gap (~64) + hero screen width, capped by the section
+     canvas so the right card never clips against `.sh-section--power`. */
+  width: 100%;
+  max-width: none;
+  margin: 48px auto 0;
+  padding-inline: 0;
+}
+
+.sh-stage--power .sh-window {
+  min-height: 980px;
+}
+
+@media (min-width: 640px) {
+.sh-stage--power {
+    margin: 64px auto 0;
+  }
+}
+
+.sh-power-stage {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: clamp(20px, 2vw, 36px);
+  width: 100%;
+}
+
+.sh-power-rail {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 clamp(260px, 21vw, 340px);
+  gap: 20px;
+  min-width: 0;
+  padding-top: 8px;
+}
+
+
+.sh-power-stage > .sh-window-wrap {
+  flex: 1 1 auto;
+  min-width: 0;
+  /* Power card runs to the right edge of the canvas — no hero width cap. */
+  max-width: none;
+  margin-left: auto;
+}
+
+@media (max-width: 900px) {
+.sh-power-stage {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 28px;
+  }
+
+.sh-power-rail {
+    flex-basis: auto;
+  }
+
+.sh-power-stage > .sh-window-wrap {
+    max-width: none;
+    margin-left: 0;
+  }
+}
+
+/* Capability list — replaces the old bottom pill tabs. */
+
+.sh-power-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 4px 0;
+}
+
+.sh-power-list__item {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  filter: blur(2px);
+  opacity: 0.45;
+  transition:
+    filter 0.25s ease,
+    opacity 0.25s ease;
+}
+
+.sh-power-list__item:hover {
+  filter: blur(0.6px);
+  opacity: 0.75;
+}
+
+.sh-power-list__item.is-active {
+  filter: none;
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+.sh-power-list__item {
+    filter: none;
+    opacity: 0.4;
+  }
+
+.sh-power-list__item:hover {
+    filter: none;
+    opacity: 0.7;
+  }
+
+.sh-power-list__item.is-active {
+    filter: none;
+    opacity: 1;
+  }
+}
+
+.sh-power-list__btn {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 14px 18px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  font-size: clamp(22px, 2.6vw, 34px);
+  font-weight: 560;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+  color: #171717;
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.sh-power-list__item.is-active .sh-power-list__btn {
+  color: #141510;
+  background: color-mix(in oklab, #141510 8%, transparent);
+}
+
+.sh-power-list__btn:hover {
+  color: #141510;
+}
+
+.sh-power-list__caption {
+  margin: 0;
+  padding: 0 18px 12px;
+  overflow: hidden;
+}
+
+.sh-power-list__caption span {
+  display: block;
+  font-size: 15px;
+  line-height: 1.45;
+  color: #525252;
+  text-wrap: balance;
+}
+
+/* Second theater: scenic wallpaper fills the wide frame; screen matches
+   the hero (28px pad, full stage width, 720px window). */
+
+.sh-power-theater {
+  position: relative;
+  display: grid;
+  grid-template: 1fr / 1fr;
+  width: 100%;
+  border-radius: var(--sh-screen-radius);
+  overflow: hidden;
+  isolation: isolate;
+  background:
+    linear-gradient(
+      color-mix(in oklab, #edecec 5%, transparent),
+      color-mix(in oklab, #edecec 5%, transparent)
+    ),
+    linear-gradient(#1b1913, #1b1913);
+}
+
+.sh-power-theater::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  border-radius: inherit;
+  border: 1px solid rgba(237, 236, 236, 0.025);
+  pointer-events: none;
+}
+
+.sh-power-theater__wallpaper {
+  grid-area: 1 / 1;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  user-select: none;
+}
+
+.sh-power-theater__screen {
+  grid-area: 1 / 1;
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+  /* Match `.sh-hero-theater .sh-power-theater__screen`. */
+  padding: 28px;
+}
+
+@media (max-width: 720px) {
+.sh-power-theater__screen {
+    padding: 24px 14px;
+  }
+}
+
+/* Shared product window chrome inside the scenic frame (hero + power). */
+.sh-power-theater__screen .sh-window {
+  width: 100%;
+  border-radius: 10px;
+  box-shadow:
+    0 28px 70px rgba(0, 0, 0, 0.14),
+    0 14px 32px rgba(0, 0, 0, 0.1),
+    0 0 0 1px rgba(237, 236, 236, 0.1);
+}
+
+/* Power card: full hero width, no 1280 cap. */
+.sh-section--power .sh-power-theater__screen .sh-window {
+  max-width: none;
+  min-height: 980px;
+}
+
+/* Ops screen inside the Power of Terra window: dark diagram shell, header
+   on top, preview fills the card (no caption under the frame). */
+
+.sh-power-ops {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+}
+
+.sh-power-ops .sh-ops {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  gap: 0;
+  justify-content: stretch;
+}
+
+.sh-power-ops .sh-ops__frame {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  aspect-ratio: auto;
+  border-radius: 0;
+}
+
+/* Collaborate tab: playground fills the ops pane. */
+.sh-ops__pane .sh-playground {
+  flex: 1;
+  height: 100%;
+  min-height: 0;
+}
+
+/* ---- ops states (tab-driven screens inside the frame) ---- */
+
+.sh-ops__state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Keep-alive panes: stack in the frame; inactive stays mounted (visibility
+   only) so tab switches stay instant. */
+
+.sh-ops__pane {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  visibility: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.sh-ops__pane.is-active {
+  visibility: visible;
+  pointer-events: auto;
+  z-index: 1;
+}
+
+/* Map tab: the diagram is the whole frame — its own border/radius would
+   double up with the frame's. Pane padding already clears the tabs. */
+
+.sh-ops__state .sh-diagram {
+  border: none;
+  border-radius: 0;
+  height: 100%;
+  padding-bottom: 0;
+}
+
+.sh-opstate {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 28px 32px;
+  overflow-y: auto;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.sh-opstate--soon {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 14px;
+}
+
+.sh-opstate--soon p {
+  margin: 0;
+  max-width: 30rem;
+  font-size: 15px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.65);
+  text-wrap: balance;
+}
+
+.sh-opstate__pill {
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  font-family: "SF Mono", ui-monospace, Menlo, monospace;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* Monitor demo — hardcoded activity feed (marketing only). */
+
+.sh-monitor {
+  flex: 1;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 24px 24px;
+  color: rgba(255, 255, 255, 0.92);
+  overflow: hidden;
+}
+
+.sh-monitor__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.sh-monitor__head b {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.sh-monitor__head em {
+  margin-left: auto;
+  font-style: normal;
+  font-family: "SF Mono", ui-monospace, Menlo, monospace;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.sh-monitor__live {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #34d399;
+  box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.55);
+  animation: sh-monitor-ping 1.6s ease-out infinite;
+}
+
+@keyframes sh-monitor-ping {
+  0% {
+    box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.55);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(52, 211, 153, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(52, 211, 153, 0);
+  }
+}
+
+.sh-monitor__body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(140px, 0.32fr) 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 720px) {
+  .sh-monitor__body {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sh-monitor__nodes {
+  list-style: none;
+  margin: 0;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+}
+
+.sh-monitor__node {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.55);
+  transition: background 0.25s ease, color 0.25s ease;
+}
+
+.sh-monitor__node.is-hot {
+  background: rgba(52, 211, 153, 0.12);
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.sh-monitor__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.25);
+  flex-shrink: 0;
+}
+
+.sh-monitor__node.is-hot .sh-monitor__dot {
+  background: #34d399;
+}
+
+.sh-monitor__feed {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.sh-monitor__feed-label {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.sh-monitor__feed ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.sh-monitor__row {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1.4fr) 36px minmax(0, 0.7fr) 44px;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid transparent;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.sh-monitor__row.is-pulse {
+  background: rgba(99, 102, 241, 0.14);
+  border-color: rgba(99, 102, 241, 0.28);
+}
+
+.sh-monitor__method,
+.sh-monitor__path {
+  font-family: "SF Mono", ui-monospace, Menlo, monospace;
+  font-size: 11px;
+}
+
+.sh-monitor__method {
+  color: #a5b4fc;
+}
+
+.sh-monitor__path {
+  color: rgba(255, 255, 255, 0.78);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sh-monitor__status {
+  font-family: "SF Mono", ui-monospace, Menlo, monospace;
+  font-size: 11px;
+  color: #6ee7b7;
+}
+
+.sh-monitor__comp {
+  color: rgba(255, 255, 255, 0.5);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sh-monitor__ms {
+  text-align: right;
+  font-family: "SF Mono", ui-monospace, Menlo, monospace;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sh-monitor__live {
+    animation: none;
+  }
+}
+
+/* Ask / Implement tabs embed the theater (static app + Terra chat). Permanent
+   screen here, not a popover — no close/fullscreen chrome. */
+
+.sh-ops__state .sh-theater__panel--inline {
+  border-radius: 0;
+  border: none;
+}
+
+.sh-ops__state .sh-theater__close,
+.sh-ops__state .sh-theater__expand {
+  display: none;
+}
+
+.sh-ops__state .sh-theater__dock {
+  bottom: 12px;
+}
+
+/* Let the floating chat overhang the preview onto the wallpaper. Keep the
+   live stage clipped so only the dock escapes the product chrome. */
+
+.sh-power-theater .sh-window,
+.sh-power-theater .sh-window-body,
+.sh-power-theater .sh-diagram,
+.sh-power-theater .sh-ops,
+.sh-power-theater .sh-ops__frame,
+.sh-power-theater .sh-ops__state,
+.sh-power-theater .sh-ops__pane,
+.sh-power-theater .sh-theater__panel--inline {
+  overflow: visible;
+}
+
+.sh-power-theater .sh-theater__stage,
+.sh-power-theater .sh-replica--live {
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+.sh-power-theater .sh-theater__dock {
+  z-index: 6;
+  /* Paint may leave the preview box — don't contain it to the panel. */
+  contain: layout style;
+}
+
+.sh-power-theater .sh-theater__dock.is-dragging {
+  z-index: 8;
+}
+
+.sh-ops {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 20px;
+}
+
+.sh-ops__frame {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  /* Native ask-terra.mp4 ratio — contain fills edge-to-edge, no letterbox. */
+  aspect-ratio: 2330 / 1390;
+  border-radius: 16px;
+  background: #111318;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.06),
+    0 24px 48px -24px rgba(0, 0, 0, 0.35);
+}
+
+.sh-ops__video {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  /* Slight inset so the baked Screen Studio pointer isn’t clipped by the frame/tabs. */
+  transform: scale(0.94);
+  transform-origin: center;
+}
+
+.sh-ops__caption {
+  margin: 0 auto;
+  max-width: 36rem;
+  text-align: center;
+  font-size: 15px;
+  line-height: 1.45;
+  color: #525252;
+  text-wrap: balance;
+  min-height: 2.9em;
+}
+
+.sh-window-wrap {
+  position: relative;
+  width: 100%;
+}
+
+/* Empty repo screen: linen weave inside the window while it waits for a URL —
+   a 2×2 mirrored tile (seamless repeat) at half its pixel size, so retina gets
+   full native density. Stays put once the map lands — the diagram sits on the
+   same weave the empty screen had. */
+
+.sh-section--hero .sh-window::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(rgba(246, 245, 243, 0.55), rgba(246, 245, 243, 0.55)),
+    url("/images/linen-tile.webp") repeat top left;
+  background-size: auto, 1249px 700px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.sh-window {
+  position: relative;
+  display: flex;
+  min-height: 480px;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: var(--sh-screen-radius);
+  background: var(--sh-window);
+  box-shadow: 0 0 1px #00000040;
+}
+
+.sh-window--bare {
+  /* No top toolbar / zoom chrome — diagram uses the full frame. */
+  align-items: stretch;
+  justify-content: flex-start;
+}
+
+.sh-window--bare > .sh-window-body,
+.sh-window--bare > .sh-drop,
+.sh-window--bare > .sh-diagram {
+  flex: 1;
+  width: 100%;
+  min-height: 100%;
+  align-self: stretch;
+}
+
+.sh-window--bare .sh-window-body {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+.sh-window--bare .sh-diagram {
+  flex: 1;
+  min-height: 100%;
+}
+
+/* The bare window's big corner radius eats the legend's ends — inset it. */
+
+.sh-window--bare .sh-diagram__legend {
+  padding-inline: 28px;
+}
+
+@media (min-width: 640px) {
+.sh-window {
+    min-height: 720px;
+  }
+}
+
+.sh-window__bar {
+  position: absolute;
+  inset: 0 0 auto 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  /* Inline inset tracks the big screen radius so chips clear the corner curve. */
+  padding: 20px calc(var(--sh-screen-radius) * 0.45);
+  z-index: 5;
+}
+
+.sh-window__group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sh-zoom {
+  position: absolute;
+  inset: auto 0 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px calc(var(--sh-screen-radius) * 0.45);
+  font-size: 13px;
+  color: #737373;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.sh-zoom__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  pointer-events: auto;
+}
+
+.sh-zoom__pill span {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+}
+
+.sh-zoom__pill em {
+  font-style: normal;
+  font-size: 13px;
+  padding: 0 4px;
+  color: #404040;
+}
+
+/* "Try it yourself" pencil note above the Power card — sits in the section's
+   top gap, right of centre, and curls down onto the card's top edge. */
+
+.sh-power-note {
+  position: absolute;
+  /* Sits in the section's top gap, right of centre; the curl drops onto the
+     card's top edge. */
+  left: 52%;
+  bottom: calc(100% - 6px);
+  /* Narrow: the curl is tall now, so width sets how far it reaches down. */
+  width: clamp(200px, 17vw, 300px);
+  pointer-events: none;
+  z-index: 3;
+}
+
+.sh-power-note__text {
+  display: block;
+  font-size: clamp(30px, 2.6vw, 46px);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: rgba(122, 113, 106, 0.14);
+  -webkit-text-stroke: 2.2px #7a716a;
+  paint-order: stroke fill;
+  filter: url(#sh-pencil);
+  transform: rotate(-4deg);
+  transform-origin: left bottom;
+}
+
+.sh-power-note__line {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: 4px;
+}
+
+@media (max-width: 900px) {
+  .sh-power-note {
+    display: none;
+  }
+}
+
+/* Power keeps a heading for structure, but the capability list is the visible
+   title — so the h3 is read, not seen. */
+
+.sh-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Section title as a pencil drawing, scattered across the blank gap between
+   the hero and the Power card. Decorative — the real heading is `.sh-sr-only`. */
+
+.sh-power-gap-title {
+  position: absolute;
+  /* Right edge lands just left of the "Try it yourself" note; the last word
+     ("Terra") sits on that note's line, the earlier words step up from it. */
+  right: calc(50% + 24px);
+  /* Left bound keeps the sentence off the clipped section edge. */
+  left: 24px;
+  bottom: calc(100% + 318px);
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 0 20px;
+  pointer-events: none;
+}
+
+.sh-power-gap-title__word {
+  display: block;
+  /* Fixed box + fixed baseline: the words line up on one baseline regardless
+     of ascenders/descenders. Stroke and pencil filter spill outside it. */
+  height: 1em;
+  overflow: visible;
+  font-size: clamp(46px, 5.4vw, 96px);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  filter: url(#sh-pencil);
+  opacity: 0.9;
+}
+
+/* SVG glyphs, not CSS text-stroke: the outline has to be dashable so the word
+   can draw itself instead of fading in. */
+
+.sh-power-gap-title__glyph {
+  font: inherit;
+  letter-spacing: inherit;
+  fill: rgba(122, 113, 106, 0.12);
+  stroke: #7a716a;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Staircase: each word drops a step, so the sentence walks down into the note. */
+
+.sh-power-gap-title__word:nth-child(1) {
+  transform: translateY(-1.35em) rotate(-4deg);
+}
+
+.sh-power-gap-title__word:nth-child(2) {
+  transform: translateY(-0.9em) rotate(2deg);
+}
+
+.sh-power-gap-title__word:nth-child(3) {
+  transform: translateY(-0.45em) rotate(-6deg);
+}
+
+.sh-power-gap-title__word:nth-child(4) {
+  transform: rotate(3deg);
+}
+
+@media (max-width: 900px) {
+  .sh-power-gap-title {
+    display: none;
+  }
+}
+
+/* Hero copy reads a touch smaller than the section scale — the film below is
+   the subject. Local `--sh-read` override, so title + sub shrink together. */
+.sh-section--hero .sh-copy--hero {
+  --sh-read: 0.88;
+}
+
+@media (min-width: 901px) {
+  .sh-section--hero .sh-copy--hero {
+    --sh-read: 1.28;
+  }
+}
+
+/* Pinned hero: the painting is a fixed wrapper — it fills the pinned section
+   and never resizes. One unit (the section's own height), so browser zoom
+   cannot flip it onto a different branch than the film inside it. */
+.sh-section--hero .sh-power-theater.sh-hero-card {
+  height: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+  /* Card padding is layout budget now — animate it with the drop. */
+  transition:
+    padding-top 0.9s cubic-bezier(0.22, 1, 0.36, 1),
+    padding-bottom 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Copy is intrinsic; the stage takes everything else. */
+.sh-section--hero .sh-copy--hero {
+  flex: 0 0 auto;
+}
+
+/* The hero section is the pinned viewport box; the card fills it. */
+.sh-section--hero {
+  display: flex;
+  flex-direction: column;
+}

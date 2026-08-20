@@ -1,0 +1,54 @@
+/* Landing layout tokens — painting card is wide; product window stays 720px. */
+
+.sh-root--landing {
+  --sh-hero-window: 720px;
+  --sh-flight-tile: 128px;
+  --sh-section-canvas-max: min(calc(100vw - 32px), 1400px);
+  /* Power runs wider than the copy sections — the demo card is the subject. */
+  --sh-power-canvas-max: calc(100vw - 32px);
+  /* Cool gray pastel — gray first, no purple. */
+  --sh-bg: #e3e4e7;
+}
+
+/* Desktop at 100% should read like the previous 150% view without
+   shrinking the layout viewport or widening the cards. */
+@media (min-width: 901px) {
+  .sh-root--landing {
+    --sh-read: 1.5;
+    --sh-flight-tile: 164px;
+  }
+
+  .sh-root--landing .sh-caption {
+    font-size: 18px;
+    line-height: 24px;
+  }
+
+  .sh-root--landing .sh-caption--md {
+    font-size: 21px;
+    line-height: 30px;
+  }
+
+  .sh-root--landing .sh-power-list__btn {
+    font-size: clamp(33px, 3.9vw, 51px);
+  }
+
+  .sh-root--landing .sh-power-list__caption span {
+    font-size: 22.5px;
+  }
+}
+
+.sh-root--landing > .sh-nav {
+  width: 100%;
+  max-width: none;
+}
+
+/* Hero painting stays full section width; cap copy sections on ultra-wide. */
+.sh-root--landing .sh-section:not(.sh-section--hero) {
+  width: min(100%, var(--sh-section-canvas-max));
+  margin-inline: auto;
+}
+
+/* Specificity must match the `:not(.sh-section--hero)` rule above. */
+.sh-root--landing .sh-section.sh-section--power:not(.sh-section--hero) {
+  width: min(100%, var(--sh-power-canvas-max));
+}
