@@ -12,35 +12,35 @@ export function Faq() {
   const [open, setOpen] = useState(0);
 
   return (
-    <section className="hl-section">
-      <div className="hl-faq">
+    <section className="terra-section">
+      <div className="terra-faq">
         <div>
-          <div className="hl-faq__aside">
-            <p ref={eyebrow} className="hl-eyebrow">
+          <div className="terra-faq__aside">
+            <p ref={eyebrow} className="terra-eyebrow">
               {faq.eyebrow}
             </p>
             <div ref={title}>
-              <h3 className="hl-display hl-h3 hl-h3--faq">{faq.title}</h3>
+              <h3 className="terra-display terra-h3 terra-h3--faq">{faq.title}</h3>
             </div>
-            <div ref={art} className="hl-faq__art hl-art" aria-hidden style={{ aspectRatio: "1 / 1" }} />
+            <div ref={art} className="terra-faq__art terra-art" aria-hidden style={{ aspectRatio: "1 / 1" }} />
           </div>
         </div>
         <div ref={list}>
-          <div className="hl-faq__list">
+          <div className="terra-faq__list">
             {faq.items.map((item, i) => (
-              <div key={item.q} className="hl-faq__item">
+              <div key={item.q} className="terra-faq__item">
                 <button
                   type="button"
-                  className="hl-faq__q"
+                  className="terra-faq__q"
                   aria-expanded={open === i}
                   aria-controls={`faq-a-${i}`}
                   onClick={() => setOpen(open === i ? -1 : i)}
                 >
-                  <span className="hl-faq__n">{String(i + 1).padStart(2, "0")}</span>
-                  <span className="hl-display hl-faq__label">{item.q}</span>
+                  <span className="terra-faq__n">{String(i + 1).padStart(2, "0")}</span>
+                  <span className="terra-display terra-faq__label">{item.q}</span>
                 </button>
                 {open === i ? (
-                  <p id={`faq-a-${i}`} className="hl-faq__a">
+                  <p id={`faq-a-${i}`} className="terra-faq__a">
                     {item.a}
                   </p>
                 ) : null}

@@ -1,4 +1,4 @@
-import { copy } from "./data.ts";
+import { copy, diagramEdges, diagramNodes } from "./data.ts";
 /** Pure helpers behind the hero glyph circle. Kept out of the component so the
  *  churn and hover falloff are testable without a canvas. */
 
@@ -6,6 +6,13 @@ import { copy } from "./data.ts";
  *  still look like code (fn, {}, ::) instead of a random alphabet, without
  *  word-shaped holes that would fake the lens. */
 export const GLYPHS = copy.heroGlobeText.replace(/\s+/g, "");
+
+/** Human-readable diagram labels / hints / purposes / edge captions for the
+ *  interior map atlas. */
+const DIAGRAM_CHARS = [
+  ...diagramNodes.map((n) => `${n.label}${n.hint}${n.purpose}`),
+  ...diagramEdges.map((e) => e.label ?? ""),
+].join("");
 
 /** Stable 32-bit hash of a cell coordinate — same cell, same glyph, every
  *  resize. `Math.random()` per frame would shimmer the whole circle. */
@@ -105,7 +112,9 @@ export function textAt(text: string, i: number) {
   return text[((i % n) + n) % n];
 }
 
-/** Every character the globe can paint: the scramble set plus whatever the
- *  resolved copy needs. Order is the atlas tile order. */
-export const CHARSET = Array.from(new Set((GLYPHS + copy.heroGlobeText).split(""))).join("");
+/** Every character the globe can paint: scramble, resolved copy, and interior
+ *  diagram labels. Order is the atlas tile order. */
+export const CHARSET = Array.from(
+  new Set((GLYPHS + copy.heroGlobeText + DIAGRAM_CHARS).split("")),
+).join("");
 export const CHAR_INDEX = new Map(Array.from(CHARSET, (ch, i) => [ch, i] as const));

@@ -1,22 +1,40 @@
 import { useEffect, useRef, useState } from "react";
-import { copy } from "../data";
+import { RepoDiagram } from "../../../features/architecture-map";
+import { copy, diagramEdges, diagramGroups, diagramNodes } from "../data";
 import { createGlobeRenderer } from "../globeGL";
-import { layoutGlobe } from "../globeLayout";
+import { HOVER_R, layoutGlobe } from "../globeLayout";
 
 /** Mouse-look: max lean toward the cursor, radians. */
 const MOUSE_LOOK = 0.22;
+/** Must match globeLayout SPHERE_FILL — used only for presence gating. */
+const SPHERE_FILL = 0.9;
+/** Map sits in the sphere; a pointer-centered clip is the only reveal. */
+const MAP_FILL = 0.72;
+const PRESENCE_IN = 0.4;
+const PRESENCE_OUT = 0.25;
 
 /** Circle of monospace glyphs that churn and warm up under the pointer.
  *  Layout is CPU; the GPU draws every glyph in one instanced call. */
 function GlyphOrb() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const mapRef = useRef<HTMLDivElement>(null);
   // Pointer and its smoothed follower live in refs: state here would
   // re-render the hero 60x/sec.
-  const pointer = useRef({ x: -1e4, y: -1e4, nx: 0, ny: 0, sx: 0, sy: 0 });
+  const pointer = useRef({
+    x: -1e4,
+    y: -1e4,
+    nx: 0,
+    ny: 0,
+    sx: 0,
+    sy: 0,
+    presence: 0,
+  });
   const reducedRef = useRef(false);
   // A lost context (Strict Mode / HMR after loseContext) cannot be reused;
   // bumping this mounts a fresh <canvas>.
   const [surface, setSurface] = useState(0);
+  const [mapPx, setMapPx] = useState(0);
+  const mapPxRef = useRef(0);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -44,6 +62,21 @@ function GlyphOrb() {
     };
     syncReduced();
 
+    const paintMap = (presence: number, px: number, py: number, globeR: number) => {
+      const map = mapRef.current;
+      if (!map) return;
+      const live = !reducedRef.current && presence > 0.02;
+      map.style.opacity = live ? String(presence) : "0";
+      map.classList.toggle("is-live", live && presence > 0.2);
+      const mapD = map.offsetWidth;
+      const localX = px - (paneW / 2 - mapD / 2);
+      const localY = py - (paneH / 2 - mapD / 2);
+      const revealR = globeR * HOVER_R;
+      map.style.clipPath = live
+        ? `circle(${revealR}px at ${localX}px ${localY}px)`
+        : "circle(0px at 50% 50%)";
+    };
+
     const draw = (now: number, dt: number) => {
       if (paneW <= 0 || paneH <= 0) return;
       if (start < 0) start = now;
@@ -52,7 +85,17 @@ function GlyphOrb() {
       const k = mouseFollow(dt);
       p.sx += (p.nx - p.sx) * k;
       p.sy += (p.ny - p.sy) * k;
-      const count = layoutGlobe(
+
+      const R = (size / 2) * SPHERE_FILL;
+      const overGlobe = Math.hypot(p.x - paneW / 2, p.y - paneH / 2) < R * 1.05;
+      const target = !reducedRef.current && overGlobe ? 1 : 0;
+      const tau = target > p.presence ? PRESENCE_IN : PRESENCE_OUT;
+      p.presence += (target - p.presence) * (1 - Math.exp(-dt / Math.max(tau, 0.001)));
+
+      const yaw = p.sx * MOUSE_LOOK;
+      const pitch = -p.sy * MOUSE_LOOK * 0.4;
+
+      const glyphs = layoutGlobe(
         {
           size,
           width: paneW,
@@ -60,13 +103,15 @@ function GlyphOrb() {
           t,
           pointerX: p.x,
           pointerY: p.y,
-          yaw: p.sx * MOUSE_LOOK,
-          pitch: -p.sy * MOUSE_LOOK * 0.4,
+          yaw,
+          pitch,
           reduced: reducedRef.current,
         },
         renderer.data,
       );
-      renderer.render(count);
+
+      renderer.render({ glyphs });
+      paintMap(p.presence, p.x, p.y, R);
     };
 
     const tick = (now: number) => {
@@ -95,6 +140,18 @@ function GlyphOrb() {
       paneH = rect.height;
       if (paneW <= 0 || paneH <= 0) return;
       size = Math.max(paneW, paneH) * 0.82;
+      // Map uses the visible pane, not the oversized clipped globe diameter.
+      const mapD = Math.min(paneW, paneH) * MAP_FILL;
+      const map = mapRef.current;
+      const nextPx = Math.round(mapD);
+      if (map) {
+        map.style.width = `${mapD}px`;
+        map.style.height = `${mapD}px`;
+      }
+      if (nextPx !== mapPxRef.current) {
+        mapPxRef.current = nextPx;
+        setMapPx(nextPx);
+      }
       renderer.resize(paneW, paneH, Math.min(1.5, window.devicePixelRatio || 1));
       draw(performance.now(), 1 / 60);
     };
@@ -155,7 +212,20 @@ function GlyphOrb() {
     };
   }, [surface]);
 
-  return <canvas key={surface} ref={canvasRef} className="hx-orb__canvas" aria-hidden />;
+  return (
+    <>
+      <div ref={mapRef} className="hx-orb__map" aria-hidden>
+        <RepoDiagram
+          nodes={diagramNodes}
+          edges={diagramEdges}
+          groups={diagramGroups}
+          hoverOnly
+          remeasureKey={mapPx}
+        />
+      </div>
+      <canvas key={surface} ref={canvasRef} className="hx-orb__canvas" aria-hidden />
+    </>
+  );
 }
 
 export function HeroChars() {
