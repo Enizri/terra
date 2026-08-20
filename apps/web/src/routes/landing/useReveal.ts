@@ -15,14 +15,14 @@ export function useReveal<T extends HTMLElement = HTMLDivElement>(delayMs = 0, s
     const el = ref.current;
     if (!el) return;
 
-    el.classList.add("hl-reveal", "hl-reveal-pending");
+    el.classList.add("terra-reveal", "terra-reveal-pending");
     el.style.transitionDelay = delayMs ? `${delayMs}ms` : "";
     if (shiftPx !== undefined) el.style.setProperty("--reveal-shift", `${shiftPx}px`);
 
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (!entry.isIntersecting) return;
-        el.classList.remove("hl-reveal-pending");
+        el.classList.remove("terra-reveal-pending");
         observer.disconnect();
       },
       { rootMargin: "0px 0px -10% 0px" },
