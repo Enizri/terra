@@ -9,7 +9,7 @@ const showcaseCss = readFileSync(path.join(route, "styles/showcase.css"), "utf8"
 const heroSource = readFileSync(path.join(route, "sections/Hero.tsx"), "utf8");
 
 test("landing hero keeps the full-card geometry", () => {
-  assert.match(showcaseCss, /min-height:\s*min\(calc\(110svh\s*-\s*108px\),\s*1450px\)/);
+  assert.match(showcaseCss, /min-height:\s*min\(calc\(80svh\s*-\s*108px\),\s*1020px\)/);
   assert.match(scaleCss, /--sh-hero-window:\s*720px/);
 });
 
