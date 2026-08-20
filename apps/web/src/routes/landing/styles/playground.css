@@ -105,7 +105,7 @@
 }
 
 .sh-playground[data-edit-nav="1"] .rp-rail {
-  background: #e8400d;
+  background: #141510;
   border-color: transparent;
   color: #ffe1d4;
 }
@@ -181,15 +181,18 @@
     min-height 0.9s cubic-bezier(0.22, 1, 0.36, 1),
     padding 0.9s cubic-bezier(0.22, 1, 0.36, 1),
     border-radius 0.9s cubic-bezier(0.22, 1, 0.36, 1),
-    background-color 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+    background-color 0.9s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.9s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .sh-section--hero[data-dropped="1"] .sh-power-theater__screen {
   width: 100%;
   max-width: none;
   height: auto;
-  /* Room for the expanded film — taller + wider than the preview slot. */
-  min-height: 860px;
+  /* Room for the expanded film — taller + wider than the preview slot,
+     but held back from the card edges so the mat still reads. */
+  width: min(100%, 1220px);
+  min-height: 760px;
   padding: 20px;
   border-radius: 28px;
 }
@@ -215,7 +218,7 @@
 .sh-hero-screen.is-expanded {
   max-width: none;
   width: 100%;
-  height: 820px;
+  height: 720px;
   aspect-ratio: auto;
 }
 

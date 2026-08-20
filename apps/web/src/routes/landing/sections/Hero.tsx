@@ -75,7 +75,7 @@ function useLerp(source: MotionValue<number>, factor = 0.1, frozen = false) {
 const HERO_FLIGHT_LERP = 0.15;
 
 /** Hero flight tile fallback — actual size comes from `--sh-flight-tile`. */
-const FLIGHT_TILE_PX_FALLBACK = 148;
+const FLIGHT_TILE_PX_FALLBACK = 128;
 
 /** Shared graphite filter for trail and headline pencil marks. */
 function PencilDefs() {
@@ -142,7 +142,7 @@ function DragTrail({
   // Only clears once the card has landed — until then it is the route.
   const opacity = useTransform(progress, [0, 0.88, 1], [1, 1, 0]);
   // Arrow lands when the pencil reaches the window, not before.
-  const arrowOpacity = useTransform(drawn, [0.9, 1], [0, 0.62]);
+  const arrowOpacity = useTransform(drawn, [0.9, 1], [0, 0.9]);
   const stroke = { fill: "none", stroke: PENCIL_INK, strokeLinecap: "round" } as const;
   return (
     <motion.svg
@@ -156,15 +156,15 @@ function DragTrail({
       <g filter="url(#sh-pencil)">
         {/* Faint guide: the whole route — arrowhead included — is visible from
             the start, so the destination reads before anything is dragged. */}
-        <path d={d} {...stroke} strokeWidth={1.8} opacity={0.28} />
-        <path d={ARROW_D} {...stroke} strokeWidth={1.8} opacity={0.28} />
+        <path d={d} {...stroke} strokeWidth={2.2} opacity={0.45} />
+        <path d={ARROW_D} {...stroke} strokeWidth={2.2} opacity={0.45} />
         {/* Pencil fills that guide in as the card is dragged, running ahead of it. */}
-        <motion.path d={d} {...stroke} strokeWidth={5} opacity={0.16} style={{ pathLength: drawn }} />
-        <motion.path d={d} {...stroke} strokeWidth={2.6} opacity={0.72} style={{ pathLength: drawn }} />
+        <motion.path d={d} {...stroke} strokeWidth={6} opacity={0.24} style={{ pathLength: drawn }} />
+        <motion.path d={d} {...stroke} strokeWidth={3.2} opacity={0.95} style={{ pathLength: drawn }} />
         {/* Hand-drawn arrowhead, sketched twice like a real pencil stroke. */}
         <motion.g style={{ opacity: arrowOpacity }}>
-          <path d={ARROW_D} {...stroke} strokeWidth={2.6} />
-          <path d={`M -10 ${TRAIL_END_Y - 20} L 1 ${TRAIL_END_Y - 3}`} {...stroke} strokeWidth={1.4} opacity={0.5} />
+          <path d={ARROW_D} {...stroke} strokeWidth={3.2} />
+          <path d={`M -10 ${TRAIL_END_Y - 20} L 1 ${TRAIL_END_Y - 3}`} {...stroke} strokeWidth={1.8} opacity={0.7} />
         </motion.g>
       </g>
     </motion.svg>
@@ -415,10 +415,23 @@ function HeroTitle() {
 
 /** Min top clearance when the framed card is taller than the viewport. */
 const LANDING_GAP_MIN = 96;
-/** Extra scroll after the screen is framed that finishes the GitHub drag. */
-const HERO_DRAG_TAIL_PX = 380;
+/** Expanded film height (mat included) — mirrors `.sh-hero-screen.is-expanded`
+ *  plus the screen padding in playground.css. */
+const HERO_SCREEN_EXPANDED_PX = 760;
 /** Extra scroll while sticky after drop so the repo map can fully assemble. */
 const HERO_HOLD_PX = 240;
+
+/** Extra pinned scroll after the drag lands — the film sits centred and the
+    scroll reads slow instead of running straight on into Power. */
+const HERO_CENTER_HOLD_PX = 420;
+
+/** How much sooner than the pin the drag finishes, px — the drop lands while
+    the card is still arriving, so the slow pinned stretch starts on a card
+    that is already fully dragged. */
+const HERO_DRAG_LEAD_PX = 320;
+
+/** Ease-out exponent on the drag: >1 slows the approach into the frame. */
+const DRAG_EASE_POWER = 0.55;
 
 /** Freeze drag geometry after this progress. */
 const FLIGHT_LOCK_PROGRESS = 0.04;
@@ -442,10 +455,19 @@ export function Hero() {
   // Once the drag is underway, ignore layout remeasures — the park anchor
   // leaves the viewport and would rewrite the trajectory every frame.
   const dragGeomLocked = useRef(false);
+  // Extra scroll the post-drop re-centering consumes; the pin grows by it so
+  // the hold after the drop is not eaten by the lift.
+  const centerLiftRef = useRef(0);
+  const [centerLift, setCenterLift] = useState(0);
   // Sticky pin (not fixed/absolute swaps): native scroll blends through
   // free → framed → hold → release with no JS position thrashing.
   const { scrollY } = useScroll();
-  const scrollYProgress = useTransform(scrollY, [0, dragEndScroll], [0, 1]);
+  const scrollRaw = useTransform(scrollY, [0, dragEndScroll], [0, 1]);
+  // Ease-out: the card covers most of the route early, then crawls the last
+  // stretch into the frame — the drag reads slow where it is being watched.
+  const scrollYProgress = useTransform(scrollRaw, (p) =>
+    p <= 0 ? 0 : p >= 1 ? 1 : 1 - Math.pow(1 - p, DRAG_EASE_POWER),
+  );
   const progressRef = useRef(scrollYProgress);
   progressRef.current = scrollYProgress;
 
@@ -467,15 +489,30 @@ export function Hero() {
       const cardOffset = card.offsetTop;
       // The painting stays directly below the nav on tall screens too.
       const gap = LANDING_GAP_MIN;
-      // Negative sticky top pulls the hero up so the painting sits at `gap`.
-      const stickTop = gap - cardOffset;
+      // Base frame: painting sits at `gap` under the nav.
+      const framedTop = gap - cardOffset;
+      // Final pin: the expanded film centered in the viewport. Computed from
+      // the fixed expanded height (not the live one) so the value is identical
+      // before and after the drop — the hero never jumps when the film grows.
+      const screen = card.querySelector<HTMLElement>(".sh-power-theater__screen");
+      let stickTop = framedTop;
+      if (screen) {
+        const screenTopInHero =
+          screen.getBoundingClientRect().top - hero.getBoundingClientRect().top;
+        stickTop = Math.min(
+          framedTop,
+          Math.round((window.innerHeight - HERO_SCREEN_EXPANDED_PX) / 2 - screenTopInHero),
+        );
+      }
       hero.style.setProperty("--hero-stick-top", `${stickTop}px`);
+      centerLiftRef.current = framedTop - stickTop;
 
       setHeroHeight(hero.offsetHeight);
+      setCenterLift(centerLiftRef.current);
 
-      // Sticky engages when the painting would sit at `gap`.
-      const frameAt = Math.max(1, pin.offsetTop + cardOffset - gap);
-      setDragEndScroll(frameAt + HERO_DRAG_TAIL_PX);
+      // Sticky engages exactly where the drag ends: free scroll all the way
+      // through the drag, then the pin takes over with the film centered.
+      setDragEndScroll(Math.max(1, pin.offsetTop - stickTop - HERO_DRAG_LEAD_PX));
 
       // Mid-drag: keep stick metrics fresh, but don't rewrite the flight path.
       if (dragGeomLocked.current && !parked) return;
@@ -497,7 +534,7 @@ export function Hero() {
         const titleRect = title?.getBoundingClientRect();
         const stageCx = sr.left + sr.width / 2;
         const stageCy = sr.top + sr.height / 2;
-        const inset = tilePx / 2 + 12;
+        const inset = tilePx / 2 - 16;
         const rawX = ar.left + ar.width / 2 - stageCx;
         const rawY =
           titleRect && window.innerWidth > 900
@@ -551,7 +588,7 @@ export function Hero() {
 
   const pinHeight =
     heroHeight > 0
-      ? heroHeight + HERO_DRAG_TAIL_PX + HERO_HOLD_PX
+      ? heroHeight + HERO_HOLD_PX + HERO_CENTER_HOLD_PX + centerLift
       : undefined;
 
   return (

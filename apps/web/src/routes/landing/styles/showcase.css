@@ -23,10 +23,33 @@
   transition: max-width 0.9s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+/* On drop the film grows into the card's own padding first: the deep bottom
+   padding collapses, so the wallpaper stretches as little as possible. */
+.sh-section--hero[data-dropped="1"] .sh-power-theater.sh-hero-card {
+  padding-top: 16px;
+  padding-bottom: 24px;
+}
+
+/* Copy shrinks visually on drop and the film slides up into the slack. Both
+   are transforms — layout height never changes, so the scroll mapping that
+   drives the drag stays stable and scrolling back up un-drops cleanly. */
+.sh-section--hero .sh-copy--hero {
+  transition: transform 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.sh-section--hero[data-dropped="1"] .sh-copy--hero {
+  transform: scale(0.86);
+  transform-origin: top center;
+}
+
+.sh-section--hero[data-dropped="1"] .sh-power-theater__screen {
+  transform: translateY(-40px);
+}
+
 /* After the GitHub drop: open up so the workspace is readable. */
 .sh-section--hero[data-dropped="1"] .sh-stage--hero {
   max-width: min(98%, 1480px);
-  margin-bottom: 48px;
+  margin-bottom: 100px;
   padding-inline: 16px;
 }
 
@@ -43,10 +66,11 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 100%;
+  width: min(100%, 1560px);
   max-width: none;
-  min-height: min(calc(100svh - 20px), 980px);
-  padding: 88px 0 24px;
+  margin-inline: auto;
+  min-height: min(calc(80svh - 20px), 730px);
+  padding: 48px 0 72px;
   border-radius: 26px;
   overflow: hidden;
   isolation: isolate;
@@ -58,16 +82,16 @@
        extra height is reachable because the section unpins around y=700.
        The svh term is NOT tied to --sh-read — the viewport does not shrink
        with the reading scale, so scaling it here would be double-counting. */
-    min-height: min(calc(110svh - 108px), 1450px);
+    min-height: min(calc(80svh - 108px), 1020px);
     border-radius: 40px;
-    padding: 56px 0 24px;
+    padding: 40px 0 110px;
   }
 }
 
 @media (min-width: 1024px) {
 .sh-power-theater.sh-hero-card {
     /* Bottom-weighted: leaves painting visible below the product frame. */
-    padding: 64px 0 48px;
+    padding: 40px 0 140px;
   }
 }
 
@@ -247,12 +271,12 @@
 }
 
 .sh-power-list__item.is-active .sh-power-list__btn {
-  color: #e8400d;
-  background: color-mix(in oklab, #e8400d 8%, transparent);
+  color: #141510;
+  background: color-mix(in oklab, #141510 8%, transparent);
 }
 
 .sh-power-list__btn:hover {
-  color: #e8400d;
+  color: #141510;
 }
 
 .sh-power-list__caption {
@@ -953,14 +977,28 @@
 
 .sh-power-gap-title__word {
   display: block;
+  /* Fixed box + fixed baseline: the words line up on one baseline regardless
+     of ascenders/descenders. Stroke and pencil filter spill outside it. */
+  height: 1em;
+  overflow: visible;
   font-size: clamp(46px, 5.4vw, 96px);
   line-height: 1;
   letter-spacing: -0.02em;
-  color: rgba(122, 113, 106, 0.12);
-  -webkit-text-stroke: 2.6px #7a716a;
-  paint-order: stroke fill;
   filter: url(#sh-pencil);
   opacity: 0.9;
+}
+
+/* SVG glyphs, not CSS text-stroke: the outline has to be dashable so the word
+   can draw itself instead of fading in. */
+
+.sh-power-gap-title__glyph {
+  font: inherit;
+  letter-spacing: inherit;
+  fill: rgba(122, 113, 106, 0.12);
+  stroke: #7a716a;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 /* Staircase: each word drops a step, so the sentence walks down into the note. */
@@ -984,5 +1022,17 @@
 @media (max-width: 900px) {
   .sh-power-gap-title {
     display: none;
+  }
+}
+
+/* Hero copy reads a touch smaller than the section scale — the film below is
+   the subject. Local `--sh-read` override, so title + sub shrink together. */
+.sh-section--hero .sh-copy--hero {
+  --sh-read: 0.88;
+}
+
+@media (min-width: 901px) {
+  .sh-section--hero .sh-copy--hero {
+    --sh-read: 1.28;
   }
 }
