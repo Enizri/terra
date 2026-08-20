@@ -3,9 +3,10 @@ import test from "node:test";
 import { copy, users } from "./data.ts";
 
 test("playground copy sells live collaboration, not inference plumbing", () => {
-  assert.match(copy.trust, /live software/);
-  assert.match(copy.trust, /same repo/);
-  assert.doesNotMatch(copy.trust, /openai|endpoint/i);
+  const collaborate = copy.ops.find((o) => o.id === "collaborate")!.caption;
+  assert.match(collaborate, /live software/);
+  assert.match(collaborate, /same repo/);
+  assert.doesNotMatch(collaborate, /openai|endpoint/i);
 });
 
 test("the collaboration demo uses the approved cast", () => {

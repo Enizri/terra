@@ -12,3 +12,4 @@ node_modules/
 .playwright-mcp/
 .playwright-cli/
 research/
+output/

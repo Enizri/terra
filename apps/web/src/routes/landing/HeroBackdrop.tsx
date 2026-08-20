@@ -127,7 +127,12 @@ const ACTIVE_FRAME_MS = 0;
 /** Treat the pointer lerp as settled once delta is below this (device px). */
 const SETTLE_PX = 0.35;
 
-export default function HeroBackdrop() {
+export default function HeroBackdrop({
+  /** In-flow star (Final CTA). No fixed layer, no reveal dance. */
+  inline = false,
+}: {
+  inline?: boolean;
+}) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -181,8 +186,8 @@ export default function HeroBackdrop() {
     let width = 0;
     let height = 0;
     let touched = false;
-    // Starts hidden behind the hero; the reveal class flips it on.
-    let visible = false;
+    // Inline star is always on; fixed hero star waits for --revealed.
+    let visible = inline;
     let frame: number | null = null;
     let lastDraw = 0;
     let lastMove = 0;
@@ -299,44 +304,66 @@ export default function HeroBackdrop() {
     window.addEventListener("resize", onResize);
     document.addEventListener("visibilitychange", onVisibility);
 
-    // The wrap is fixed and viewport-sized, so it always "intersects" —
-    // observing it would keep the shader drawing for the whole page. What
-    // actually matters is whether the star itself is shown (it is hidden behind
-    // the hero), which the section tracker signals with a class.
-    const star = wrap.firstElementChild as HTMLElement;
-    const shown = () => star.classList.contains("sh-backdrop--revealed");
-    const syncVisible = () => {
-      const next = shown();
-      if (next === visible) return;
-      visible = next;
-      if (!visible) {
-        stopLoop();
-        canvas.style.visibility = "hidden";
-      } else {
-        canvas.style.visibility = "visible";
-        paintOnce();
-        kick();
-      }
-    };
-    visible = shown();
-    canvas.style.visibility = visible ? "visible" : "hidden";
-    const observer = new MutationObserver(syncVisible);
-    observer.observe(star, { attributes: true, attributeFilter: ["class"] });
+    let observer: MutationObserver | IntersectionObserver | null = null;
 
-    kick();
+    if (inline) {
+      // Pause the shader while the in-flow star is offscreen.
+      canvas.style.visibility = "visible";
+      const io = new IntersectionObserver(
+        ([entry]) => {
+          visible = entry.isIntersecting;
+          if (!visible) stopLoop();
+          else {
+            paintOnce();
+            kick();
+          }
+        },
+        { rootMargin: "80px" },
+      );
+      io.observe(wrap);
+      observer = io;
+      kick();
+    } else {
+      // Fixed hero star: only draw while --revealed is on.
+      const star = wrap.firstElementChild as HTMLElement;
+      const shown = () => star.classList.contains("sh-backdrop--revealed");
+      const syncVisible = () => {
+        const next = shown();
+        if (next === visible) return;
+        visible = next;
+        if (!visible) {
+          stopLoop();
+          canvas.style.visibility = "hidden";
+        } else {
+          canvas.style.visibility = "visible";
+          paintOnce();
+          kick();
+        }
+      };
+      visible = shown();
+      canvas.style.visibility = visible ? "visible" : "hidden";
+      const mo = new MutationObserver(syncVisible);
+      mo.observe(star, { attributes: true, attributeFilter: ["class"] });
+      observer = mo;
+      kick();
+    }
 
     return () => {
-      observer.disconnect();
+      observer?.disconnect();
       window.removeEventListener("mousemove", onPointerMove);
       window.removeEventListener("resize", onResize);
       document.removeEventListener("visibilitychange", onVisibility);
       stopLoop();
     };
-  }, []);
+  }, [inline]);
 
   return (
-    <div ref={wrapRef} className="sh-backdrop-wrap" aria-hidden>
-      <div className="sh-backdrop">
+    <div
+      ref={wrapRef}
+      className={`sh-backdrop-wrap${inline ? " sh-backdrop-wrap--inline" : ""}`}
+      aria-hidden
+    >
+      <div className={`sh-backdrop${inline ? " sh-backdrop--inline" : ""}`}>
         {/* Spin is a pure-CSS compositor animation on this child (terra.css). */}
         <div className="sh-backdrop__spin" style={{ backgroundColor: BG }}>
           <canvas ref={canvasRef} className="sh-backdrop-canvas" />

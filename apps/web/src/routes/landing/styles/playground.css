@@ -153,56 +153,81 @@
   background: #ff7a45;
 }
 
-/* Hero screen on the same scenic wallpaper as the Power of Terra card. No tab
-   bar here, so the frame is even instead of leaving the 88px bottom strip.
-   The screen centers instead of stretching, and pins its own min-height:
-   the window inside changes size across the film, and the wallpaper box
-   (which all the scroll math keys off) must not move with it. */
+/* Hero screen = the 720px video slot.
+   Outer mat: 720×412, #f3f3f3, 8px pad, 24px radius.
+   Inner: aspect-video 704×396, 17px radius. */
 
 .sh-hero-theater .sh-power-theater__screen {
-  padding: 28px;
+  display: flex;
   align-items: center;
-  /* border-box: expanded window 720px + 2×28px frame. Matching it here keeps
-     the wallpaper box identical in both states — no 56px layout jump at drop. */
-  min-height: 776px;
+  justify-content: center;
+  width: var(--sh-hero-window, 720px);
+  max-width: 100%;
+  height: 412px;
+  min-height: 412px;
+  padding: 8px;
+  margin-inline: auto;
+  border-radius: 24px;
+  background: #f3f3f3;
+  box-shadow:
+    0 25px 50px rgba(0, 0, 0, 0.05),
+    0 12px 24px rgba(0, 0, 0, 0.04),
+    0 6px 12px rgba(0, 0, 0, 0.03),
+    0 0 0 1px rgba(14, 10, 7, 0.08);
+  transition:
+    width 0.9s cubic-bezier(0.22, 1, 0.36, 1),
+    height 0.9s cubic-bezier(0.22, 1, 0.36, 1),
+    max-width 0.9s cubic-bezier(0.22, 1, 0.36, 1),
+    min-height 0.9s cubic-bezier(0.22, 1, 0.36, 1),
+    padding 0.9s cubic-bezier(0.22, 1, 0.36, 1),
+    border-radius 0.9s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.sh-section--hero[data-dropped="1"] .sh-power-theater__screen {
+  width: 100%;
+  max-width: none;
+  height: auto;
+  /* Room for the expanded film — taller + wider than the preview slot. */
+  min-height: 860px;
+  padding: 20px;
+  border-radius: 28px;
 }
 
 .sh-hero-theater .sh-power-theater__screen .sh-window {
-  /* The hero film needs the full stage width, not the power card's 1280 cap. */
   max-width: none;
 }
 
-/* Small drop window ↔ full workspace. Width morphs via max-width (px→px
-   transitions; real width is 100% clamped by it), height via explicit px. */
+/* Small drop window ↔ full workspace. */
 
 .sh-hero-screen {
   display: flex;
   width: 100%;
-  /* Hugs the 560px drop card plus the mini mat — no surround to speak of. */
-  max-width: 600px;
-  height: 320px;
+  max-width: 704px;
+  height: 396px;
+  aspect-ratio: 16 / 9;
   transition:
     max-width 0.9s cubic-bezier(0.22, 1, 0.36, 1),
-    height 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+    height 0.9s cubic-bezier(0.22, 1, 0.36, 1),
+    aspect-ratio 0.9s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .sh-hero-screen.is-expanded {
-  /* Above any real stage width, so `width: 100%` governs. */
-  max-width: 1600px;
-  height: 720px;
+  max-width: none;
+  width: 100%;
+  height: 820px;
+  aspect-ratio: auto;
 }
 
 .sh-hero-screen .sh-window {
   width: 100%;
-  /* The 480/720 min-heights would pin the small state open. */
   min-height: 0;
   transition: border-radius 0.9s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* Softer corners while small — the 48-80px hero radius swallows a 640px card. */
-
 .sh-hero-screen:not(.is-expanded) .sh-window {
-  border-radius: 24px;
+  border-radius: 17px;
+  outline: 1px solid rgba(0, 0, 0, 0.1);
 }
 
 /* Small state hugs the drop card: no linen weave, no beige surround — the
@@ -228,7 +253,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  border-radius: 24px;
+  border-radius: 17px;
 }
 
 @media (prefers-reduced-motion: reduce) {

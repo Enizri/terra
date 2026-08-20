@@ -37,7 +37,7 @@
 .sh-drop__label {
   font-weight: 700;
   color: #171717;
-  font-size: 15px;
+  font-size: calc(15px * var(--sh-read, 1));
 }
 
 /* ---- file canvas (column layout) ---- */
@@ -156,8 +156,8 @@
   position: absolute;
   left: 50%;
   top: 50%;
-  /* Starts under the card's bottom-centre; only the vertical gap is nudged. */
-  translate: 0 38px;
+  /* Tiny drop below the parked tile so the stroke starts under the card. */
+  translate: 0 10px;
   z-index: 15;
   overflow: visible;
   pointer-events: none;
@@ -176,8 +176,8 @@
 }
 
 .sh-tile--flight {
-  width: 148px;
-  height: 148px;
+  width: var(--sh-flight-tile, 148px);
+  height: var(--sh-flight-tile, 148px);
   border-radius: 1.25rem;
   box-shadow: 0 20px 30px rgba(0, 0, 0, 0.18);
 }

@@ -1,9 +1,10 @@
-import { motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { inView, rise, stagger } from "../../../shared/motion";
 import { copy, diagramNodes, MONITOR_DEMO_SPANS } from "../data";
 import { ASK_HINTS, IMPLEMENT_HINTS, TheaterPanel } from "../theater";
 import { PENCIL_INK, RepoMapDiagram, RepoWindowHeader, WindowChrome } from "../primitives";
+import { PlaygroundStage } from "./PlaygroundStage";
 
 /** Instant marketing preview + Terra chat (Ask / Implement — no live iframe). */
 function OpsPreview({
@@ -83,29 +84,25 @@ function MonitorDemo() {
   );
 }
 
-type OpsTabId = (typeof copy.ops)[number]["id"] | "map";
+type OpsTabId = (typeof copy.ops)[number]["id"];
 
-const OPS_TABS: { id: OpsTabId; label: string }[] = [
-  ...copy.ops.map((o) => ({ id: o.id as OpsTabId, label: o.label })),
-  { id: "map", label: "Map" },
-];
+const OPS_ITEMS = copy.ops;
 
 /** Tabbed ops screen for Power of Terra. */
 function OpsStage({
   active,
   mounted,
-  caption = true,
 }: {
   active: OpsTabId;
   mounted: ReadonlySet<OpsTabId>;
-  caption?: boolean;
 }) {
-  const op = copy.ops.find((o) => o.id === active);
-
   const pane = (id: OpsTabId, node: ReactNode) =>
     mounted.has(id) ? (
       <div
         key={id}
+        id={`power-pane-${id}`}
+        role="tabpanel"
+        aria-labelledby={`power-tab-${id}`}
         className={`sh-ops__pane${active === id ? " is-active" : ""}`}
         aria-hidden={active !== id}
         // Keep panes mounted when inactive so tab switches stay instant.
@@ -126,51 +123,152 @@ function OpsStage({
           )}
           {pane("map", <RepoMapDiagram hoverOnly showHeader={false} />)}
           {pane("monitor", <MonitorDemo />)}
+          {pane("collaborate", <PlaygroundStage />)}
         </div>
       </div>
-      {caption && op && (
-        <p className="sh-ops__caption" key={op.id}>
-          {op.caption}
-        </p>
-      )}
     </motion.div>
   );
 }
 
-/** Pencil curl from the Power title toward the ops tabs. */
+/** Left capability list — active expands caption; inactive stay slightly blurred. */
+function OpsCapabilityList({
+  active,
+  onSelect,
+}: {
+  active: OpsTabId;
+  onSelect: (id: OpsTabId) => void;
+}) {
+  const reduced = useReducedMotion();
+
+  return (
+    <div className="sh-power-list" role="tablist" aria-label="Terra operations">
+      {OPS_ITEMS.map((item) => {
+        const isActive = active === item.id;
+        return (
+          <div
+            key={item.id}
+            className={`sh-power-list__item${isActive ? " is-active" : ""}`}
+          >
+            <button
+              type="button"
+              id={`power-tab-${item.id}`}
+              role="tab"
+              aria-selected={isActive}
+              aria-controls={`power-pane-${item.id}`}
+              className="sh-power-list__btn"
+              onClick={() => onSelect(item.id)}
+            >
+              {item.label}
+            </button>
+            <AnimatePresence initial={false}>
+              {isActive && (
+                <motion.p
+                  key={item.id}
+                  className="sh-power-list__caption"
+                  initial={reduced ? false : { height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={reduced ? undefined : { height: 0, opacity: 0 }}
+                  transition={{ duration: 0.28, ease: "easeOut" }}
+                >
+                  <span>{item.caption}</span>
+                </motion.p>
+              )}
+            </AnimatePresence>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** "The Power of Terra" sketched into the blank gap above the section. */
+const GAP_TITLE_WORDS = ["The", "Power", "of", "Terra"];
+
+function GapTitle() {
+  const reduced = useReducedMotion();
+  return (
+    <div className="sh-power-gap-title" aria-hidden>
+      {GAP_TITLE_WORDS.map((word, i) => (
+        <motion.span
+          key={word}
+          className="sh-power-gap-title__word"
+          // Fills in left-to-right like the curl draws — never `y`/`opacity`,
+          // which would overwrite the staircase transform the CSS sets.
+          initial={reduced ? false : { clipPath: "inset(0% 100% 0% 0%)" }}
+          whileInView={{ clipPath: "inset(0% 0% 0% 0%)" }}
+          // Default `amount` only: the gap title overflows the section box, so
+          // its intersection ratio never reaches a fractional threshold.
+          viewport={{ once: true }}
+          transition={{ duration: 0.55, ease: "easeOut", delay: i * 0.22 }}
+        >
+          {word}
+        </motion.span>
+      ))}
+    </div>
+  );
+}
+
+/** Hand-drawn "Try it yourself" note that drops onto the demo card's top edge. */
+/* Drops from under the words on the right, loops once, then descends into the
+   card — so the arrow lands pointing down at the top edge, not sideways. */
+const NOTE_CURL_D =
+  "M 158 4 C 176 46, 150 78, 140 104" +
+  " C 132 126, 106 142, 96 128 C 88 116, 108 100, 122 114" +
+  " C 140 132, 122 176, 94 206 C 91 210, 89 216, 88 224";
+
+/** Seconds the curl takes to draw itself once the note scrolls into view. */
+const NOTE_DRAW_S = 1.7;
+
 function TryItNote() {
   const reduced = useReducedMotion();
-  const d =
-    "M 24 30 C 74 14, 124 36, 120 78" +
-    " C 116 116, 68 122, 62 94" +
-    " C 57 70, 98 62, 112 94" +
-    " C 132 140, 112 226, 52 300";
-  const head = "M 78 286 L 51 302 L 47 268";
-  const stroke = { fill: "none", stroke: PENCIL_INK, strokeLinecap: "round" } as const;
+  // Draws once when the note comes into view — the pencil writes, it doesn't pop.
   const draw = reduced
     ? {}
     : {
         initial: { pathLength: 0 },
         whileInView: { pathLength: 1 },
         viewport: { once: true, amount: 0.6 },
-        transition: { duration: 1.1, ease: "easeInOut" as const },
       };
+
   return (
-    <svg className="sh-tryit" viewBox="0 0 176 320" aria-hidden overflow="visible">
-      <g filter="url(#sh-pencil)" opacity={0.72}>
-        <motion.path d={d} {...stroke} strokeWidth={2.4} {...draw} />
-        <motion.path
-          d={head}
-          {...stroke}
-          strokeWidth={2.2}
-          {...draw}
-          transition={{ ...draw.transition, delay: 0.9, duration: 0.3 }}
-        />
-        <text className="sh-tryit__word" x="4" y="16" transform="rotate(-7 4 16)">
-          Try it
-        </text>
-      </g>
-    </svg>
+    <div className="sh-power-note" aria-hidden>
+      <motion.span
+        className="sh-power-note__text"
+        initial={reduced ? false : { opacity: 0 }}
+        whileInView={{ opacity: 1 }}
+        viewport={{ once: true, amount: 0.6 }}
+        transition={{ duration: 0.5 }}
+      >
+        Try it yourself
+      </motion.span>
+      <svg className="sh-power-note__line" viewBox="0 0 200 230" fill="none">
+        <g filter="url(#sh-pencil)" stroke={PENCIL_INK} strokeLinecap="round" fill="none">
+          <motion.path
+            d={NOTE_CURL_D}
+            strokeWidth={3.4}
+            opacity={0.72}
+            {...draw}
+            transition={{ duration: NOTE_DRAW_S, ease: "easeInOut", delay: 0.25 }}
+          />
+          <motion.path
+            d={NOTE_CURL_D}
+            strokeWidth={7}
+            opacity={0.12}
+            {...draw}
+            transition={{ duration: NOTE_DRAW_S, ease: "easeInOut", delay: 0.25 }}
+          />
+          {/* Arrowhead lands only once the line has reached the card. */}
+          <motion.path
+            d="M 72 206 L 88 227 L 104 208"
+            strokeWidth={3.4}
+            initial={reduced ? false : { opacity: 0 }}
+            whileInView={{ opacity: 0.7 }}
+            viewport={{ once: true, amount: 0.6 }}
+            transition={{ duration: 0.3, delay: NOTE_DRAW_S }}
+          />
+        </g>
+      </svg>
+    </div>
   );
 }
 
@@ -204,64 +302,44 @@ export function PowerSection() {
   return (
     <motion.section
       ref={sectionRef}
-      className="sh-section"
+      className="sh-section sh-section--power"
       initial="hidden"
       whileInView="show"
       variants={stagger}
       viewport={inView}
     >
-      <div className="sh-copy sh-copy--section" style={{ position: "relative" }}>
-        <motion.h3 className="sh-section-title sh-section-title--note" variants={rise}>
-          {copy.powerTitle}
-          <TryItNote />
-        </motion.h3>
-        <motion.p className="sh-p1" variants={rise}>
-          {copy.power}
-        </motion.p>
-      </div>
-
       <div className="sh-stage sh-stage--power">
-        <motion.div className="sh-window-wrap" variants={rise}>
-          <div className="sh-power-theater">
-            <img
-              className="sh-power-theater__wallpaper"
-              src="/images/theater/power-wallpaper.jpg"
-              alt=""
-              aria-hidden
-              draggable={false}
-            />
-            <div className="sh-power-theater__screen">
-              <WindowChrome toolbar={false}>
-                <div className="sh-window-body">
-                  <motion.div
-                    className="sh-diagram sh-power-ops"
-                    initial="hidden"
-                    animate="show"
-                  >
-                    <RepoWindowHeader />
-                    <OpsStage active={active} mounted={mounted} caption={false} />
-                  </motion.div>
-                </div>
-              </WindowChrome>
-            </div>
-            {/* Tab bar sits on the wallpaper strip below the product screen. */}
-            <div
-              className="sh-ops__tabs sh-power-theater__tabs"
-              role="tablist"
-              aria-label="Terra operations"
-            >
-              {OPS_TABS.map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={active === t.id}
-                  className={`sh-ops__tab${active === t.id ? " is-active" : ""}`}
-                  onClick={() => selectTab(t.id)}
-                >
-                  {t.label}
-                </button>
-              ))}
+        <motion.div className="sh-power-stage" variants={rise}>
+          <GapTitle />
+          <div className="sh-power-rail">
+            {/* No headline — the capability list is the section's own title. */}
+            <h3 className="sh-sr-only">{copy.powerTitle}</h3>
+            <OpsCapabilityList active={active} onSelect={selectTab} />
+          </div>
+          <div className="sh-window-wrap">
+            <TryItNote />
+            <div className="sh-power-theater">
+              <img
+                className="sh-power-theater__wallpaper"
+                src="/images/theater/power-wallpaper.jpg"
+                alt=""
+                aria-hidden
+                draggable={false}
+              />
+              <div className="sh-power-theater__screen">
+                <WindowChrome toolbar={false}>
+                  <div className="sh-window-body">
+                    <motion.div
+                      className="sh-diagram sh-power-ops"
+                      initial="hidden"
+                      animate="show"
+                    >
+                      <RepoWindowHeader />
+                      <OpsStage active={active} mounted={mounted} />
+                    </motion.div>
+                  </div>
+                </WindowChrome>
+              </div>
             </div>
           </div>
         </motion.div>
@@ -269,5 +347,3 @@ export function PowerSection() {
     </motion.section>
   );
 }
-
-/* ---------- Terra playground (last screen) ---------- */
