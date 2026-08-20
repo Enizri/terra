@@ -5,6 +5,7 @@ __pycache__/
 *.db
 !backend/api/internal/store/testdata/*.db
 /terra
+node_modules/
 .DS_Store
 .cache/
 .superpowers/

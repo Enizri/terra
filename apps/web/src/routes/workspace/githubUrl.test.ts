@@ -4,16 +4,16 @@ import { extractGitHubURL } from "./githubUrl.ts";
 
 test("https github URLs normalize to canonical form", () => {
   assert.equal(
-    extractGitHubURL("https://github.com/usememos/memos"),
-    "https://github.com/usememos/memos",
+    extractGitHubURL("https://github.com/terra/terra"),
+    "https://github.com/terra/terra",
   );
   assert.equal(
-    extractGitHubURL("https://github.com/usememos/memos.git"),
-    "https://github.com/usememos/memos",
+    extractGitHubURL("https://github.com/terra/terra.git"),
+    "https://github.com/terra/terra",
   );
   assert.equal(
-    extractGitHubURL("https://github.com/usememos/memos/tree/main"),
-    "https://github.com/usememos/memos",
+    extractGitHubURL("https://github.com/terra/terra/tree/main"),
+    "https://github.com/terra/terra",
   );
 });
 

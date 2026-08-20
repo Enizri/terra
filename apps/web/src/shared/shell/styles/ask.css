@@ -22,7 +22,7 @@
   height: 100%;
 }
 
-/* Light Claude-like skin — scoped so landing theater stays dark Cursor-like. */
+/* Light chat skin — scoped so the landing theater dock stays dark. */
 .sh-ws__dock .sh-terra-chat--ws {
   background: #fff;
   color: #111;
@@ -207,7 +207,7 @@
   color: #a3a3a3;
 }
 
-/* ---- Claude-like thinking + process + markdown ---- */
+/* ---- thinking + process + markdown ---- */
 
 .sh-ws-think {
   border: 1px solid rgba(0, 0, 0, 0.08);
