@@ -3,7 +3,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { copy } from "./data.ts";
-import { INSTANCE_FLOATS, MAX_INSTANCES, layoutGlobe, type GlobeFrame } from "./globeLayout.ts";
+import {
+  INSTANCE_FLOATS,
+  MAX_INSTANCES,
+  globeJourneyProgress,
+  layoutGlobe,
+  layoutGlobeJourney,
+  type GlobeFrame,
+} from "./globeLayout.ts";
 
 const SIZE = 560;
 const buf = new Float32Array(MAX_INSTANCES * INSTANCE_FLOATS);
@@ -106,4 +113,53 @@ test("glyphs flip between dim, mid and white", () => {
   assert.ok(tones.dim > 100, `dim ${tones.dim}`);
   assert.ok(tones.mid > 100, `mid ${tones.mid}`);
   assert.ok(tones.white > 100, `white ${tones.white}`);
+});
+
+test("the scroll journey keeps the globe, stretches it, then converges on the screen", () => {
+  const journey = (progress: number) =>
+    layoutGlobeJourney(
+      {
+        ...frame(),
+        progress,
+        startX: SIZE * 0.75,
+        startY: SIZE * 0.45,
+        targetX: SIZE * 0.6,
+        targetY: SIZE * 0.9,
+      },
+      buf,
+    );
+
+  const start = journey(0);
+  assert.ok(spread(start) > SIZE * 0.6, "starts as a full globe");
+  const startAlpha = Array.from(
+    { length: start },
+    (_, i) => buf[i * INSTANCE_FLOATS + 7],
+  );
+
+  const middle = journey(0.65);
+  const middleHeight = Math.max(
+    ...Array.from({ length: middle }, (_, i) => buf[i * INSTANCE_FLOATS + 1]),
+  ) - Math.min(...Array.from({ length: middle }, (_, i) => buf[i * INSTANCE_FLOATS + 1]));
+  assert.ok(middleHeight > SIZE * 0.75, "middle stretches into long streams");
+  const travelling = Array.from({ length: middle }, (_, i) => i).filter(
+    (i) => buf[i * INSTANCE_FLOATS + 7] >= startAlpha[i] * 0.5,
+  );
+  assert.ok(
+    travelling.length > middle * 0.9,
+    `the whole globe should join the flow (${travelling.length}/${middle})`,
+  );
+
+  const end = journey(0.9);
+  const visibleEndXs = Array.from({ length: end }, (_, i) => i)
+    .filter(
+      (i) =>
+        buf[i * INSTANCE_FLOATS + 7] > 0.05 &&
+        buf[i * INSTANCE_FLOATS + 1] > SIZE * 0.75,
+    )
+    .map((i) => buf[i * INSTANCE_FLOATS]);
+  assert.ok(Math.max(...visibleEndXs) - Math.min(...visibleEndXs) < SIZE * 0.35);
+
+  assert.equal(globeJourneyProgress(20, SIZE * 2, SIZE), 0);
+  assert.ok(globeJourneyProgress(-SIZE / 2, SIZE * 0.6, SIZE) > 0.5);
+  assert.equal(globeJourneyProgress(-SIZE, SIZE * 0.24, SIZE), 1);
 });

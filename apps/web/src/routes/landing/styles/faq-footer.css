@@ -28,7 +28,7 @@
    the rest of the site keeps tokens.css' #000 on #f9f8f5. */
 .terra-section,
 .terra-footer {
-  --sh-bg: #e3e4e7;
+  --sh-bg: #f9f9fb;
   --sh-ink: #141510;
   --sh-muted: #6a6c62;
   --sh-border: rgba(20, 21, 16, 0.12);

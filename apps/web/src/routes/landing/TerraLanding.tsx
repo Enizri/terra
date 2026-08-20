@@ -2,11 +2,14 @@ import { MotionConfig, useReducedMotion } from "motion/react";
 import { useEffect } from "react";
 import "@fontsource-variable/geist";
 import "@fontsource-variable/geist-mono";
+// Gilda Display: the landing's serif display face. 400 is the only weight it ships.
+import "@fontsource/gilda-display/400.css";
 import "../../shared/styles/tokens.css";
 import "../../shared/styles/ui.css";
 import "./landing.css";
 import { SiteNav } from "./sections/SiteNav";
 import { HeroChars } from "./sections/HeroChars";
+import { GlobeJourney } from "./sections/GlobeJourney";
 import { PowerSection } from "./sections/PowerSection";
 import { Faq } from "./sections/Faq";
 import { Final } from "./sections/Final";
@@ -105,8 +108,10 @@ export default function TerraLanding() {
       <div className="sh-root sh-root--landing">
         <SiteNav />
 
-        <HeroChars />
-        <PowerSection />
+        <GlobeJourney>
+          <HeroChars />
+          <PowerSection />
+        </GlobeJourney>
         <Faq />
         <Final />
       </div>

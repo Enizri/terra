@@ -205,6 +205,13 @@ export const copy = {
   },
   heroEyebrow: "Built for agentic development.",
   heroHeadline: "Software that only humans can understand.",
+  /** Two-tone hero headline: `lead` in ink, `muted` in grey, split on an
+      explicit line break. Distinct from `heroTitle`, which feeds the retired
+      word-swap hero in `sections/Hero.tsx`. */
+  heroHeadlineParts: {
+    lead: "Software that only",
+    muted: "humans can understand.",
+  },
   heroSubtitle:
     "Terra maps your repo, then runs it in the cloud so you can change the live software — no local setup.",
   /** Wrapped around the hero globe as one glyph per cell. Away from the
@@ -253,9 +260,6 @@ export const copy = {
     primary: { label: "Get started", href: "#" },
     secondary: { label: "See how teams use Terra", href: "#power" },
   },
-  powerTitle: "The power of Terra",
-  power:
-    "One map of your repo. Select any component, chat with it, and the change lands on the fly — no cloning, no local setup. Ask questions, implement with Terra in the loop, and monitor what the architecture says is alive.",
   /** Fallback demo clip when an op has no dedicated video. */
   opsVideo: "/videos/landing/ask-terra.mp4",
   ops: [

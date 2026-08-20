@@ -115,6 +115,37 @@ export type GlobeFrame = {
   reduced: boolean;
 };
 
+export type GlobeJourneyFrame = GlobeFrame & {
+  /** Scroll-scrubbed transformation, 0 = globe and 1 = inside the screen. */
+  progress: number;
+  startX: number;
+  startY: number;
+  targetX: number;
+  targetY: number;
+};
+
+const STREAMS = 32;
+
+const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
+const mix = (a: number, b: number, t: number) => a + (b - a) * t;
+const smoothstep = (from: number, to: number, value: number) => {
+  const t = clamp01((value - from) / Math.max(to - from, 0.001));
+  return t * t * (3 - 2 * t);
+};
+
+/** Starts when the hero/journey reaches the viewport top and completes as the
+ * real screen reaches the upper quarter. Both endpoints come from the DOM. */
+export function globeJourneyProgress(
+  journeyTop: number,
+  screenTop: number,
+  viewportHeight: number,
+) {
+  if (!(viewportHeight > 0)) return 0;
+  if (journeyTop >= 0) return 0;
+  const distance = screenTop - journeyTop - viewportHeight * 0.24;
+  return clamp01(-journeyTop / Math.max(distance, 1));
+}
+
 /** Writes one frame's quads into `out` and returns how many were written.
  *  `glyphsOut`, when given, receives the character drawn by each quad — the
  *  only way to assert on what the lens actually decoded. */
@@ -225,5 +256,54 @@ export function layoutGlobe(f: GlobeFrame, out: Float32Array, glyphsOut?: string
       if (n >= MAX_INSTANCES) return n;
     }
   }
+  return n;
+}
+
+/** Reuses every hero-globe quad and scroll-morphs the whole sphere into a
+ * flowing curtain of character streams. Nothing is sampled or dropped. */
+export function layoutGlobeJourney(f: GlobeJourneyFrame, out: Float32Array): number {
+  const p = clamp01(f.progress);
+  const shape = smoothstep(0, 0.72, p);
+  const vanish = 1 - smoothstep(0.9, 1, p);
+  const paneW = f.width ?? f.size;
+  const paneH = f.height ?? f.size;
+  const sourceX = paneW / 2;
+  const sourceY = paneH / 2;
+  const n = layoutGlobe(f, out);
+  const rows = Math.max(2, Math.ceil(n / STREAMS));
+
+  const travel = easeInOutQuad(p);
+  const centerX = mix(f.startX, f.targetX, travel);
+  const centerY =
+    mix(f.startY, f.targetY, travel) - Math.sin(travel * Math.PI) * paneH * 0.08;
+  const tail = paneH * 1.45;
+  const startSpread = Math.min(paneW * 0.42, 520);
+
+  for (let i = 0; i < n; i++) {
+    const o = i * INSTANCE_FLOATS;
+    const x = out[o] - sourceX;
+    const y = out[o + 1] - sourceY;
+    const lane = i % STREAMS;
+    const row = Math.floor(i / STREAMS);
+    const laneT = lane / (STREAMS - 1) - 0.5;
+    const rowT = Math.min(1, row / (rows - 1));
+    const converge = rowT * rowT;
+    const streamX =
+      f.targetX +
+      laneT * mix(startSpread, 18, converge) +
+      Math.sin(rowT * Math.PI * 3 + lane * 0.8) * 22 * (1 - converge);
+    const streamY =
+      f.targetY - tail * (1 - rowT) + Math.sin(rowT * Math.PI * 4 + lane) * 8;
+
+    out[o] = mix(centerX + x, streamX, shape);
+    out[o + 1] = mix(centerY + y, streamY, shape);
+    out[o + 2] = mix(out[o + 2], 12, shape);
+    // The hero globe is light on charcoal; the streams become ink on paper.
+    out[o + 4] = mix(out[o + 4], 0.18, shape);
+    out[o + 5] = mix(out[o + 5], 0.18, shape);
+    out[o + 6] = mix(out[o + 6], 0.22, shape);
+    out[o + 7] *= vanish;
+  }
+
   return n;
 }
