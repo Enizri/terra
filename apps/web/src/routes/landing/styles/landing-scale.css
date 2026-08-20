@@ -1,4 +1,4 @@
-/* Landing layout tokens — painting card is wide; product window stays Folk 720px. */
+/* Landing layout tokens — painting card is wide; product window stays 720px. */
 
 .sh-root--landing {
   --sh-hero-window: 720px;

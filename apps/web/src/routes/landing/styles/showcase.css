@@ -7,7 +7,7 @@
   max-width: none;
 }
 
-/* Hero product — Folk video slot: outer 720×412 gray mat, hangs under the copy. */
+/* Hero product — video slot: outer 720×412 gray mat, hangs under the copy. */
 
 .sh-section--hero .sh-stage--hero {
   position: relative;
@@ -34,7 +34,7 @@
   min-height: 0;
 }
 
-/* Folk painting card: near-full-bleed, 40px corners.
+/* Painting card: near-full-bleed, 40px corners.
    Extra bottom padding grows the painting downward without lifting the copy. */
 
 .sh-power-theater.sh-hero-card {

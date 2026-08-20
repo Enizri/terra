@@ -11,7 +11,7 @@
   position: sticky;
   top: 0;
   z-index: 50;
-  /* Folk first-screen chrome: 16px page inset, cream strip above the painting. */
+  /* First-screen chrome: 16px page inset, cream strip above the painting. */
   padding: calc(16px * var(--sh-read, 1)) calc(16px * var(--sh-read, 1)) 0;
   font-size: calc(16px * var(--sh-read, 1));
   /* Sticky already layers; keep nav compositing off the scrolling document. */
@@ -120,7 +120,7 @@
   width: 100%;
 }
 
-/* Hero only: sticky pin + Folk painting card positioning context.
+/* Hero only: sticky pin + painting card positioning context.
    --hero-stick-top frames the painting under the nav while stuck. */
 
 .sh-section--hero {
@@ -133,7 +133,7 @@
   background-color: var(--sh-bg);
   z-index: 1;
   overflow-x: clip;
-  /* Override .sh-section's 0 16px — Folk card uses its own 16px inset. */
+  /* Override .sh-section's 0 16px — the painting card uses its own 16px inset. */
   padding: calc(16px * var(--sh-read, 1)) calc(16px * var(--sh-read, 1)) 0;
 }
 
@@ -272,7 +272,7 @@
 }
 
 .sh-copy--hero {
-  /* Overlay on the painting — Folk hero-on-painting column.
+  /* Overlay on the painting — hero-on-painting column.
      Vertical rhythm comes from the card padding + title margin. */
   position: relative;
   z-index: 10;
@@ -348,7 +348,7 @@
 }
 
 .sh-root h2.sh-hero-title {
-  /* Folk display: clamp(36px, 5.2vw, 60px) / 600 / 1.05 / -0.028em / 20ch
+  /* Display type: clamp(36px, 5.2vw, 60px) / 600 / 1.05 / -0.028em / 20ch
      Beats `.sh-root h2` token defaults for weight / tracking / leading. */
   margin: 48px 0 0;
   max-width: 20ch;

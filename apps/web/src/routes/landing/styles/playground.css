@@ -153,7 +153,7 @@
   background: #ff7a45;
 }
 
-/* Hero screen = Folk video slot.
+/* Hero screen = the 720px video slot.
    Outer mat: 720×412, #f3f3f3, 8px pad, 24px radius.
    Inner: aspect-video 704×396, 17px radius. */
 
@@ -188,7 +188,7 @@
   width: 100%;
   max-width: none;
   height: auto;
-  /* Room for the expanded film — taller + wider than the Folk preview slot. */
+  /* Room for the expanded film — taller + wider than the preview slot. */
   min-height: 860px;
   padding: 20px;
   border-radius: 28px;

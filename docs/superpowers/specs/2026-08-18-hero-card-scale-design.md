@@ -1,8 +1,8 @@
-# Folk-sized landing hero card
+# Full-bleed landing hero card
 
 ## Goal
 
-Match Folk's full painted hero-card geometry in Terra while preserving Terra's GitHub drag and expanded workspace. Keep the painting directly below the navigation instead of vertically centering it on tall screens.
+Give the Terra landing a full painted hero card — the painting runs nearly edge to edge and taller than the viewport — while preserving Terra's GitHub drag and expanded workspace. Keep the painting directly below the navigation instead of vertically centering it on tall screens.
 
 ## Approved behavior
 

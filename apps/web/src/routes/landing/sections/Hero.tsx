@@ -95,7 +95,7 @@ const TRAIL_LEAD = 0.24;
 /** Fill speed relative to the drag — >1 so the pencil pulls further ahead. */
 const TRAIL_FILL_RATE = 0.95;
 
-/** Where the trail points: top-center of the Folk-sized video / drop frame. */
+/** Where the trail points: top-center of the 720px video / drop frame. */
 const TRAIL_END_Y = -160;
 
 /** Sideways nudge on the trail's end so the arrow sits over the drop target. */
@@ -465,7 +465,7 @@ export function Hero() {
       if (parked) dragGeomLocked.current = false;
 
       const cardOffset = card.offsetTop;
-      // Folk keeps the painting directly below the nav on tall screens too.
+      // The painting stays directly below the nav on tall screens too.
       const gap = LANDING_GAP_MIN;
       // Negative sticky top pulls the hero up so the painting sits at `gap`.
       const stickTop = gap - cardOffset;
@@ -565,7 +565,7 @@ export function Hero() {
         variants={stagger}
       >
         <LayoutGroup>
-          {/* Folk-style first screen: wallpaper, copy, and product share one card. */}
+          {/* First screen: wallpaper, copy, and product share one card. */}
           <div className="sh-power-theater sh-hero-theater sh-hero-card" ref={cardRef}>
             <img
               className="sh-power-theater__wallpaper"
