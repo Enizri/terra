@@ -146,6 +146,18 @@ export function globeJourneyProgress(
   return clamp01(-journeyTop / Math.max(distance, 1));
 }
 
+/** Softens discrete wheel/touchpad steps without changing scroll endpoints. */
+export function smoothGlobeJourneyProgress(current: number, target: number, dt: number) {
+  const next = clamp01(current) +
+    (clamp01(target) - clamp01(current)) * (1 - Math.exp(-Math.max(0, dt) / 0.12));
+  return Math.abs(target - next) < 0.0005 ? clamp01(target) : next;
+}
+
+/** Holds the glyph topology steady while the globe stretches into streams. */
+export function globeJourneyClockRate(progress: number) {
+  return 1 - smoothstep(0, 0.18, progress);
+}
+
 /** Writes one frame's quads into `out` and returns how many were written.
  *  `glyphsOut`, when given, receives the character drawn by each quad — the
  *  only way to assert on what the lens actually decoded. */

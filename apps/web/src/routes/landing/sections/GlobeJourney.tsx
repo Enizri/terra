@@ -5,8 +5,10 @@ import { diagramEdges, diagramGroups, diagramNodes } from "../data";
 import { createGlobeRenderer } from "../globeGL";
 import {
   HOVER_R,
+  globeJourneyClockRate,
   globeJourneyProgress,
   layoutGlobeJourney,
+  smoothGlobeJourneyProgress,
 } from "../globeLayout";
 
 const MOUSE_LOOK = 0.22;
@@ -48,13 +50,13 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
     let visible = true;
     let width = 0;
     let height = 0;
-    let startedAt = -1;
     let last = 0;
+    let globeT = 0;
+    let shownProgress = 0;
     const mouseFollow = (dt: number) => 1 - Math.pow(0.9, dt * 60);
 
-    const draw = (now: number, dt: number) => {
+    const draw = (dt: number) => {
       if (disposed || width <= 0 || height <= 0) return 1;
-      if (startedAt < 0) startedAt = now;
       const rootRect = root.getBoundingClientRect();
       if (rootRect.bottom < 0 || rootRect.top > height) return 1;
       const screen = root.querySelector<HTMLElement>(
@@ -64,7 +66,10 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
 
       const canvasRect = canvas.getBoundingClientRect();
       const screenRect = screen.getBoundingClientRect();
-      const progress = globeJourneyProgress(rootRect.top, screenRect.top, height);
+      const targetProgress = globeJourneyProgress(rootRect.top, screenRect.top, height);
+      shownProgress = smoothGlobeJourneyProgress(shownProgress, targetProgress, dt);
+      const progress = shownProgress;
+      globeT += dt * globeJourneyClockRate(progress);
       const desktop = width > 900;
       const size = desktop
         ? Math.min(width * 0.48, height * 0.82)
@@ -95,7 +100,7 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
           size,
           width,
           height,
-          t: 2 + (now - startedAt) / 1000 + progress * 6,
+          t: globeT,
           pointerX: sourcePointerX,
           pointerY: sourcePointerY,
           yaw: p.sx * MOUSE_LOOK + progress * 0.42,
@@ -145,7 +150,7 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
       if (disposed || !visible || document.hidden) return;
       const dt = last ? Math.min(0.05, (now - last) / 1000) : 1 / 60;
       last = now;
-      const progress = draw(now, dt);
+      const progress = draw(dt);
       if (progress < 1) frame = requestAnimationFrame(tick);
     };
     const play = () => {

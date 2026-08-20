@@ -337,12 +337,6 @@ export const faq = {
   ],
 };
 
-export const closing = {
-  title: "Put your repo on the map.",
-  copy: "Point Terra at a repo and it draws the architecture in a couple of minutes. No install.",
-  cta: "Map your repo",
-};
-
 export const footer = {
   tagline: "One map of your repo. A human approves every merge.",
   cols: [

@@ -19,8 +19,6 @@
   --sh-shadow-film-hover: 0 30px 90px rgba(20, 21, 16, 0.22);
   --sh-shadow-hero-card: 0 18px 80px rgba(0, 0, 0, 0.18);
   --sh-presence: #3f9d6e;
-  --sh-tone-coral: oklch(0.83 0.085 38);
-  --sh-tone-coral-ink: oklch(0.26 0.06 35);
   --sh-tone-muted: oklch(0.89 0.006 106.5);
 }
 
@@ -154,14 +152,6 @@
   font-size: clamp(2.6rem, 6vw, 4.5rem);
   line-height: 0.98;
   letter-spacing: -0.02em;
-}
-
-.terra-h3--cta {
-  margin: 0;
-  font-size: clamp(2rem, 5vw, 3rem);
-  line-height: 1.05;
-  font-weight: 600;
-  letter-spacing: -0.01em;
 }
 
 .terra-lead {
@@ -1061,53 +1051,6 @@
   font-size: 14px;
   line-height: 1.6;
   color: var(--sh-muted);
-}
-
-/* ---------- closing CTA ---------- */
-
-.terra-cta {
-  position: relative;
-  overflow: hidden;
-  padding: 56px 32px;
-  border-radius: var(--sh-r-xl);
-  text-align: center;
-  background: var(--sh-tone-coral);
-  color: var(--sh-tone-coral-ink);
-}
-
-@media (min-width: 640px) {
-  .terra-cta {
-    padding: 80px 48px;
-  }
-}
-
-.terra-cta__art {
-  margin: 0 auto 8px;
-  height: 112px;
-  width: auto;
-}
-
-@media (min-width: 640px) {
-  .terra-cta__art {
-    height: 128px;
-  }
-}
-
-.terra-cta__copy {
-  margin: 16px auto 0;
-  max-width: 28rem;
-  font-size: 14px;
-  line-height: 1.6;
-  opacity: 0.82;
-}
-
-.terra-cta__actions {
-  margin-top: 28px;
-}
-
-.terra-cta .terra-pill--fill {
-  background: var(--sh-tone-coral-ink);
-  color: var(--sh-tone-coral);
 }
 
 /* ---------- footer ---------- */

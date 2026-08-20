@@ -30,3 +30,10 @@ test("hover hole shows the playground RepoDiagram, not glyph labels", () => {
   assert.match(css, /clip-path:\s*circle\(0px at 50% 50%\)/);
   assert.doesNotMatch(css, /#101116/);
 });
+
+test("reload plays the character bloom before the globe settles", () => {
+  assert.match(journeySource, /let globeT = 0/);
+  assert.match(journeySource, /globeT \+= dt \* globeJourneyClockRate\(progress\)/);
+  assert.match(journeySource, /t:\s*globeT/);
+  assert.doesNotMatch(journeySource, /t:\s*2 \+/);
+});

@@ -6,9 +6,11 @@ import { copy } from "./data.ts";
 import {
   INSTANCE_FLOATS,
   MAX_INSTANCES,
+  globeJourneyClockRate,
   globeJourneyProgress,
   layoutGlobe,
   layoutGlobeJourney,
+  smoothGlobeJourneyProgress,
   type GlobeFrame,
 } from "./globeLayout.ts";
 
@@ -162,4 +164,18 @@ test("the scroll journey keeps the globe, stretches it, then converges on the sc
   assert.equal(globeJourneyProgress(20, SIZE * 2, SIZE), 0);
   assert.ok(globeJourneyProgress(-SIZE / 2, SIZE * 0.6, SIZE) > 0.5);
   assert.equal(globeJourneyProgress(-SIZE, SIZE * 0.24, SIZE), 1);
+});
+
+test("scroll progress eases toward both directions without changing its endpoints", () => {
+  const down = smoothGlobeJourneyProgress(0, 1, 1 / 60);
+  assert.ok(down > 0 && down < 1);
+  assert.ok(smoothGlobeJourneyProgress(down, 0, 1 / 60) < down);
+  assert.equal(smoothGlobeJourneyProgress(0, 1, 1), 1);
+});
+
+test("the character clock eases to a stop before the stream stage", () => {
+  assert.equal(globeJourneyClockRate(0), 1);
+  assert.ok(globeJourneyClockRate(0.09) > 0 && globeJourneyClockRate(0.09) < 1);
+  assert.equal(globeJourneyClockRate(0.18), 0);
+  assert.equal(globeJourneyClockRate(1), 0);
 });
