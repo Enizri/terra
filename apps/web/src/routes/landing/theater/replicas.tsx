@@ -161,7 +161,16 @@ export function MemosHomeReplica() {
         </header>
         <div className="rp-home__board" data-sel="board" data-sel-label="Notes board">
           <div className="rp-home__composer" data-sel="composer" data-sel-label="Composer">
-            <span className="rp-avatar" data-sel="avatar" data-sel-label="Avatar" />
+            <img
+              className="rp-avatar"
+              data-sel="avatar"
+              data-sel-label="Avatar"
+              src={`${users[0].photo}.webp`}
+              alt=""
+              width={22}
+              height={22}
+              draggable={false}
+            />
             <textarea
               placeholder="Any thoughts…"
               value={draft}
@@ -178,7 +187,7 @@ export function MemosHomeReplica() {
             {notes.map((n, i) => (
               <article className="rp-memo" data-sel={`note-${i}`} data-sel-label="Memo card" key={`${n.text}-${i}`}>
                 <header>
-                  <span className="rp-avatar" />
+                  <img className="rp-avatar" src={`${users[0].photo}.webp`} alt="" width={22} height={22} draggable={false} />
                   <div>
                     <b>you</b>
                     <time>{n.when}</time>
