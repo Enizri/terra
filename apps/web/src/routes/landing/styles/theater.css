@@ -674,6 +674,11 @@
   flex-shrink: 0;
 }
 
+.sh-replica img.rp-avatar {
+  display: block;
+  object-fit: cover;
+}
+
 .sh-replica .rp-avatar--lg {
   width: 40px;
   height: 40px;
@@ -1032,4 +1037,3 @@
 .sh-theater__panel--inline .sh-live {
   min-height: 0;
 }
-

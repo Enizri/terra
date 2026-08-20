@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { users } from "../data";
 /* ---------- replicas ---------- */
 
 const SEED_NOTES = [
@@ -57,19 +58,19 @@ function MemosReplica({ variant }: { variant: "app" | "notes" }) {
 
 const EXPLORE_NOTES = [
   {
-    who: "steven",
+    user: users[0],
     when: "2h ago",
     text: "Shipped the new sync engine — offline edits now merge cleanly.",
     tags: ["release", "sync"],
   },
   {
-    who: "bo",
+    user: users[1],
     when: "yesterday",
     text: "Reading list: add the SQLite WAL deep-dive before Thursday.",
     tags: ["reading"],
   },
   {
-    who: "terra",
+    user: users[2],
     when: "3d ago",
     text: "Idea: keyboard-first quick capture from anywhere in the app.",
     tags: ["idea", "ux"],
@@ -254,9 +255,9 @@ export function MemosExploreReplica() {
         {EXPLORE_NOTES.map((n, i) => (
           <article className="rp-memo" data-sel={`memo-${i}`} data-sel-label="Memo card" key={n.text}>
             <header>
-              <span className="rp-avatar" />
+              <img className="rp-avatar" src={`${n.user.photo}.webp`} alt="" width={22} height={22} draggable={false} />
               <div>
-                <b>{n.who}</b>
+                <b>{n.user.name}</b>
                 <time>{n.when}</time>
               </div>
               <span className="rp-memo__vis">Public</span>

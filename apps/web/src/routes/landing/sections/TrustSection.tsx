@@ -13,8 +13,8 @@ const PLAY_STEPS = 7;
 /** Cursor colors — match the users' avatar rings (bg-amber / indigo / green). */
 const PLAY_HEX: Record<string, string> = {
   "1": "#f59e0b",
-  "3": "#6366f1",
-  "4": "#22c55e",
+  "2": "#6366f1",
+  "3": "#22c55e",
 };
 
 type PlayCursor = {
@@ -27,18 +27,18 @@ type PlayCursor = {
 
 const PLAY_CURSORS: PlayCursor[] = [
   {
-    user: users[0], // Giel → the nav rail
+    user: users[0], // Evyatar → the nav rail
     path: [[68, 66], [3, 38], [3, 42], [6, 56], [9, 62], [11, 58], [60, 70]],
     // Announce one step before the edit lands, hold the bubble through it.
     say: { 1: "Paint the nav brand orange", 2: "Paint the nav brand orange" },
   },
   {
-    user: users[2], // Niels → the memo cards
+    user: users[1], // Maya → the memo cards
     path: [[42, 14], [48, 20], [54, 32], [56, 30], [58, 38], [50, 48], [44, 20]],
     say: { 3: "Rounder cards, please", 4: "Rounder cards, please" },
   },
   {
-    user: users[3], // Jeroen → the activity heatmap
+    user: users[2], // Leo → the activity heatmap
     path: [[86, 78], [80, 68], [70, 58], [40, 54], [19, 42], [16, 38], [80, 74]],
     say: { 4: "Light up the activity graph", 5: "Light up the activity graph" },
   },

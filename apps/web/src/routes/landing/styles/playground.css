@@ -480,8 +480,8 @@
   z-index: 40;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 12px 4px 6px;
+  gap: 8px;
+  padding: 6px 16px 6px 8px;
   border-radius: 999px;
   background: rgba(20, 21, 26, 0.72);
   backdrop-filter: blur(6px);
@@ -491,8 +491,8 @@
 }
 
 .sh-play-presence img {
-  width: 22px;
-  height: 22px;
+  width: 48px;
+  height: 48px;
   border-radius: 999px;
   border: 1.5px solid #14151a;
   object-fit: cover;
@@ -500,5 +500,5 @@
 }
 
 .sh-play-presence picture:not(:first-child) {
-  margin-left: -10px;
+  margin-left: -20px;
 }
