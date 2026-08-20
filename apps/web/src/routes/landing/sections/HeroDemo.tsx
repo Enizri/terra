@@ -18,7 +18,7 @@ const CRUMB_BOARD = "Web App › Notes board";
 
 /** Real server pipeline copy — the scan phase replays it verbatim. */
 const SCAN_LABELS = [
-  "Cloning github.com/usememos/memos",
+  "Cloning github.com/terra/terra",
   "Read 312 files across 5 languages",
   "Terra is reading the architecture",
   "Saving 6 components",
@@ -195,7 +195,7 @@ export function HeroScriptedDemo({ dropped }: { dropped: boolean }) {
       await click();
       filmRef.current?.openPreview(true);
 
-      // Beat 6 — Memos opens over the map; select the board.
+      // Beat 6 — the app opens over the map; select the board.
       const board = await waitForEl(() => theaterRef.current?.getSelEl("board") ?? null, signal);
       if (!board) return;
       await sleep(700, signal); // panel entrance settles

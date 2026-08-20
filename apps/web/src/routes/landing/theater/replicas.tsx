@@ -21,7 +21,7 @@ function MemosReplica({ variant }: { variant: "app" | "notes" }) {
     <div className="rp-app">
       <header className="rp-head" data-sel="header" data-sel-label="Header">
         <span className="rp-avatar" />
-        <b>Memos</b>
+        <b>Terra</b>
         <span className="rp-head__sub">
           {variant === "app" ? "web/src — what people see" : "store/memo.go — what a note looks like"}
         </span>
@@ -85,19 +85,19 @@ const EXPLORE_TAGS = [
   ["ux", 3],
 ] as const;
 
-/** Shared Memos icon rail — `active` marks Home vs Explore. */
+/** Shared icon rail — `active` marks Home vs Explore. */
 function MemosRail({ active }: { active: "home" | "explore" }) {
   return (
-    <nav className="rp-rail" aria-label="Memos">
+    <nav className="rp-rail" aria-label="Terra">
       <div className="rp-rail__top">
-        <span className="rp-rail__logo" data-sel="logo" data-sel-label="Memos logo">
+        <span className="rp-rail__logo" data-sel="logo" data-sel-label="Terra logo">
           <img src="/images/memos/logo.webp" alt="" width={36} height={36} draggable={false} />
         </span>
         <span
           className={`rp-rail__item${active === "home" ? " is-active" : ""}`}
           data-sel="nav-home"
-          data-sel-label="Memos nav"
-          title="Memos"
+          data-sel-label="Terra nav"
+          title="Terra"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" aria-hidden>
             <path d="m16 6 4 14" />
@@ -141,7 +141,7 @@ function MemosRail({ active }: { active: "home" | "explore" }) {
   );
 }
 
-/** Clickable Memos home replica — composer + personal feed (Ask demo). */
+/** Clickable home replica — composer + personal feed (Ask demo). */
 export function MemosHomeReplica() {
   const [notes, setNotes] = useState(SEED_NOTES);
   const [draft, setDraft] = useState("");
@@ -156,7 +156,7 @@ export function MemosHomeReplica() {
       <MemosRail active="home" />
       <main className="rp-home">
         <header className="rp-home__title" data-sel="home-title" data-sel-label="Home title">
-          <b>Memos</b>
+          <b>Terra</b>
           <span>Your notes</span>
         </header>
         <div className="rp-home__board" data-sel="board" data-sel-label="Notes board">
@@ -211,7 +211,7 @@ export function MemosHomeReplica() {
   );
 }
 
-/** Clickable Memos explore replica (Implement demo). */
+/** Clickable explore replica (Implement demo). */
 export function MemosExploreReplica() {
   return (
     <div className="rp-shell">
@@ -223,13 +223,13 @@ export function MemosExploreReplica() {
             <circle cx="11" cy="11" r="7" />
             <path d="m20 20-3.5-3.5" />
           </svg>
-          <input placeholder="Search memos…" readOnly tabIndex={-1} />
+          <input placeholder="Search notes…" readOnly tabIndex={-1} />
         </label>
 
         <div className="rp-explorer__stats">
-          <div className="rp-explorer__stat" data-sel="stat-memos" data-sel-label="Memos count">
+          <div className="rp-explorer__stat" data-sel="stat-memos" data-sel-label="Notes count">
             <b>128</b>
-            <span>memos</span>
+            <span>notes</span>
           </div>
           <div className="rp-explorer__stat" data-sel="stat-tags" data-sel-label="Tags count">
             <b>14</b>
@@ -291,7 +291,7 @@ function AuthReplica() {
     <div className="rp-auth">
       <div className="rp-auth__card" data-sel="signin-card" data-sel-label="Sign-in card">
         <span className="rp-avatar rp-avatar--lg" />
-        <h4 data-sel="signin-title" data-sel-label="Title">Sign in to Memos</h4>
+        <h4 data-sel="signin-title" data-sel-label="Title">Sign in to Terra</h4>
         <label data-sel="field-user" data-sel-label="Username field">
           Username
           <input placeholder="steven" />
@@ -330,11 +330,11 @@ const DASH: Record<string, DashConfig> = {
     ],
     cols: ["Route", "Method", "Status"],
     rows: [
-      ["/api/v1/memos", "GET", "200"],
-      ["/api/v1/memos", "POST", "201"],
+      ["/api/v1/notes", "GET", "200"],
+      ["/api/v1/notes", "POST", "201"],
       ["/api/v1/auth/signin", "POST", "200"],
       ["/api/v1/attachments", "POST", "201"],
-      ["/api/v1/memos/42", "DELETE", "204"],
+      ["/api/v1/notes/42", "DELETE", "204"],
     ],
   },
   files: {

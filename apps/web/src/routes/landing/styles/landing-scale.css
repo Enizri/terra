@@ -6,9 +6,11 @@
   --sh-section-canvas-max: min(calc(100vw - 32px), 1400px);
   /* Power runs wider than the copy sections — the demo card is the subject. */
   --sh-power-canvas-max: calc(100vw - 32px);
+  /* Cool gray pastel — gray first, no purple. */
+  --sh-bg: #e3e4e7;
 }
 
-/* Comet desktop at 100% should read like the previous 150% view without
+/* Desktop at 100% should read like the previous 150% view without
    shrinking the layout viewport or widening the cards. */
 @media (min-width: 901px) {
   .sh-root--landing {

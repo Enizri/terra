@@ -85,7 +85,7 @@ function PlayCursorSprite({ c, step }: { c: PlayCursor; step: number }) {
   );
 }
 
-/** Live collaboration film: named cursors restyle the Memos replica. */
+/** Live collaboration film: named cursors restyle the app replica. */
 export function PlaygroundStage() {
   const reduced = useReducedMotion();
   const [tick, setTick] = useState(0);

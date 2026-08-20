@@ -196,7 +196,7 @@ export function RepoWindowHeader({ receiveLayout }: { receiveLayout?: boolean })
         transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
       />
       <div className="sh-diagram__title">
-        <div className="sh-diagram__repo">usememos/memos</div>
+        <div className="sh-diagram__repo">terra/terra</div>
         <div className="sh-diagram__meta">
           {diagramNodes.length} parts · read straight from the code
         </div>

@@ -5,7 +5,7 @@
 .sh-root {
   --color-tint: #0077ff;
   --color-label: #000;
-  /* Page floor — Lassie background-primary (#f9f8f5). */
+  /* Page floor. */
   --sh-bg: #f9f8f5;
   --sh-window: #fafafa;
   --sh-ink: #000;

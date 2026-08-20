@@ -80,6 +80,14 @@
   overflow: hidden;
 }
 
+/* The pill is `width: fit-content` and cannot shrink — at ~436px of content it
+   outruns a phone viewport. Drop the section links so logo + CTA still fit. */
+@media (max-width: 479px) {
+.sh-nav__links {
+    display: none;
+  }
+}
+
 .sh-nav__link {
   padding: calc(6px * var(--sh-read, 1)) calc(12px * var(--sh-read, 1));
   border-radius: 999px;
@@ -97,7 +105,7 @@
   color: #141510;
 }
 
-/* hilos nav CTA: black pill, not the shared orange rect. Loads after ui.css. */
+/* Nav CTA: black pill, not the shared orange rect. Loads after ui.css. */
 
 .sh-root .sh-btn--nav {
   margin-left: calc(4px * var(--sh-read, 1));
@@ -166,14 +174,15 @@
 .sh-section--hero {
   position: sticky;
   top: var(--hero-stick-top, 0px);
-  /* When stick-top is negative, fill the viewport so later sections don't peek. */
-  min-height: calc(100vh - var(--hero-stick-top, 0px));
-  min-height: calc(100dvh - var(--hero-stick-top, 0px));
+  /* Pinned box: a fixed height, not a floor. Content that outgrows it would
+     hang below the fold with no scroll left to reach it. */
+  height: calc(100vh - var(--hero-stick-top, 0px));
+  height: calc(100dvh - var(--hero-stick-top, 0px));
   /* Opaque over later sections while sticky — same floor as the root. */
   background-color: var(--sh-bg);
   z-index: 1;
   overflow-x: clip;
-  /* Override .sh-section's 0 16px — the painting card uses its own 16px inset. */
+  /* Override .sh-section's 0 16px — the card uses its own 16px inset. */
   padding: calc(16px * var(--sh-read, 1)) calc(16px * var(--sh-read, 1)) 0;
 }
 
@@ -348,11 +357,13 @@
   visibility: hidden;
 }
 
+/* Below the two-column hero the subtitle runs wide enough to reach the tile,
+   so park it lower — in the drop card's empty top band instead of over words. */
 @media (max-width: 900px) {
 .sh-flight-anchor {
     right: 0;
     top: auto;
-    bottom: -120px;
+    bottom: -215px;
   }
 }
 
@@ -367,12 +378,10 @@
   }
 }
 
-/* Power sits after `.sh-hero-pin`, not after `.sh-section--hero` (the pin wraps
-   the sticky hero). Padding on the section itself cannot collapse or miss. */
+/* Power sits after the hero split. */
 
 .sh-section--power {
-  /* Breathing room so Power reads as its own act, not a tail of the hero. */
-  padding-top: clamp(320px, 28vw, 540px);
+  padding-top: clamp(80px, 8vw, 140px);
   padding-bottom: 280px;
 }
 
@@ -396,7 +405,7 @@
 }
 
 .sh-root h2.sh-hero-title {
-  /* Display type: clamp(36px, 5.2vw, 60px) / 600 / 1.05 / -0.028em / 20ch
+  /* Display: clamp(36px, 5.2vw, 60px) / 600 / 1.05 / -0.028em / 20ch
      Beats `.sh-root h2` token defaults for weight / tracking / leading. */
   margin: 48px 0 0;
   max-width: 20ch;

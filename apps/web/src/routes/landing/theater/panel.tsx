@@ -60,7 +60,7 @@ export function TheaterPanel({
   className = "",
   chatHints,
   designMode = false,
-  /** Marketing Power tabs: static Memos UI, no LiveFrame. */
+  /** Marketing Power tabs: static app UI, no LiveFrame. */
   demoReplica,
   scripted = false,
   scriptRef,
@@ -312,7 +312,7 @@ export function TheaterPanel({
         <div className="sh-theater__chrome">
           <span className="sh-chip sh-theater__label">
             <span className="sh-chip__mark" />
-            {demoReplica ? "Memos" : node.label}
+            {demoReplica ? "Terra" : node.label}
             <span className="sh-theater__hint">Terra picks a component and redesigns it</span>
           </span>
         </div>

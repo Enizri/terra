@@ -34,19 +34,19 @@ export const ASK_HINTS = [
 /** Hardcoded Ask replies keyed by chip text — marketing demo only. */
 export const DEMO_ASK_REPLIES: Record<(typeof ASK_HINTS)[number], string> = {
   "Explain this selection":
-    "This is part of Memos' explore surface — the UI people use to browse notes. On the map it sits under Web App and talks to the API for every list and search.",
+    "This is part of Terra's explore surface — the UI people use to browse notes. On the map it sits under Web App and talks to the API for every list and search.",
   "Where is this defined?":
     "Defined in the frontend tree (web/src). Terra ties the selection to that path so you can jump from the map straight into the files that own this UI.",
   "What depends on this?":
-    "Explore depends on the Request Handler (API) for memo lists and tags. Upstream, Sign-in gates who can see private notes before this screen loads.",
+    "Explore depends on the Request Handler (API) for note lists and tags. Upstream, Sign-in gates who can see private notes before this screen loads.",
   "How does this talk to the store?":
-    "It never touches the database directly — the Web App calls the API, Notes writes memos, and Storage (terra.db / SQLite) persists them. The map edge is web → api → memos → db.",
+    "It never touches the database directly — the Web App calls the API, Notes writes notes, and Storage (terra.db / SQLite) persists them. The map edge is web → api → notes → db.",
   "Show the evidence":
-    "Evidence lives on the map edges: memo_service routes, store/memo.go, and the explore feed components. Each claim links back to those files — not a guessed summary.",
+    "Evidence lives on the map edges: note_service routes, store/note.go, and the explore feed components. Each claim links back to those files — not a guessed summary.",
 };
 
 export const DEMO_ASK_FALLBACK =
-  "On the Memos map this UI belongs to Web App. It reaches Storage only through the API and Notes layers — pick another question for a tighter answer.";
+  "On the Terra map this UI belongs to Web App. It reaches Storage only through the API and Notes layers — pick another question for a tighter answer.";
 
 /** One-shot Implement design chips (scripted preview transforms). */
 export const IMPLEMENT_HINTS = [

@@ -1,0 +1,1240 @@
+/* Tokens the hl-* FAQ and footer blocks need. They live here so the rest of
+   the app keeps its own palette.
+   ponytail: kept as one block — split into tokens.css if a second route ever
+   wants this scale. */
+:root {
+  --font-display: "Fraunces Variable", "Fraunces", ui-serif, Georgia, serif;
+  --sh-content-width: 1100px;
+  --sh-gutter: 24px;
+  --sh-ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --sh-r-sm: 8px;
+  --sh-r-md: 12px;
+  --sh-r-lg: 16px;
+  --sh-r-xl: 24px;
+  --sh-r-pill: 999px;
+  --sh-row-hover: rgba(20, 21, 16, 0.04);
+  --sh-shadow-card:
+    0 24px 60px -30px rgba(0, 0, 0, 0.28), inset 0 0 0 1px rgba(20, 21, 16, 0.12);
+  --sh-shadow-film: 0 24px 80px rgba(20, 21, 16, 0.16);
+  --sh-shadow-film-hover: 0 30px 90px rgba(20, 21, 16, 0.22);
+  --sh-shadow-hero-card: 0 18px 80px rgba(0, 0, 0, 0.18);
+  --sh-presence: #3f9d6e;
+  --sh-tone-coral: oklch(0.83 0.085 38);
+  --sh-tone-coral-ink: oklch(0.26 0.06 35);
+  --sh-tone-muted: oklch(0.89 0.006 106.5);
+}
+
+/* Warm near-black reads better under Fraunces; only FAQ and footer use it —
+   the rest of the site keeps tokens.css' #000 on #f9f8f5. */
+.hl-section,
+.hl-footer {
+  --sh-bg: #e3e4e7;
+  --sh-ink: #141510;
+  --sh-muted: #6a6c62;
+  --sh-border: rgba(20, 21, 16, 0.12);
+}
+
+/* FAQ / footer geometry layer.
+   Section rhythm, type scale, card sizes, tone tiles. Imported last so it
+   wins over the older `.sh-*` landing skin wherever the two overlap.
+
+   Breakpoints: sm 640, md 768, lg 1024, xl 1280. */
+
+/* ---------- section shell ---------- */
+
+.hl-section {
+  width: 100%;
+  max-width: var(--sh-content-width); /* 1100px */
+  margin-inline: auto;
+  padding: 64px var(--sh-gutter);
+}
+
+@media (min-width: 640px) {
+  .hl-section {
+    padding-block: 96px;
+  }
+}
+
+/* Testimonials run wider than the column but keep a 1052px inner measure. */
+.hl-section--wide {
+  max-width: 1400px;
+}
+
+.hl-section--wide .hl-section__head {
+  max-width: 1052px;
+  margin-inline: auto;
+}
+
+/* The story opener sits closer to the hero above it. */
+.hl-section--story {
+  position: relative;
+  padding-block: 80px 64px;
+}
+
+@media (min-width: 640px) {
+  .hl-section--story {
+    padding-block: 96px;
+  }
+}
+
+/* Logo strip is full-bleed; only its inner row is capped. */
+.hl-section--bleed {
+  max-width: none;
+  padding: 56px 0;
+}
+
+@media (min-width: 640px) {
+  .hl-section--bleed {
+    padding-block: 80px;
+  }
+}
+
+/* ---------- type ---------- */
+
+/* Display headings. As a class it is one declaration
+   instead of one per element, and the SOFT/WONK axes need the `full` Fraunces
+   build — imported in app/main.tsx. */
+.hl-display {
+  font-family: var(--font-display);
+  font-kerning: normal;
+  font-feature-settings: "kern", "liga", "calt";
+  font-optical-sizing: auto;
+  font-variation-settings: "SOFT" 40, "WONK" 0;
+}
+
+.hl-eyebrow {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--sh-muted);
+}
+
+/* The story opener's eyebrow is bigger and not uppercased. */
+.hl-eyebrow--hero {
+  font-size: 18px;
+  letter-spacing: 0.2em;
+  text-transform: none;
+}
+
+.hl-eyebrow--center {
+  text-align: center;
+}
+
+.hl-h2 {
+  margin: 20px 0 0;
+  font-size: clamp(2.4rem, 7vw, 5.4rem);
+  line-height: 0.98;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  text-wrap: wrap;
+}
+
+.hl-h3 {
+  margin: 16px 0 0;
+  font-size: clamp(1.9rem, 4vw, 3rem);
+  line-height: 1.05;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+.hl-h3--wide {
+  max-width: 42rem;
+  font-size: clamp(1.9rem, 4.5vw, 3.4rem);
+  line-height: 1.03;
+}
+
+.hl-h3--bento {
+  max-width: 42rem;
+  font-size: clamp(1.7rem, 4vw, 2.8rem);
+}
+
+.hl-h3--faq {
+  font-size: clamp(2.6rem, 6vw, 4.5rem);
+  line-height: 0.98;
+  letter-spacing: -0.02em;
+}
+
+.hl-h3--cta {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 3rem);
+  line-height: 1.05;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.hl-lead {
+  margin: 28px 0 0;
+  max-width: 32rem;
+  font-size: 18px;
+  line-height: 1.5;
+  color: var(--sh-muted);
+}
+
+.hl-copy {
+  margin: 20px 0 0;
+  max-width: 24rem;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--sh-muted);
+}
+
+.hl-copy--sm {
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+/* ---------- buttons ---------- */
+
+.hl-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border: 0;
+  border-radius: var(--sh-r-pill);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.hl-pill--fill {
+  background: var(--sh-ink);
+  color: var(--sh-bg);
+}
+
+.hl-pill--outline {
+  border: 2px solid #000;
+  background: transparent;
+  color: var(--sh-ink);
+}
+
+.hl-pill--ghost {
+  border: 2px solid #000;
+  background: var(--sh-bg);
+  color: var(--sh-ink);
+  box-shadow: 0 8px 30px rgba(28, 29, 24, 0.16);
+}
+
+.hl-pill--ghost:hover {
+  background: #fff;
+}
+
+/* Button feedback: a brightness dip. No scale, no lift. */
+.hl-press {
+  transition:
+    filter 0.12s var(--sh-ease-out),
+    background-color 0.12s var(--sh-ease-out),
+    color 0.12s var(--sh-ease-out),
+    border-color 0.12s var(--sh-ease-out),
+    box-shadow 0.12s var(--sh-ease-out);
+}
+
+.hl-press:active {
+  filter: brightness(0.92);
+}
+
+/* ---------- scroll reveal ---------- */
+
+.hl-reveal {
+  transition:
+    opacity 0.45s var(--sh-ease-out),
+    transform 0.45s var(--sh-ease-out);
+  will-change: opacity, transform;
+}
+
+.hl-reveal-pending {
+  opacity: 0;
+  transform: translateY(var(--reveal-shift, 14px));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hl-reveal-pending {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ---------- cards ---------- */
+
+.hl-card {
+  overflow: hidden;
+  border-radius: var(--sh-r-md);
+  background: #fff;
+  box-shadow: var(--sh-shadow-card);
+}
+
+/* ---------- art slots ----------
+   Art slots reserve space with fixed boxes, and the text
+   placement depends on them. These ship empty at the exact reserved sizes —
+   drop artwork in as a child and it fills the box. */
+
+.hl-art {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Inline glyph inside a headline: zero-height so it never grows the line box,
+   with the image absolutely centred on the slot. */
+.hl-glyph {
+  position: relative;
+  display: inline-block;
+  height: 0;
+  width: 1.48em;
+  margin-inline: 8px;
+  vertical-align: middle;
+}
+
+.hl-glyph > * {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+  display: block;
+  width: 1.48em;
+  height: 1.15em;
+  max-width: none;
+}
+
+.hl-glyph--narrow {
+  width: 1.13em;
+}
+
+.hl-glyph--narrow > * {
+  width: 1.13em;
+  height: 1.4em;
+}
+
+/* ---------- hero shell ---------- */
+
+.hl-hero {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  min-height: 100svh;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 96px 16px;
+  background: var(--sh-bg);
+  color: var(--sh-ink);
+}
+
+@media (min-width: 640px) {
+  .hl-hero {
+    padding: 96px 24px;
+  }
+}
+
+/* Row of tiles behind the card. 156px wide on a 93px pitch, so they overlap
+   by a third — the crowd reads as a line, not a strip of separate icons. */
+.hl-hero__crowd {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.hl-hero__crowd-item {
+  position: absolute;
+  /* Half above the edge: the row reads as a crowd leaning in from off-screen. */
+  top: calc(var(--crowd-size, 156px) * -0.45);
+  width: var(--crowd-size, 156px);
+  height: auto;
+  max-width: none;
+  transform-origin: 50% 72%;
+  translate: -50% 0;
+  transition: transform 90ms cubic-bezier(0.2, 0, 0, 1);
+  user-select: none;
+}
+
+.hl-hero__card {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  max-width: 42rem;
+  padding: 40px 24px;
+  border: 3px solid #000;
+  border-radius: var(--sh-r-xl);
+  background: #fff;
+  text-align: center;
+  color: var(--sh-ink);
+  box-shadow: var(--sh-shadow-hero-card);
+}
+
+@media (min-width: 640px) {
+  .hl-hero__card {
+    padding-inline: 40px;
+  }
+}
+
+/* The mark is a masked span, so it needs both axes — `width: auto` collapses it. */
+.hl-hero__mark {
+  margin-inline: auto;
+  width: 64px;
+  height: 64px;
+}
+
+.hl-hero__title {
+  margin: 16px auto 0;
+  max-width: 16ch;
+  font-size: clamp(1.9rem, 4.5vw, 3rem);
+  line-height: 1.05;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+.hl-hero__sub {
+  margin: 16px auto 0;
+  max-width: 60ch;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--sh-muted);
+}
+
+@media (min-width: 640px) {
+  .hl-hero__sub {
+    font-size: 16px;
+  }
+}
+
+.hl-hero__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.hl-hero__actions > * {
+  width: 100%;
+}
+
+@media (min-width: 640px) {
+  .hl-hero__actions {
+    /* Reversed so the primary sits on the right. */
+    flex-direction: row-reverse;
+    justify-content: center;
+  }
+
+  .hl-hero__actions > * {
+    width: auto;
+  }
+}
+
+.hl-hero__note {
+  margin: 20px 0 0;
+  font-size: 13px;
+  color: var(--sh-muted);
+}
+
+.hl-hero__note a {
+  color: var(--sh-ink);
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-color: rgba(20, 21, 16, 0.35);
+  text-underline-offset: 3px;
+}
+
+.hl-hero__scroll {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 30;
+  display: flex;
+  justify-content: center;
+  padding-bottom: 24px;
+}
+
+@media (min-width: 640px) {
+  .hl-hero__scroll {
+    padding-bottom: 32px;
+  }
+}
+
+.hl-hero__scroll .hl-pill {
+  padding: 8px 20px;
+}
+
+/* ---------- story: floating side art ---------- */
+
+.hl-float {
+  position: absolute;
+  right: 10%;
+  bottom: 8px;
+  width: 220px;
+  pointer-events: none;
+}
+
+@media (max-width: 767px) {
+  .hl-float {
+    display: none;
+  }
+}
+
+/* ---------- two-column section (how it works) ---------- */
+
+.hl-split {
+  display: grid;
+  gap: 48px;
+  align-items: center;
+}
+
+@media (min-width: 1024px) {
+  .hl-split {
+    grid-template-columns: 0.85fr 1fr;
+  }
+}
+
+.hl-split__art {
+  margin-top: 32px;
+  width: 160px;
+}
+
+@media (max-width: 1023px) {
+  .hl-split__art {
+    display: none;
+  }
+}
+
+/* ---------- chat card ---------- */
+
+.hl-chat__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--sh-border);
+}
+
+.hl-chat__channel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sh-ink);
+}
+
+.hl-stack {
+  display: flex;
+  margin-left: auto;
+}
+
+.hl-stack > * + * {
+  margin-left: -6px;
+  transition: margin 180ms var(--sh-ease-out);
+}
+
+.hl-stack:hover > * + * {
+  margin-left: 2px;
+}
+
+.hl-avatar {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  vertical-align: middle;
+  width: 22px;
+  height: 22px;
+}
+
+.hl-avatar__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: var(--sh-r-pill);
+  background: #fff;
+  object-fit: cover;
+  box-shadow: inset 0 0 0 1px var(--sh-border);
+}
+
+.hl-avatar__pic {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* The Terra star stands in for an agent's face. */
+.hl-avatar__mark {
+  width: 100%;
+  height: 100%;
+  rotate: none;
+}
+
+/* Agents get a squircle so they read as not-a-person at a glance. */
+.hl-avatar--agent .hl-avatar__img {
+  border-radius: 28%;
+}
+
+.hl-avatar--lg,
+.hl-avatar--lg .hl-avatar__img {
+  width: 32px;
+  height: 32px;
+}
+
+.hl-avatar__dot {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--sh-r-pill);
+  background: var(--sh-presence);
+  box-shadow: 0 0 0 2px #fff;
+}
+
+.hl-chat__body {
+  padding-block: 6px;
+}
+
+.hl-chat__row {
+  display: flex;
+  gap: 10px;
+  padding: 8px 12px;
+  cursor: default;
+  transition: background-color 120ms var(--sh-ease-out);
+}
+
+.hl-chat__row:hover {
+  background: var(--sh-row-hover);
+}
+
+.hl-chat__meta {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.hl-chat__name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sh-ink);
+}
+
+.hl-chat__time {
+  font-size: 11px;
+  color: var(--sh-muted);
+}
+
+.hl-chat__text {
+  margin: 2px 0 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--sh-ink);
+}
+
+.hl-chat__col {
+  min-width: 0;
+  flex: 1;
+}
+
+/* Inline PR / work card inside a message. */
+.hl-chat__work {
+  margin-top: 8px;
+  padding: 12px 14px;
+  border-radius: var(--sh-r-sm);
+  box-shadow: inset 0 0 0 1px var(--sh-border);
+}
+
+.hl-chat__work-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.hl-chat__work-sub {
+  margin: 4px 0 0;
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--sh-muted);
+}
+
+/* ---------- film card ---------- */
+
+.hl-film {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 1.75rem;
+  background: #000;
+  cursor: pointer;
+  box-shadow: var(--sh-shadow-film);
+  transition:
+    transform 0.2s var(--sh-ease-out),
+    box-shadow 0.2s var(--sh-ease-out);
+}
+
+@media (min-width: 640px) {
+  .hl-film {
+    border-radius: 2.25rem;
+  }
+}
+
+.hl-film:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--sh-shadow-film-hover);
+}
+
+.hl-film__video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hl-film__scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0);
+  transition: background-color 0.2s var(--sh-ease-out);
+  pointer-events: none;
+}
+
+.hl-film:hover .hl-film__scrim {
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.hl-film__play {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.hl-film__play > span {
+  display: flex;
+  width: 64px;
+  height: 64px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: var(--sh-r-pill);
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  backdrop-filter: blur(4px);
+  transform: translateY(4px) scale(0.95);
+  transition: transform 0.2s var(--sh-ease-out);
+}
+
+.hl-film:hover .hl-film__play > span {
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hl-film,
+  .hl-film__play > span,
+  .hl-film__scrim {
+    transition: none;
+  }
+
+  .hl-film:hover {
+    transform: none;
+  }
+}
+
+/* ---------- three columns divided by rules ---------- */
+
+.hl-cols {
+  display: grid;
+  grid-template-columns: 1fr;
+  margin-top: 40px;
+}
+
+.hl-cols__item {
+  padding-block: 24px;
+  border-top: 1px solid var(--sh-border);
+}
+
+.hl-cols__item:first-child {
+  border-top: 0;
+}
+
+@media (min-width: 640px) {
+  .hl-cols {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .hl-cols__item {
+    padding: 4px 32px;
+    border-top: 0;
+    border-left: 1px solid var(--sh-border);
+  }
+
+  .hl-cols__item:first-child {
+    padding-left: 0;
+    border-left: 0;
+  }
+}
+
+.hl-cols__art {
+  margin-bottom: 20px;
+  height: 96px;
+  width: auto;
+}
+
+.hl-cols__title {
+  margin: 0;
+  font-size: 1.4rem;
+  line-height: 1.1;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.hl-cols__copy {
+  margin: 8px 0 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--sh-muted);
+}
+
+/* ---------- bento ---------- */
+
+.hl-bento {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  margin-top: 48px;
+}
+
+@media (min-width: 640px) {
+  .hl-bento {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .hl-bento {
+    grid-template-columns: repeat(3, 1fr);
+    grid-auto-rows: minmax(0, auto);
+  }
+
+  /* Two of the six tiles run tall, which is what stops the grid reading as a
+     plain 3x2. Columns 1 and 3 take the double-height slot. */
+  .hl-bento__tile--tall {
+    grid-row: span 2;
+  }
+}
+
+.hl-bento__tile {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  padding: 28px;
+  border-radius: var(--sh-r-lg);
+  background: var(--tone);
+  color: var(--tone-ink);
+}
+
+.hl-bento__art {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding-block: 8px;
+  min-height: 96px;
+}
+
+.hl-bento__title {
+  margin: 0;
+  font-size: 1.4rem;
+  line-height: 1.15;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.hl-bento__copy {
+  margin: 8px 0 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  opacity: 0.78;
+}
+
+/* ---------- logo strip ---------- */
+
+.hl-logos {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 20px 40px;
+  max-width: var(--sh-content-width);
+  margin: 32px auto 0;
+  padding-inline: var(--sh-gutter);
+}
+
+@media (min-width: 640px) {
+  .hl-logos {
+    gap: 24px 48px;
+  }
+}
+
+.hl-logos__item {
+  font-size: 18px;
+  opacity: 0.45;
+  color: var(--sh-ink);
+}
+
+@media (min-width: 640px) {
+  .hl-logos__item {
+    font-size: 22px;
+  }
+}
+
+/* ---------- testimonials ---------- */
+
+.hl-quotes {
+  display: flex;
+  gap: 16px;
+  margin-top: 40px;
+  padding-bottom: 8px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+
+.hl-quotes::-webkit-scrollbar {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .hl-quotes {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+    overflow: visible;
+    padding-bottom: 0;
+  }
+}
+
+@media (min-width: 1280px) {
+  .hl-quotes {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.hl-quote {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  width: 85%;
+  margin: 0;
+  padding: 24px;
+  scroll-snap-align: center;
+  border-radius: var(--sh-r-md);
+  background: color-mix(in oklab, var(--sh-tone-muted) 40%, transparent);
+  transition: background-color 0.2s var(--sh-ease-out);
+}
+
+.hl-quote:hover {
+  background: var(--tone);
+  color: var(--tone-ink);
+}
+
+@media (min-width: 640px) {
+  .hl-quote {
+    width: 70%;
+    padding: 28px;
+  }
+}
+
+@media (min-width: 768px) {
+  .hl-quote {
+    width: auto;
+  }
+}
+
+.hl-quote__text {
+  margin: 0;
+  flex: 1;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.hl-quote__by {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 20px 0 0;
+}
+
+.hl-quote__name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.hl-quote__role {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+/* ---------- FAQ ---------- */
+
+.hl-faq {
+  display: grid;
+  gap: 40px;
+}
+
+@media (min-width: 1024px) {
+  .hl-faq {
+    grid-template-columns: 0.8fr 1.2fr;
+    gap: 64px;
+  }
+
+  .hl-faq__aside {
+    position: sticky;
+    top: 96px;
+    align-self: start;
+  }
+}
+
+.hl-faq__art {
+  margin-top: 40px;
+  width: 200px;
+}
+
+@media (max-width: 1023px) {
+  .hl-faq__art {
+    display: none;
+  }
+}
+
+.hl-faq__list {
+  border-bottom: 1px solid var(--sh-border);
+}
+
+.hl-faq__item {
+  padding-block: 4px;
+  border-top: 1px solid var(--sh-border);
+}
+
+.hl-faq__q {
+  display: flex;
+  width: 100%;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 20px 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.hl-faq__n {
+  flex-shrink: 0;
+  width: 28px;
+  margin-top: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: var(--sh-muted);
+}
+
+.hl-faq__label {
+  flex: 1;
+  font-size: 1.15rem;
+  line-height: 1.25;
+}
+
+@media (min-width: 640px) {
+  .hl-faq__label {
+    font-size: 1.35rem;
+  }
+}
+
+.hl-faq__a {
+  padding: 0 0 20px 44px;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--sh-muted);
+}
+
+/* ---------- closing CTA ---------- */
+
+.hl-cta {
+  position: relative;
+  overflow: hidden;
+  padding: 56px 32px;
+  border-radius: var(--sh-r-xl);
+  text-align: center;
+  background: var(--sh-tone-coral);
+  color: var(--sh-tone-coral-ink);
+}
+
+@media (min-width: 640px) {
+  .hl-cta {
+    padding: 80px 48px;
+  }
+}
+
+.hl-cta__art {
+  margin: 0 auto 8px;
+  height: 112px;
+  width: auto;
+}
+
+@media (min-width: 640px) {
+  .hl-cta__art {
+    height: 128px;
+  }
+}
+
+.hl-cta__copy {
+  margin: 16px auto 0;
+  max-width: 28rem;
+  font-size: 14px;
+  line-height: 1.6;
+  opacity: 0.82;
+}
+
+.hl-cta__actions {
+  margin-top: 28px;
+}
+
+.hl-cta .hl-pill--fill {
+  background: var(--sh-tone-coral-ink);
+  color: var(--sh-tone-coral);
+}
+
+/* ---------- footer ---------- */
+
+.hl-footer {
+  position: relative;
+  overflow: hidden;
+  background: var(--sh-ink);
+  color: var(--sh-bg);
+}
+
+.hl-footer__inner {
+  max-width: var(--sh-content-width);
+  margin-inline: auto;
+  padding: 64px var(--sh-gutter) 32px;
+}
+
+@media (min-width: 640px) {
+  .hl-footer__inner {
+    padding-top: 80px;
+  }
+}
+
+.hl-footer__top {
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+}
+
+@media (min-width: 640px) {
+  .hl-footer__top {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+  }
+}
+
+.hl-footer__brand {
+  max-width: 20rem;
+}
+
+.hl-footer__wordmark {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.hl-footer__tagline {
+  margin: 12px 0 0;
+  font-size: 13px;
+  line-height: 1.6;
+  opacity: 0.62;
+}
+
+.hl-footer__cols {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 40px;
+}
+
+.hl-footer__col h4 {
+  margin: 0 0 12px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  opacity: 0.5;
+}
+
+.hl-footer__col a {
+  display: block;
+  padding-block: 4px;
+  font-size: 13.5px;
+  color: inherit;
+  text-decoration: none;
+  opacity: 0.78;
+}
+
+.hl-footer__col a:hover {
+  opacity: 1;
+}
+
+.hl-footer__base {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  margin-top: 48px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(241, 242, 238, 0.14);
+  font-size: 12.5px;
+  opacity: 0.5;
+}
+
+/* ---------- film lightbox ----------
+   Native <dialog>: showModal() supplies the backdrop, focus trap, and Esc. */
+
+.hl-lightbox {
+  width: min(1100px, 92vw);
+  max-width: none;
+  padding: 0;
+  border: 0;
+  border-radius: var(--sh-r-lg);
+  background: #000;
+  overflow: visible;
+}
+
+.hl-lightbox::backdrop {
+  background: rgba(20, 21, 16, 0.72);
+}
+
+.hl-lightbox__video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--sh-r-lg);
+}
+
+.hl-lightbox__close {
+  position: absolute;
+  top: -44px;
+  right: 0;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: var(--sh-r-pill);
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+}

@@ -1,7 +1,7 @@
 export const IMG = "/terra/images";
 
 /** Repo whose real frontend the theater previews live (via terra serve). */
-export const REPO_URL = "github.com/usememos/memos";
+export const REPO_URL = "github.com/terra/terra";
 /** Diagram node that gets the live preview instead of a replica. */
 export const LIVE_NODE_ID = "web";
 
@@ -74,7 +74,7 @@ export const files: FileItem[] = [
   { id: "file-2", label: "Request Handler", subLabel: "internal/api · 31 files" },
   { id: "file-3", label: "Scanner", subLabel: "internal/scan/walk.go" },
   { id: "file-4", label: "Analyzer", subLabel: "analyzer/terra_analyzer" },
-  { id: "file-5", label: "GitHub", subLabel: "usememos/memos" },
+  { id: "file-5", label: "GitHub", subLabel: "terra/terra" },
   { id: "file-6", label: "Sign-in", subLabel: "internal/auth · 12 files" },
   { id: "file-7", label: "Notes", subLabel: "store/memo.go" },
   { id: "file-8", label: "Uploads", subLabel: "store/attachment.go" },
@@ -203,8 +203,56 @@ export const copy = {
     to: "humans",
     tail: "can understand",
   },
+  heroEyebrow: "Built for agentic development.",
+  heroHeadline: "Software that only humans can understand.",
   heroSubtitle:
     "Terra maps your repo, then runs it in the cloud so you can change the live software — no local setup.",
+  /** Wrapped around the hero globe as one glyph per cell. Away from the
+      cursor the field is scrambled; the lens reconstitutes this stream so
+      functions, classes and library calls from several languages read as
+      code rather than as noise. */
+  heroGlobeText: [
+    "func Handle(w http.ResponseWriter, r *http.Request) error · ",
+    "export function useState<T>(init: T): [T, Dispatch<T>] · ",
+    "class Component extends React.Component<Props, State> · ",
+    "def __init__(self, repo: str) -> None: · ",
+    "impl Display for Terra { fn fmt(&self, f: &mut Formatter) · ",
+    "from flask import Flask, jsonify · ",
+    "const [repo, setRepo] = useState<string | null>(null) · ",
+    "fn main() { let map = Terra::load(path)?; · ",
+    "SELECT id, name FROM components WHERE live = 1 · ",
+    "import { motion } from \"motion/react\" · ",
+    "pub async fn map_repo(path: PathBuf) -> Result<Map> · ",
+    "interface Node { kind: string; files: string[] } · ",
+    "go func(ctx context.Context) error { return s.Listen(ctx) } · ",
+    "useEffect(() => { void load(repo) }, [repo]) · ",
+    "fmt.Errorf(\"clone failed: %w\", err) · ",
+    "struct Server { addr string `json:\"addr\"` } · ",
+    "type Props = { id: string; onMap: (n: Node) => void } · ",
+    "match node { Some(n) => n.kind, None => \"\" } · ",
+    "std::vector<Component> tree; tree.push_back(root); · ",
+    "export default function Page(): React.FC<Props> · ",
+    "class UserService implements Repository { findById(id) · ",
+    "pandas.DataFrame.from_records(rows).groupby(\"kind\") · ",
+    "numpy.ndarray; torch.nn.Linear(128, 64) · ",
+    "tokio::spawn(async move { map.apply(diff).await }) · ",
+    "sqlx::query(\"SELECT * FROM files WHERE path = $1\") · ",
+    "@Component({ selector: \"app-root\" }) class App {} · ",
+    "func (s *Store) Get(ctx context.Context, id ID) (*Node, error) · ",
+    "extension View { var body: some View { Content() } } · ",
+    "package main; import \"fmt\"; func main() { fmt.Println(m) } · ",
+    "using System.Linq; class Program { static async Task Main() · ",
+    "def train(model, epochs=10): for x in loader: loss.backward() · ",
+    "git.clone(url).then(analyze); cargo test --lib · ",
+    "query Repo($id: ID!) { repo(id: $id) { nodes { name } } } · ",
+    ".sh-hero { display: grid; place-items: center } · ",
+    "<section className=\"hero\"><canvas aria-hidden /></section> · ",
+    "ONE MAP OF YOUR REPO · ASK IT ANYTHING · SHIP ON THE FLY · ",
+  ].join(""),
+  heroCta: {
+    primary: { label: "Get started", href: "#" },
+    secondary: { label: "See how teams use Terra", href: "#power" },
+  },
   powerTitle: "The power of Terra",
   power:
     "One map of your repo. Select any component, chat with it, and the change lands on the fly — no cloning, no local setup. Ask questions, implement with Terra in the loop, and monitor what the architecture says is alive.",
@@ -244,12 +292,67 @@ export const copy = {
 
 /** Fake live spans for the Power of Terra Monitor tab (marketing only). */
 export const MONITOR_DEMO_SPANS = [
-  { method: "GET", path: "/api/v1/memos", status: "200", component: "Notes", ms: "18ms" },
+  { method: "GET", path: "/api/v1/notes", status: "200", component: "Notes", ms: "18ms" },
   { method: "POST", path: "/api/v1/auth/signin", status: "200", component: "Sign-in", ms: "42ms" },
-  { method: "GET", path: "/api/v1/memos:search", status: "200", component: "Web App", ms: "31ms" },
-  { method: "POST", path: "/api/v1/memos", status: "201", component: "Notes", ms: "27ms" },
+  { method: "GET", path: "/api/v1/notes:search", status: "200", component: "Web App", ms: "31ms" },
+  { method: "POST", path: "/api/v1/notes", status: "201", component: "Notes", ms: "27ms" },
   { method: "GET", path: "/api/v1/attachments", status: "200", component: "Uploads", ms: "22ms" },
-  { method: "DELETE", path: "/api/v1/memos/42", status: "204", component: "Notes", ms: "15ms" },
+  { method: "DELETE", path: "/api/v1/notes/42", status: "204", component: "Notes", ms: "15ms" },
   { method: "GET", path: "/api/v1/users/me", status: "200", component: "Sign-in", ms: "12ms" },
   { method: "POST", path: "/api/v1/attachments", status: "201", component: "Uploads", ms: "88ms" },
 ] as const;
+
+export const faq = {
+  eyebrow: "Questions",
+  title: "Fair questions.",
+  items: [
+    {
+      q: "What is Terra?",
+      a: "A map of your repo that you can talk to. Terra reads the code, draws the architecture, runs the app in the cloud, and applies the changes you ask for.",
+    },
+    {
+      q: "Does my code leave my machine?",
+      a: "Terra clones the repo into an isolated cloud workspace. Nothing is written back until you approve a diff.",
+    },
+    {
+      q: "What does it cost?",
+      a: "Mapping a public repo is free. Cloud runs and private repos use workspace credits.",
+    },
+    {
+      q: "Which languages does it read?",
+      a: "The analyzer is language-aware rather than language-specific — Go and TypeScript are the best-covered today.",
+    },
+    {
+      q: "Can it change things without me?",
+      a: "No. Every change arrives as a diff and a preview. A human merges.",
+    },
+    {
+      q: "Is this a replacement for my IDE?",
+      a: "No. It's the layer above it — the part where you decide what to change and see what it did.",
+    },
+  ],
+};
+
+export const closing = {
+  title: "Put your repo on the map.",
+  copy: "Point Terra at a repo and it draws the architecture in a couple of minutes. No install.",
+  cta: "Map your repo",
+};
+
+export const footer = {
+  tagline: "One map of your repo. A human approves every merge.",
+  cols: [
+    {
+      title: "Product",
+      links: ["The film", "Pricing", "Changelog", "Blog"],
+    },
+    {
+      title: "Legal",
+      links: ["Privacy", "Terms"],
+    },
+    {
+      title: "Account",
+      links: ["Get started", "Sign in"],
+    },
+  ],
+};
