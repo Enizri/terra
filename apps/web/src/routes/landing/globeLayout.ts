@@ -67,9 +67,8 @@ const HL2_EDGE = 0.15;
 /** Glyph flips per second with the pointer away / right under it. */
 const AMBIENT_RATE = 0.5;
 const HOVER_RATE = 24;
-/** Lens radius, as a share of the globe radius. Wide enough that whole words
- *  land inside it — a small lens resolves single letters and reads as noise. */
-const HOVER_R = 0.4;
+/** Lens radius as a share of the globe radius — glyph hole and map flashlight. */
+export const HOVER_R = 0.55;
 /** Lens strength needed to resolve a cell, and the per-cell jitter on it. */
 const RESOLVE_MIN = 0.12;
 const RESOLVE_JITTER = 0.4;
@@ -81,9 +80,9 @@ const PEAK_ALPHA = 1;
 /** How far the back of the globe fades behind the front. */
 const BACK_ALPHA = 0.68;
 /** Inside the lens the depth fade lifts, so the far side shows through. */
-const LENS_SEE_THROUGH = 0.92;
+const LENS_SEE_THROUGH = 0.95;
 /** How hard the lens punches out the front face (their hover × 2.5 dissolve). */
-const HOLE_GAIN = 1.55;
+const HOLE_GAIN = 1.9;
 /** Discrete inks — dim, mid, white on charcoal (#232323), matching CA's field. */
 const INK = [
   [0.72, 0.72, 0.7],

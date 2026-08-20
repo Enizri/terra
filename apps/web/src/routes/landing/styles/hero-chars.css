@@ -121,22 +121,115 @@
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  /* Charcoal only behind the globe — feathers into the page gray, no pane split. */
+  /* Charcoal must cover the full glyph sphere (~0.74 of closest-side on a
+     square pane). Stopping the solid fill earlier left outer glyphs on the
+     page gray — a washed smudge instead of a code globe. */
   background: radial-gradient(
     circle closest-side at 50% 50%,
     #232323 0%,
-    #232323 48%,
-    color-mix(in srgb, #232323 30%, var(--sh-bg)) 72%,
+    #232323 78%,
+    color-mix(in srgb, #232323 35%, var(--sh-bg)) 90%,
     transparent 100%
   );
+}
+
+.hx-orb__map {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 3;
+  overflow: hidden;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+  clip-path: circle(0px at 50% 50%);
+  transform: translate(-50%, -50%);
+  will-change: opacity, clip-path;
+  background: none;
+}
+
+.hx-orb__map.is-live {
+  pointer-events: auto;
+}
+
+.hx-orb__map .sh-diagram {
+  height: 100%;
+  padding: 4px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.hx-orb__map .sh-diagram__legend {
+  display: none;
+}
+
+.hx-orb__map .sh-diagram__canvas {
+  padding: 10px 8px;
+  border: none;
+  border-radius: 0;
+  background: none;
+}
+
+.hx-orb__map .sh-diagram__flow {
+  gap: 14px;
+}
+
+.hx-orb__map .sh-diagram__col {
+  gap: 8px;
+}
+
+.hx-orb__map .sh-diagram__group-body {
+  gap: 8px;
+}
+
+.hx-orb__map .sh-diagram__group-title {
+  margin-bottom: 2px;
+  font-size: 9px;
+}
+
+.hx-orb__map .sh-diagram__node {
+  min-width: 0;
+  max-width: 132px;
+  padding: 8px 9px 7px;
+  gap: 4px;
+  border-radius: 8px;
+}
+
+.hx-orb__map .sh-diagram__name {
+  font-size: 12px;
+}
+
+.hx-orb__map .sh-diagram__purpose {
+  font-size: 10px;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.hx-orb__map .sh-diagram__status {
+  display: none;
+}
+
+.hx-orb__map .sh-diagram__foot {
+  margin-top: 2px;
+  padding-top: 5px;
+}
+
+.hx-orb__map .sh-diagram__hint {
+  font-size: 9px;
 }
 
 .hx-orb__canvas {
   position: absolute;
   inset: 0;
-  z-index: 1;
+  z-index: 2;
   display: block;
   width: 100%;
   height: 100%;
   background: none;
+  pointer-events: none;
 }
