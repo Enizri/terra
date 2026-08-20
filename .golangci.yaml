@@ -1,4 +1,4 @@
-# Style aligned with https://github.com/usememos/memos — gofmt + goimports, no custom column padding.
+# Terra Go style: gofmt + goimports, no custom column padding.
 version: "2"
 
 linters:

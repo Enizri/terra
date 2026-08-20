@@ -5,8 +5,9 @@ name: check
 on:
   push:
     branches: [staging, main, master]
+  # No base-branch filter: stacked PRs base on other topic branches, and
+  # merge-gate requires this job on every PR.
   pull_request:
-    branches: [staging, main]
 
 jobs:
   check:

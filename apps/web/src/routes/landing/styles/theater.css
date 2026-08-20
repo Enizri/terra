@@ -895,7 +895,7 @@
   outline-offset: 3px;
 }
 
-/* ---- terra chat dock — Cursor floating chrome ---- */
+/* ---- terra chat dock — floating editor chrome ---- */
 
 .sh-theater__dock {
   position: absolute;
@@ -914,7 +914,7 @@
   z-index: 4;
 }
 
-/* Opaque dark shell — Cursor product demos never use backdrop-filter over live UI. */
+/* Opaque dark shell — never backdrop-filter over live UI; it smears the frame. */
 
 @media (prefers-reduced-motion: no-preference) {
 .sh-theater__dock.is-dragging .sh-terra-chat {
@@ -922,7 +922,7 @@
   }
 }
 
-/* Title bar — Cursor h-7 traffic lights + title */
+/* Title bar — 28px traffic lights + title */
 
 .sh-theater__dock .sh-terra-chat__head:active,
 .sh-theater__dock.is-dragging .sh-terra-chat__head {

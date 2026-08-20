@@ -7,9 +7,10 @@
 name: merge-gate
 
 on:
+  # No base-branch filter — a PR stacked on another topic branch needs the
+  # same gate as one based on staging.
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-    branches: [staging, main]
   check_run:
     types: [completed]
 

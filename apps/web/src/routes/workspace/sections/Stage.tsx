@@ -113,7 +113,7 @@ export function DropStage({
             setUrl(e.target.value);
             setIntakeError(null);
           }}
-          placeholder="github.com/usememos/memos"
+          placeholder="github.com/terra/terra"
           aria-label="GitHub repository URL"
           spellCheck={false}
           disabled={running}
