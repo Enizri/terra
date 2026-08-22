@@ -133,17 +133,17 @@ const smoothstep = (from: number, to: number, value: number) => {
   return t * t * (3 - 2 * t);
 };
 
-/** Starts when the hero/journey reaches the viewport top and completes as the
- * real screen reaches the upper quarter. Both endpoints come from the DOM. */
+/** Starts on the first page scroll and completes when the real screen reaches
+ * the upper quarter. */
 export function globeJourneyProgress(
-  journeyTop: number,
+  scrollTop: number,
   screenTop: number,
   viewportHeight: number,
 ) {
   if (!(viewportHeight > 0)) return 0;
-  if (journeyTop >= 0) return 0;
-  const distance = screenTop - journeyTop - viewportHeight * 0.24;
-  return clamp01(-journeyTop / Math.max(distance, 1));
+  if (scrollTop <= 0) return 0;
+  const distance = screenTop + scrollTop - viewportHeight * 0.24;
+  return clamp01(scrollTop / Math.max(distance, 1));
 }
 
 /** Softens discrete wheel/touchpad steps without changing scroll endpoints. */
@@ -156,6 +156,37 @@ export function smoothGlobeJourneyProgress(current: number, target: number, dt: 
 /** Holds the glyph topology steady while the globe stretches into streams. */
 export function globeJourneyClockRate(progress: number) {
   return 1 - smoothstep(0, 0.18, progress);
+}
+
+/** Lets the lower edge unravel before the globe itself starts travelling. */
+export function globeJourneyTravel(progress: number) {
+  return easeInOutQuad(smoothstep(0.15, 1, progress));
+}
+
+/** Crossfades the light globe glyphs to ink as the dark backing dissolves. */
+export function globeJourneyInk(progress: number) {
+  return smoothstep(0, 0.1, progress);
+}
+
+/** A second scroll interval in the FAQ-to-footer bridge. */
+export function cleanGlobeJourneyProgress(
+  dockTop: number,
+  viewportHeight: number,
+) {
+  if (!(viewportHeight > 0)) return 0;
+  return 1 - smoothstep(-0.35, 0.95, dockTop / viewportHeight);
+}
+
+export function cleanGlobeJourneyOpacity(progress: number) {
+  return smoothstep(0, 0.18, progress);
+}
+
+export function cleanGlobeJourneyTravel(progress: number) {
+  return easeInOutQuad(smoothstep(0.05, 0.92, progress));
+}
+
+export function cleanGlobeJourneyScale(progress: number) {
+  return mix(0.06, 0.5, cleanGlobeJourneyTravel(progress));
 }
 
 /** Writes one frame's quads into `out` and returns how many were written.
@@ -275,7 +306,9 @@ export function layoutGlobe(f: GlobeFrame, out: Float32Array, glyphsOut?: string
  * flowing curtain of character streams. Nothing is sampled or dropped. */
 export function layoutGlobeJourney(f: GlobeJourneyFrame, out: Float32Array): number {
   const p = clamp01(f.progress);
-  const shape = smoothstep(0, 0.72, p);
+  const converge = smoothstep(0.22, 0.55, p);
+  const narrow = smoothstep(0.1, 0.88, p);
+  const ink = globeJourneyInk(p);
   const vanish = 1 - smoothstep(0.9, 1, p);
   const paneW = f.width ?? f.size;
   const paneH = f.height ?? f.size;
@@ -284,11 +317,9 @@ export function layoutGlobeJourney(f: GlobeJourneyFrame, out: Float32Array): num
   const n = layoutGlobe(f, out);
   const rows = Math.max(2, Math.ceil(n / STREAMS));
 
-  const travel = easeInOutQuad(p);
+  const travel = globeJourneyTravel(p);
   const centerX = mix(f.startX, f.targetX, travel);
-  const centerY =
-    mix(f.startY, f.targetY, travel) - Math.sin(travel * Math.PI) * paneH * 0.08;
-  const tail = paneH * 1.45;
+  const centerY = mix(f.startY, f.targetY, travel);
   const startSpread = Math.min(paneW * 0.42, 520);
 
   for (let i = 0; i < n; i++) {
@@ -299,21 +330,48 @@ export function layoutGlobeJourney(f: GlobeJourneyFrame, out: Float32Array): num
     const row = Math.floor(i / STREAMS);
     const laneT = lane / (STREAMS - 1) - 0.5;
     const rowT = Math.min(1, row / (rows - 1));
-    const converge = rowT * rowT;
+    const laneConverge = rowT * rowT;
+    const streamSpread = mix(startSpread, 18, laneConverge);
+    const laneRoom = 1 - Math.abs(laneT) * 2;
     const streamX =
       f.targetX +
-      laneT * mix(startSpread, 18, converge) +
-      Math.sin(rowT * Math.PI * 3 + lane * 0.8) * 22 * (1 - converge);
-    const streamY =
-      f.targetY - tail * (1 - rowT) + Math.sin(rowT * Math.PI * 4 + lane) * 8;
+      laneT * streamSpread +
+      Math.sin(rowT * Math.PI * 3 + lane * 0.8) *
+        Math.min(22, streamSpread * 0.1) * laneRoom;
+    const sourcePointY = centerY + y;
+    const streamY = Math.max(sourcePointY, mix(centerY, f.targetY, rowT));
 
-    out[o] = mix(centerX + x, streamX, shape);
-    out[o + 1] = mix(centerY + y, streamY, shape);
-    out[o + 2] = mix(out[o + 2], 12, shape);
+    const bottomness = clamp01(0.5 + y / (f.size * SPHERE_FILL));
+    const seed = (hash2(i, lane) % 1000) / 1000;
+    const releaseAt = clamp01((1 - bottomness) * 0.55 + (seed - 0.5) * 0.05);
+    const release = smoothstep(releaseAt, releaseAt + 0.12, p);
+    const wind =
+      Math.sin(seed * Math.PI * 2 + p * Math.PI * 4) *
+      Math.min(28, f.size * 0.045) *
+      release;
+    const flowX = centerX + x + wind;
+    const flowY = mix(
+      sourcePointY,
+      Math.max(sourcePointY, f.targetY),
+      release * 0.55,
+    );
+    const streamBlend = release * converge;
+
+    const rawX = mix(flowX, streamX, streamBlend);
+    const anchorX = mix(centerX, f.targetX, streamBlend);
+    const dx = rawX - anchorX;
+    const taper = 1 - (1 - narrow) * (1 - rowT * streamBlend);
+    const halfWidth = Math.abs(dx) <= 9
+      ? Math.abs(dx)
+      : 9 + (Math.abs(dx) - 9) * (1 - taper);
+    out[o] = anchorX + Math.sign(dx) * halfWidth;
+    out[o + 1] = mix(flowY, streamY, streamBlend);
+    out[o + 2] = mix(out[o + 2], 12, release);
     // The hero globe is light on charcoal; the streams become ink on paper.
-    out[o + 4] = mix(out[o + 4], 0.18, shape);
-    out[o + 5] = mix(out[o + 5], 0.18, shape);
-    out[o + 6] = mix(out[o + 6], 0.22, shape);
+    const paper = Math.max(release, ink);
+    out[o + 4] = mix(out[o + 4], 0.18, paper);
+    out[o + 5] = mix(out[o + 5], 0.18, paper);
+    out[o + 6] = mix(out[o + 6], 0.22, paper);
     out[o + 7] *= vanish;
   }
 

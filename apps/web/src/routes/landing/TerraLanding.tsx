@@ -111,8 +111,9 @@ export default function TerraLanding() {
         <GlobeJourney>
           <HeroChars />
           <PowerSection />
+          <Faq />
+          <div className="gx-journey__footer-dock" aria-hidden />
         </GlobeJourney>
-        <Faq />
         <Final />
       </div>
     </MotionConfig>

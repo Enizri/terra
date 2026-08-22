@@ -1,12 +1,22 @@
 import { useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { RepoDiagram } from "../../../features/architecture-map";
+import {
+  createCelestialGlobeRenderer,
+  type CelestialGlobeRenderer,
+} from "../celestialGlobe3D";
 import { diagramEdges, diagramGroups, diagramNodes } from "../data";
 import { createGlobeRenderer } from "../globeGL";
 import {
   HOVER_R,
+  cleanGlobeJourneyOpacity,
+  cleanGlobeJourneyProgress,
+  cleanGlobeJourneyScale,
+  cleanGlobeJourneyTravel,
   globeJourneyClockRate,
+  globeJourneyInk,
   globeJourneyProgress,
+  globeJourneyTravel,
   layoutGlobeJourney,
   smoothGlobeJourneyProgress,
 } from "../globeLayout";
@@ -21,6 +31,7 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
   const reduced = useReducedMotion();
   const rootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const sphereCanvasRef = useRef<HTMLCanvasElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<HTMLDivElement>(null);
   const [mapPx, setMapPx] = useState(0);
@@ -36,14 +47,16 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
   });
 
   useEffect(() => {
-    if (reduced) return;
+    const reduceMotion = Boolean(reduced);
     const root = rootRef.current;
     const canvas = canvasRef.current;
+    const sphereCanvas = sphereCanvasRef.current;
     const backdrop = backdropRef.current;
     const map = mapRef.current;
-    if (!root || !canvas || !backdrop || !map) return;
+    if (!root || !canvas || !sphereCanvas || !backdrop || !map) return;
     const renderer = createGlobeRenderer(canvas);
     if (!renderer || renderer === "lost") return;
+    let sphereRenderer: CelestialGlobeRenderer | null = null;
 
     let disposed = false;
     let frame = 0;
@@ -52,7 +65,9 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
     let height = 0;
     let last = 0;
     let globeT = 0;
+    let cleanT = 0;
     let shownProgress = 0;
+    let shownCleanProgress = 0;
     const mouseFollow = (dt: number) => 1 - Math.pow(0.9, dt * 60);
 
     const draw = (dt: number) => {
@@ -62,14 +77,26 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
       const screen = root.querySelector<HTMLElement>(
         ".sh-power-theater__screen .sh-window",
       );
-      if (!screen) return 1;
+      const dock = root.querySelector<HTMLElement>(".gx-journey__footer-dock");
+      if (!screen || !dock) return 1;
 
       const canvasRect = canvas.getBoundingClientRect();
       const screenRect = screen.getBoundingClientRect();
-      const targetProgress = globeJourneyProgress(rootRect.top, screenRect.top, height);
+      const dockRect = dock.getBoundingClientRect();
+      const targetProgress = reduceMotion
+        ? 0
+        : globeJourneyProgress(window.scrollY, screenRect.top, height);
       shownProgress = smoothGlobeJourneyProgress(shownProgress, targetProgress, dt);
       const progress = shownProgress;
-      globeT += dt * globeJourneyClockRate(progress);
+      const targetCleanProgress = reduceMotion
+        ? 0
+        : cleanGlobeJourneyProgress(dockRect.top, height);
+      shownCleanProgress = smoothGlobeJourneyProgress(
+        shownCleanProgress,
+        targetCleanProgress,
+        dt,
+      );
+      if (!reduceMotion) globeT += dt * globeJourneyClockRate(progress);
       const desktop = width > 900;
       const size = desktop
         ? Math.min(width * 0.48, height * 0.82)
@@ -94,6 +121,8 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
         progress < 0.03 ? p.x - (startX - width / 2) : -1e4;
       const sourcePointerY =
         progress < 0.03 ? p.y - (startY - height / 2) : -1e4;
+      const yaw = p.sx * MOUSE_LOOK + progress * 0.42;
+      const pitch = -p.sy * MOUSE_LOOK * 0.4 + progress * -0.08;
 
       const glyphs = layoutGlobeJourney(
         {
@@ -103,9 +132,9 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
           t: globeT,
           pointerX: sourcePointerX,
           pointerY: sourcePointerY,
-          yaw: p.sx * MOUSE_LOOK + progress * 0.42,
-          pitch: -p.sy * MOUSE_LOOK * 0.4 + progress * -0.08,
-          reduced: false,
+          yaw,
+          pitch,
+          reduced: reduceMotion,
           progress,
           startX,
           startY,
@@ -116,15 +145,43 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
       );
       renderer.render({ glyphs });
 
-      const discFade = 1 - Math.min(1, Math.max(0, progress / 0.3));
-      const travel = progress * progress * (3 - 2 * progress);
+      const travel = globeJourneyTravel(progress);
       const centerX = startX + (targetX - startX) * travel;
-      const centerY =
-        startY + (targetY - startY) * travel - Math.sin(travel * Math.PI) * height * 0.08;
+      const centerY = startY + (targetY - startY) * travel;
+      const discFade = 1 - globeJourneyInk(progress);
       backdrop.style.width = `${size}px`;
       backdrop.style.height = `${size}px`;
       backdrop.style.opacity = String(discFade);
       backdrop.style.transform = `translate3d(${centerX - size / 2}px, ${centerY - size / 2}px, 0)`;
+      const cleanTravel = cleanGlobeJourneyTravel(shownCleanProgress);
+      const cleanArc = Math.sin(cleanTravel * Math.PI);
+      if (!reduceMotion && shownCleanProgress > 0) cleanT += dt;
+      const cleanStartX = width * (desktop ? 0.5 : 0.5);
+      const cleanStartY = height + size * 0.28;
+      const cleanTargetX = width * (desktop ? 0.62 : 0.5);
+      // Keep the finished sphere fully inside the light bridge; the footer
+      // begins before the sticky viewport ends.
+      const cleanTargetY = height * (desktop ? 0.30 : 0.28);
+      const cleanX = cleanStartX + (cleanTargetX - cleanStartX) * cleanTravel +
+        cleanArc * size * (desktop ? 0.08 : 0.03);
+      const cleanY = cleanStartY + (cleanTargetY - cleanStartY) * cleanTravel;
+      const cleanOpacity = cleanGlobeJourneyOpacity(shownCleanProgress);
+      const cleanActive = cleanOpacity > 0.001;
+      sphereCanvas.parentElement?.classList.toggle("is-clean-flight", cleanActive);
+      sphereRenderer?.render({
+        width,
+        height,
+        diameter: size * MAP_FILL * (
+          cleanActive ? cleanGlobeJourneyScale(shownCleanProgress) : 1
+        ),
+        x: cleanActive ? cleanX : centerX,
+        y: cleanActive ? cleanY : centerY,
+        yaw,
+        pitch,
+        spin: reduceMotion ? 0.35 : globeT * 0.22 + cleanT * 0.18,
+        opacity: cleanActive ? cleanOpacity : discFade,
+        emergence: cleanActive ? Math.max(0.03, cleanTravel) : 1,
+      });
 
       const mapD = size * MAP_FILL;
       if (Math.round(mapD) !== mapPxRef.current) {
@@ -142,7 +199,7 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
       map.style.clipPath = p.presence > 0.02
         ? `circle(${size * 0.5 * HOVER_R}px at ${localX}px ${localY}px)`
         : "circle(0px at 50% 50%)";
-      return progress;
+      return Math.min(progress, shownCleanProgress);
     };
 
     const tick = (now: number) => {
@@ -151,7 +208,12 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
       const dt = last ? Math.min(0.05, (now - last) / 1000) : 1 / 60;
       last = now;
       const progress = draw(dt);
-      if (progress < 1) frame = requestAnimationFrame(tick);
+      if (
+        !reduceMotion &&
+        (progress < 1 || shownCleanProgress < 1 || cleanGlobeJourneyOpacity(shownCleanProgress) > 0)
+      ) {
+        frame = requestAnimationFrame(tick);
+      }
     };
     const play = () => {
       if (frame || disposed || !visible || document.hidden) return;
@@ -164,6 +226,7 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
       height = rect.height;
       if (width <= 0 || height <= 0) return;
       renderer.resize(width, height, Math.min(1.5, window.devicePixelRatio || 1));
+      sphereRenderer?.resize(width, height, window.devicePixelRatio || 1);
       play();
     };
     const onMove = (event: PointerEvent) => {
@@ -182,6 +245,14 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
       p.ny = 0;
     };
 
+    void createCelestialGlobeRenderer(sphereCanvas, play).then((created) => {
+      if (disposed) {
+        created?.dispose();
+        return;
+      }
+      sphereRenderer = created;
+      resize();
+    });
     const resizeObserver = new ResizeObserver(resize);
     resizeObserver.observe(canvas);
     const intersectionObserver = new IntersectionObserver(([entry]) => {
@@ -199,9 +270,11 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
         frame = 0;
       } else play();
     };
-    window.addEventListener("scroll", play, { passive: true });
-    window.addEventListener("pointermove", onMove, { passive: true });
-    document.addEventListener("pointerleave", onLeave);
+    if (!reduceMotion) {
+      window.addEventListener("scroll", play, { passive: true });
+      window.addEventListener("pointermove", onMove, { passive: true });
+      document.addEventListener("pointerleave", onLeave);
+    }
     document.addEventListener("visibilitychange", onVisibility);
     resize();
     if (document.fonts && document.fonts.status !== "loaded") {
@@ -218,20 +291,22 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
       if (frame) cancelAnimationFrame(frame);
       resizeObserver.disconnect();
       intersectionObserver.disconnect();
-      window.removeEventListener("scroll", play);
-      window.removeEventListener("pointermove", onMove);
-      document.removeEventListener("pointerleave", onLeave);
+      if (!reduceMotion) {
+        window.removeEventListener("scroll", play);
+        window.removeEventListener("pointermove", onMove);
+        document.removeEventListener("pointerleave", onLeave);
+      }
       document.removeEventListener("visibilitychange", onVisibility);
+      sphereRenderer?.dispose();
       renderer.dispose();
     };
   }, [reduced]);
-
-  if (reduced) return <>{children}</>;
 
   return (
     <div ref={rootRef} className="gx-journey">
       <div className="gx-journey__sticky" aria-hidden>
         <div ref={backdropRef} className="gx-journey__disc" />
+        <canvas ref={sphereCanvasRef} className="gx-journey__sphere" />
         <div ref={mapRef} className="hx-orb__map">
           <RepoDiagram
             nodes={diagramNodes}
