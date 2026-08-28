@@ -233,3 +233,10 @@ the enums and model JSON schema live only in
 `backend/analyzer/terra_analyzer/tasks/architecture/schema.py`.
 `case-studies/memos.map.json` is the golden answer key and is checked by
 `backend/analyzer/tests/test_app.py` and `backend/api/internal/analysis/contract_test.go`.
+
+## License
+
+MIT — see [`LICENSE`](LICENSE).
+
+The bundled celestial globe model is CC0 (Virtual Museums of Małopolska); its
+provenance is recorded in `apps/web/public/terra/models/celestial-globe-license.txt`.

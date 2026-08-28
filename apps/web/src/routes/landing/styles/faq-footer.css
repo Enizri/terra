@@ -1,6 +1,6 @@
 /* Tokens the terra-* FAQ and footer blocks need. They live here so the rest of
    the app keeps its own palette.
-   ponytail: kept as one block — split into tokens.css if a second route ever
+   Kept as one block — split into tokens.css if a second route ever
    wants this scale. */
 :root {
   --font-display: "Fraunces Variable", "Fraunces", ui-serif, Georgia, serif;

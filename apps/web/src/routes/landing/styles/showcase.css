@@ -891,23 +891,6 @@
   width: 100%;
 }
 
-/* Empty repo screen: linen weave inside the window while it waits for a URL —
-   a 2×2 mirrored tile (seamless repeat) at half its pixel size, so retina gets
-   full native density. Stays put once the map lands — the diagram sits on the
-   same weave the empty screen had. */
-
-.sh-section--hero .sh-window::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(rgba(246, 245, 243, 0.55), rgba(246, 245, 243, 0.55)),
-    url("/images/linen-tile.webp") repeat top left;
-  background-size: auto, 1249px 700px;
-  pointer-events: none;
-  z-index: 0;
-}
-
 .sh-window {
   position: relative;
   display: flex;

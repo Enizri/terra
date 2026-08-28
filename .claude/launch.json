@@ -4,13 +4,13 @@
     {
       "name": "terra-web",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--prefix", "web"],
+      "runtimeArgs": ["run", "dev", "--prefix", "apps/web"],
       "port": 5173
     },
     {
       "name": "terra-web-alt",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--prefix", "web", "--", "--port", "5174", "--strictPort"],
+      "runtimeArgs": ["run", "dev", "--prefix", "apps/web", "--", "--port", "5174", "--strictPort"],
       "port": 5174
     }
   ]
