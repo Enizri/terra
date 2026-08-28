@@ -34,16 +34,6 @@
     --sh-flight-tile: 164px;
   }
 
-  .sh-root--landing .sh-caption {
-    font-size: 18px;
-    line-height: 24px;
-  }
-
-  .sh-root--landing .sh-caption--md {
-    font-size: 21px;
-    line-height: 30px;
-  }
-
   /* The drawer runs at the reference `lg:text-3xl` / `lg:text-md`; the
      `--sh-read` inflation the rest of the page uses would blow it past the
      card beside it. */

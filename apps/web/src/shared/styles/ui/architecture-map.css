@@ -61,31 +61,6 @@
   text-overflow: ellipsis;
 }
 
-.sh-diagram__badge {
-  margin-left: auto;
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 9px;
-  border-radius: 999px;
-  border: 1px solid var(--dg-border);
-  background: rgba(255, 255, 255, 0.03);
-  font-family: var(--dg-mono);
-  font-size: 10px;
-  color: var(--dg-muted);
-  white-space: nowrap;
-}
-
-.sh-diagram__badge::before {
-  content: "";
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: #12b886;
-  box-shadow: 0 0 6px rgba(18, 184, 134, 0.8);
-}
-
 .sh-diagram__canvas {
   position: relative;
   flex: 1;
@@ -515,9 +490,6 @@
     display: none;
   }
 
-.sh-diagram__badge {
-    display: none;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -532,4 +504,3 @@
     animation: none;
   }
 }
-

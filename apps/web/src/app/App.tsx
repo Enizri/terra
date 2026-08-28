@@ -10,7 +10,6 @@ function NewSession() {
   return <Navigate replace to={`/new/s/${randomSlug()}`} />;
 }
 
-// Older landing experiments live in ./sections — kept for reference.
 export default function App() {
   return (
     <>

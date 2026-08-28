@@ -12,9 +12,8 @@ const journeySource = readFileSync(
 
 test("hero is a 1:1 split with the globe on charcoal", () => {
   assert.match(css, /grid-template-columns:\s*1fr 1fr/);
-  // Both stops of the shared journey disc. The solid core used to be guarded by a
-  // bare `background: #232323`, which actually matched the hero CTA's fill —
-  // it stopped being charcoal when the buttons moved to the token palette.
+  // Both stops of the shared journey disc must stay charcoal, independent of
+  // the CTA fill in the token palette.
   assert.match(css, /#232323 0%/);
   assert.match(css, /#232323 78%/);
   assert.doesNotMatch(source, /HeroTitle/);

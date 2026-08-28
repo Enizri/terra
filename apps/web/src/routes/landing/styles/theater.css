@@ -41,38 +41,6 @@
   height: 19px;
 }
 
-/* ---- canvas ---- */
-
-/* The content layer RepoDiagram scales down when a column outgrows the canvas.
-   `padding: inherit` keeps the flow inside the same padding box it had as a
-   direct child, so the measured offsets don't move. */
-
-/* ---- group box ---- */
-
-/* ---- node ---- */
-
-/* The tech tile: brand colours arrive inline from TechIcon. */
-
-/* Railway's attached-volume row: the card's evidence path lives in a footer
-   sub-row under its own rule. Always visible — static card heights keep the
-   measured arrows honest. */
-
-/* ---- connections ---- */
-
-/* Streak of light running along a lit wire, source → target. Dash lengths are
-   user units, so on a short route it reads as one pulse rather than a train. */
-
-/* Focus / dim / lit state rules moved to shared/styles/ui.css — RepoDiagram is
-   shared, so its interaction states must not live in a route sheet. */
-
-/* ---- legend ---- */
-
-/* ---- stacked fallback ---- */
-
-@media (max-width: 767px) {
-/* A down-chevron stands in for the arrows the stacked layout drops. */
-}
-
 /* ---- theater ---- */
 
 .sh-theater {
@@ -97,10 +65,6 @@
   z-index: 60;
   display: grid;
   place-items: center;
-}
-
-.sh-theater--windowed {
-  background: rgba(24, 17, 10, 0.5);
 }
 
 .sh-theater--full {
@@ -231,11 +195,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.sh-theater__close,
-.sh-theater__expand {
-  line-height: 1;
 }
 
 /* ---- replica ---- */

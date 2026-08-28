@@ -197,8 +197,8 @@ export default function RepoDiagram({
         if (route) next[edgeKey(e)] = route;
       }
       // Scale content to fit the canvas on both axes; routes stay valid under
-      // the scale. Where the columns are still allowed to flex-shrink, the
-      // width term is ~1 and this behaves exactly like the old height-only fit.
+      // the scale. Where the columns can still flex-shrink the width term is
+      // ~1, so the fit is driven by height alone.
       let topY = Infinity;
       let botY = -Infinity;
       let leftX = Infinity;
