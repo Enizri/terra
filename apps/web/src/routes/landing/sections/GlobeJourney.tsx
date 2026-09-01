@@ -14,6 +14,14 @@ import {
 } from "../globeDrag";
 import { createGlobeRenderer } from "../globeGL";
 import {
+  advanceToss,
+  createToss,
+  grabToss,
+  releaseToss,
+  tossBy,
+  tossYawGain,
+} from "../globeToss";
+import {
   cleanGlobeJourneyOpacity,
   cleanGlobeJourneyProgress,
   cleanGlobeJourneyScale,
@@ -67,12 +75,21 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
     let shownProgress = 0;
     let shownCleanProgress = 0;
     const spin = createSpin();
+    const toss = createToss();
     let dragging = false;
     let spinning = false;
+    let tossing = false;
+    /** True while the globe is parked on the sun, where a press throws it
+     *  instead of only turning it. Latched at pointerdown so a scroll
+     *  mid-gesture cannot change what the drag means. */
+    let tossable = false;
+    let tossHeld = false;
     let lastDragX = 0;
     let lastDragY = 0;
     let lastDragT = 0;
     let grabRadius = 1;
+    let grabCenterX = 0;
+    let grabCenterY = 0;
 
     const draw = (dt: number) => {
       if (disposed || width <= 0 || height <= 0) return 1;
@@ -149,13 +166,32 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
       backdrop.style.transform = `translate3d(${centerX - size / 2}px, ${centerY - size / 2}px, 0)`;
       if (!reduceMotion && shownCleanProgress > 0 && !dragging) cleanT += dt;
       const fit = finaleGlobeFit(dockRect, canvasRect);
-      const cleanX = fit.x;
-      // Parked on the painted sun from the first frame — the blur is the
-      // backdrop, not a disc the globe has to climb onto.
-      const cleanY = fit.y;
       const cleanOpacity = cleanGlobeJourneyOpacity(shownCleanProgress);
       const cleanDiameter = fit.diameter * cleanGlobeJourneyScale(shownCleanProgress);
       const cleanActive = cleanOpacity > 0.001;
+      // Same press-and-spin handle as the hero: it rides whichever globe is
+      // on screen. The finale chrome is pointer-events none except its links,
+      // so the press reaches this disc instead of the photo.
+      const finaleGrab = cleanActive && cleanOpacity > 0.35;
+      tossable = finaleGrab;
+      // The box a thrown globe flies in: the rounded inner edge of the sky
+      // card on three sides, and the terrace as the floor — below that ridge
+      // the photo paints over it, so it would sink out of the scene.
+      const tossRadius = cleanDiameter / 2;
+      const cardLeft = dockRect.left - canvasRect.left;
+      const cardTop = dockRect.top - canvasRect.top;
+      const wall = FINALE_RADIUS + tossRadius;
+      tossing = advanceToss(toss, dt, tossHeld, {
+        left: cardLeft + wall - fit.x,
+        right: cardLeft + dockRect.width - wall - fit.x,
+        top: cardTop + wall - fit.y,
+        bottom: cardTop + fit.ridge - tossRadius - fit.y,
+      });
+      // Parked on the painted sun from the first frame — the blur is the
+      // backdrop, not a disc the globe has to climb onto — plus wherever the
+      // reader has thrown it.
+      const cleanX = fit.x + toss.x;
+      const cleanY = fit.y + toss.y;
       const sticky = sphereCanvas.parentElement;
       sticky?.classList.toggle("is-clean-flight", cleanActive);
       if (sticky) {
@@ -218,23 +254,30 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
         // A ground-level view of a sphere hung high in the sky: the reader is
         // looking slightly up at it, like the figures on the terrace.
         pitch: cleanActive ? pitch + 0.12 : pitch,
-        spin: reduceMotion ? 0.35 : cleanActive ? 0.22 : globeT * 0.22 + cleanT * 0.18,
+        // Docked, the roll is the tumble the throw put on it.
+        spin: reduceMotion
+          ? 0.35
+          : cleanActive
+          ? 0.22 + toss.roll
+          : globeT * 0.22 + cleanT * 0.18,
         opacity: cleanActive ? cleanOpacity : discFade,
         hallLight: cleanActive ? 2.6 * cleanOpacity : 0,
       });
 
-      // Same press-and-spin handle as the hero: it rides whichever globe is
-      // on screen. The finale chrome is pointer-events none except its links,
-      // so the press reaches this disc instead of the photo.
-      const finaleGrab = cleanActive && cleanOpacity > 0.35;
+      // The handle rides whichever globe is on screen, and remembers where
+      // its centre landed so a press can tell a rim grab from a centre one.
       if (finaleGrab) {
         grabRadius = cleanDiameter / 2;
+        grabCenterX = canvasRect.left + cleanX;
+        grabCenterY = canvasRect.top + cleanY;
         pad.style.width = `${cleanDiameter}px`;
         pad.style.height = `${cleanDiameter}px`;
         pad.style.transform =
           `translate3d(${cleanX - cleanDiameter / 2}px, ${cleanY - cleanDiameter / 2}px, 0)`;
       } else {
         grabRadius = size / 2;
+        grabCenterX = canvasRect.left + centerX;
+        grabCenterY = canvasRect.top + centerY;
         pad.style.width = `${size}px`;
         pad.style.height = `${size}px`;
         pad.style.transform =
@@ -260,6 +303,7 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
         (progress < 1 ||
           dragging ||
           spinning ||
+          tossing ||
           dockInView ||
           shownCleanProgress < 1 ||
           cleanGlobeJourneyOpacity(shownCleanProgress) > 0)
@@ -285,6 +329,17 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
     const onDown = (event: PointerEvent) => {
       dragging = true;
       grab(spin);
+      // Only the docked globe is throwable. In the hero the glyph field is
+      // scroll-morphed into the streams, so moving it would fight the layout.
+      tossHeld = tossable;
+      if (tossHeld) {
+        grabToss(
+          toss,
+          event.clientX - grabCenterX,
+          event.clientY - grabCenterY,
+          grabRadius,
+        );
+      }
       lastDragX = event.clientX;
       lastDragY = event.clientY;
       lastDragT = event.timeStamp;
@@ -295,13 +350,11 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
     const onDrag = (event: PointerEvent) => {
       if (!dragging) return;
       const dt = Math.max(0.001, (event.timeStamp - lastDragT) / 1000);
-      dragBy(
-        spin,
-        event.clientX - lastDragX,
-        event.clientY - lastDragY,
-        grabRadius,
-        dt,
-      );
+      const dx = event.clientX - lastDragX;
+      const dy = event.clientY - lastDragY;
+      if (tossHeld) tossBy(toss, dx, dy, dt);
+      // A rim grab spends most of the gesture on roll, so it turns less.
+      dragBy(spin, dx, dy, grabRadius, dt, tossHeld ? tossYawGain(toss) : 1);
       lastDragX = event.clientX;
       lastDragY = event.clientY;
       lastDragT = event.timeStamp;
@@ -311,6 +364,10 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
       if (!dragging) return;
       dragging = false;
       release(spin);
+      if (tossHeld) {
+        releaseToss(toss);
+        tossHeld = false;
+      }
       if (pad.hasPointerCapture(event.pointerId)) {
         pad.releasePointerCapture(event.pointerId);
       }

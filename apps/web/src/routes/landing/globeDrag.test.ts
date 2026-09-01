@@ -46,6 +46,19 @@ test("a violent flick is capped", () => {
   assert.ok(spin.pitchVel <= MAX_FLING);
 });
 
+test("gain trades the turn away without touching the default", () => {
+  const full = createSpin();
+  dragBy(full, RADIUS, 0, RADIUS, 1 / 60);
+  const half = createSpin();
+  dragBy(half, RADIUS, 0, RADIUS, 1 / 60, 0.5);
+  const none = createSpin();
+  dragBy(none, RADIUS, 0, RADIUS, 1 / 60, 0);
+
+  assert.equal(half.yaw, full.yaw / 2, "the finale's rim grab turns it less");
+  assert.equal(none.yaw, 0, "all of it can go to roll instead");
+  assert.equal(none.emaYaw, 0, "and the fling goes with it");
+});
+
 test("the throw coasts, decays, and parks level", () => {
   const spin = createSpin();
   spin.yaw = 0;

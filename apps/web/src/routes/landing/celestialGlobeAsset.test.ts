@@ -25,6 +25,6 @@ test("the 3D globe is a closed sphere, not a dissolving shell", () => {
   assert.doesNotMatch(src, /discard;/);
   assert.match(journey, /finaleGlobeFit/);
   assert.match(journey, /terra-finale__sun/);
-  assert.match(journey, /const cleanY = fit\.y/);
+  assert.match(journey, /const cleanY = fit\.y \+ toss\.y/);
   assert.doesNotMatch(journey, /emergence/);
 });

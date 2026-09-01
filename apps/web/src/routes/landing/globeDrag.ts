@@ -38,17 +38,21 @@ export function createSpin(): SpinState {
 const clamp = (v: number, limit: number) => Math.max(-limit, Math.min(limit, v));
 
 /** Applies one pointer move. `dt` is the time since the previous move, so a
- *  slow drag and a fast one of the same distance fling differently. */
+ *  slow drag and a fast one of the same distance fling differently. `gain`
+ *  scales how much of the gesture becomes a turn: the finale globe hands part
+ *  of a rim grab to globeToss.ts as roll instead, and the hero keeps all of
+ *  it at the default. */
 export function dragBy(
   state: SpinState,
   dxPx: number,
   dyPx: number,
   radiusPx: number,
   dt: number,
+  gain = 1,
 ) {
   const r = Math.max(1, radiusPx);
-  const dYaw = (dxPx / r) * YAW_PER_RADIUS;
-  const dPitch = (dyPx / r) * PITCH_PER_RADIUS;
+  const dYaw = (dxPx / r) * YAW_PER_RADIUS * gain;
+  const dPitch = (dyPx / r) * PITCH_PER_RADIUS * gain;
   state.yaw += dYaw;
   state.pitch = clamp(state.pitch + dPitch, PITCH_LIMIT);
   state.yawVel = 0;
