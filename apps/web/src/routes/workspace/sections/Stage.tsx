@@ -8,6 +8,7 @@ import { StatusLine } from "../../../shared/shell/StatusLine";
 import { WsDropCard } from "../../../shared/shell/DropCard";
 import { MapStage } from "./MapStage";
 import { ModelGate } from "./ModelGate";
+import type { ModelChoice } from "../../../features/analysis";
 
 /** Centre column: drop / mapping / map. */
 export function DropStage({
@@ -16,12 +17,14 @@ export function DropStage({
   selectedIds,
   onSelect,
   onElements,
+  onModel,
 }: {
   analyze: ReturnType<typeof useAnalyze>;
   map: TerraMap | null;
   selectedIds: string[];
   onSelect: (id: string | null, additive?: boolean) => void;
   onElements: (picked: LiveSelection[]) => void;
+  onModel: (choice: ModelChoice) => void;
 }) {
   const [over, setOver] = useState(false);
   const [url, setUrl] = useState("");
@@ -67,7 +70,14 @@ export function DropStage({
   return (
     <main className={`sh-ws__stage${map && !recommendation ? " is-map" : ""}`}>
       {recommendation ? (
-        <ModelGate recommendation={recommendation} onContinue={proceed} onCancel={cancel} />
+        <ModelGate
+          recommendation={recommendation}
+          onContinue={(modelId, apiKey, provider) => {
+            onModel({ modelId, apiKey });
+            proceed(modelId, apiKey, provider);
+          }}
+          onCancel={cancel}
+        />
       ) : map ? (
         <>
           <MapStage map={map} selectedIds={selectedIds} onSelect={onSelect} onElements={onElements} />

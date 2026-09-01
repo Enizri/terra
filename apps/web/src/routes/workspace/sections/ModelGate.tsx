@@ -12,9 +12,10 @@ import {
   type Recommendation,
 } from "../../../features/analysis";
 import { ApiKeyModal } from "./ApiKeyModal";
+import { ModelChoices } from "./ModelChoices";
 
 /** Hard gate between probe and analyze: nothing costs a token until the user
- * picks a model and hits Continue. */
+ * picks a model and hits Continue. BYOK models without a stored key stay closed. */
 export function ModelGate({
   recommendation,
   onContinue,
@@ -54,12 +55,17 @@ export function ModelGate({
   };
 
   const recommended = catalog.find((e) => e.id === recommendation.model_id) ?? null;
+  const recommendedLocked =
+    !!recommended && needsKey(recommended, getApiKey(recommended.provider ?? ""));
+  const recommendedBlocked =
+    !!recommended && !eligibility(recommended, caps).eligible;
 
   if (pendingKey) {
     return (
       <ApiKeyModal
         provider={pendingKey.provider ?? "provider"}
         modelName={pendingKey.display_name}
+        submitLabel="Save API key locally"
         onSubmit={(key) => {
           setApiKey(pendingKey.provider ?? "", key);
           const entry = pendingKey;
@@ -78,15 +84,26 @@ export function ModelGate({
       {loadError && <p className="sh-ws__error">{loadError}</p>}
 
       {recommended ? (
-        <div className="sh-gate__card">
+        <div className={`sh-gate__card${recommendedLocked ? " is-locked" : ""}`}>
           <p className="sh-gate__name">
             {recommended.display_name}
             <span className="sh-gate__tag">{recommended.tier}</span>
           </p>
           <p className="sh-gate__why">{recommendation.reason}</p>
-          <p className="sh-gate__fit">{fitNote(recommended, caps)}</p>
-          <button className="sh-btn" type="button" onClick={() => pick(recommended)}>
-            Continue with {recommended.display_name}
+          <p className="sh-gate__fit">
+            {recommendedLocked
+              ? "Closed — save an API key locally to use this model"
+              : fitNote(recommended, caps)}
+          </p>
+          <button
+            className="sh-btn"
+            type="button"
+            disabled={recommendedBlocked}
+            onClick={() => pick(recommended)}
+          >
+            {recommendedLocked
+              ? `Save a key for ${recommended.display_name}`
+              : `Continue with ${recommended.display_name}`}
           </button>
         </div>
       ) : (
@@ -97,30 +114,7 @@ export function ModelGate({
         {expanded ? "Hide other models" : "Change model"}
       </button>
 
-      {expanded && (
-        <ul className="sh-gate__list">
-          {catalog.map((entry) => {
-            const { eligible, hint } = eligibility(entry, caps);
-            return (
-              <li key={entry.id} className="sh-gate__item">
-                <button
-                  type="button"
-                  className="sh-gate__choice"
-                  disabled={!eligible}
-                  onClick={() => pick(entry)}
-                >
-                  <span className="sh-gate__name">
-                    {entry.display_name}
-                    <span className="sh-gate__tag">{entry.tier}</span>
-                  </span>
-                  <span className="sh-gate__why">{entry.blurb}</span>
-                  <span className="sh-gate__fit">{eligible ? fitNote(entry, caps) : hint}</span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+      {expanded && <ModelChoices catalog={catalog} caps={caps} onPick={pick} />}
 
       <button className="sh-ws__stop" type="button" onClick={onCancel}>
         Cancel
