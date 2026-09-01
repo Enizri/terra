@@ -2,11 +2,26 @@
    nothing new is defined here beyond layout. */
 
 .sh-ws {
+  /* Designed around a 1920×1080 CSS viewport. On 4K at 100% OS scale the
+     CSS pixel is physically tiny, so Chrome zoom was the only way to read
+     it. Scale the whole shell in proportion and shrink the layout box so
+     the magnified UI still fills the window. */
+  --sh-ws-scale: clamp(1, min(100vw / 1920px, 100dvh / 1080px), 1.65);
+  zoom: var(--sh-ws-scale);
   display: grid;
   grid-template-columns: 240px minmax(0, 1fr) 380px;
   grid-template-rows: auto minmax(0, 1fr);
-  height: 100dvh;
+  width: calc(100% / var(--sh-ws-scale));
+  height: calc(100dvh / var(--sh-ws-scale));
+  min-height: 0;
   overflow: hidden;
+}
+
+@supports not (zoom: 1) {
+  .sh-ws {
+    transform: scale(var(--sh-ws-scale));
+    transform-origin: 0 0;
+  }
 }
 
 /* ---- header ---- */

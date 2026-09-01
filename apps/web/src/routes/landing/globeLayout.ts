@@ -4,19 +4,15 @@ import {
   glyphAt,
   hash2,
   highlightAt,
-  hoverWeight,
-  resolves,
   ringAt,
-  textAt,
   toneAt,
 } from "./glyphGrid.ts";
-import { copy } from "./data.ts";
 
 /* Geometry: a stack of rings that drift upward
    and wrap, scaled to a sphere silhouette, twisted along the stack, with two
    highlight bands sweeping the surface. Ours draws characters instead of a
-   mapped text texture, and the cursor works as a decoder lens — glyphs are
-   scrambled until it lands on them.
+   mapped text texture, and the field churns faster the harder the globe is
+   turning — see globeDrag.ts for where that spin comes from.
 
    This module is pure: it turns a moment in time into a flat buffer of quad
    instances. Nothing here touches the DOM or a GL context, so the whole look
@@ -31,9 +27,6 @@ export const COLS_EQ = 200;
 const COLS_REF_PX = 560;
 /** Cap on how tightly a large pane packs — 1 is the 560px look. */
 const DENSITY_MAX = 1.6;
-/** How far the sentence advances from one ring to the next. A prime keeps
- *  rings from lining up into vertical stripes of the same word. */
-const TEXT_ROW_STEP = 37;
 /** Total twist across the stack, radians. */
 const TWIST = Math.PI;
 /** Intro: the collapsed stack opens into the globe over this many seconds. */
@@ -51,7 +44,7 @@ const UV_SPEED = 0.054;
 const SHAPE_SPEED = 0.027;
 /** Fixed lean on the globe, radians. */
 const TILT = (10 * Math.PI) / 180;
-/** How far the highlight bands slide with the cursor, in turns. */
+/** How far the highlight bands slide with the globe's lean, in turns. */
 const HIGHLIGHT_LEAN = 0.06;
 /** Camera distance in sphere radii — drives the perspective spread. */
 const CAM_Z = 4;
@@ -64,14 +57,9 @@ const HL_EDGE = 0.16;
 const HL2_POS = 0.72;
 const HL2_SIZE = 0.42;
 const HL2_EDGE = 0.15;
-/** Glyph flips per second with the pointer away / right under it. */
+/** Glyph flips per second at rest, and per rad/s of spin on top of it. */
 const AMBIENT_RATE = 0.5;
-const HOVER_RATE = 24;
-/** Lens radius as a share of the globe radius — glyph hole and map flashlight. */
-export const HOVER_R = 0.55;
-/** Lens strength needed to resolve a cell, and the per-cell jitter on it. */
-const RESOLVE_MIN = 0.12;
-const RESOLVE_JITTER = 0.4;
+const SPIN_RATE = 3.6;
 /** Monospace cell size at the sphere's equator. */
 const FONT_PX = 12;
 /** Solid enough to read, not a wash. */
@@ -79,10 +67,6 @@ const REST_ALPHA = 1;
 const PEAK_ALPHA = 1;
 /** How far the back of the globe fades behind the front. */
 const BACK_ALPHA = 0.68;
-/** Inside the lens the depth fade lifts, so the far side shows through. */
-const LENS_SEE_THROUGH = 0.95;
-/** How hard the lens punches out the front face (their hover × 2.5 dissolve). */
-const HOLE_GAIN = 1.9;
 /** Discrete inks — dim, mid, white on charcoal (#232323), matching CA's field. */
 const INK = [
   [0.72, 0.72, 0.7],
@@ -106,12 +90,11 @@ export type GlobeFrame = {
   height?: number;
   /** Seconds since the globe mounted. */
   t: number;
-  /** Cursor in canvas px; far away when the pointer has left. */
-  pointerX: number;
-  pointerY: number;
-  /** Smoothed mouse-look, radians. */
+  /** Drag-driven orientation, radians. */
   yaw: number;
   pitch: number;
+  /** Extra glyph churn from how fast the globe is turning, rad/s. */
+  churnRate?: number;
   reduced: boolean;
 };
 
@@ -185,15 +168,136 @@ export function cleanGlobeJourneyTravel(progress: number) {
   return easeInOutQuad(smoothstep(0.05, 0.92, progress));
 }
 
-export function cleanGlobeJourneyScale(progress: number) {
-  return mix(0.06, 0.5, cleanGlobeJourneyTravel(progress));
+/** The globe sits on the painted sun at full size — the blur is behind it,
+ *  so growing in from a smaller disc would read as coming up from below. */
+export function cleanGlobeJourneyScale(_progress: number) {
+  return 1;
+}
+
+/** Kept at zero: the mesh is already in its socket, not rising from the terrace. */
+export const FINALE_GLOBE_RISE = 0;
+
+/** Distance haze over the sphere: how far the warm veil reaches past it. */
+export const FINALE_HAZE_SPREAD = 1.5;
+
+/** Out-of-focus sun behind the 3D globe: mask radius in globe diameters.
+ *  The painted disc's radius is ~0.54 of the globe diameter; this stays
+ *  larger so the solid blur covers the sharp limb instead of fading on it. */
+export const FINALE_SUN_BLUR_RADIUS = 1.2;
+
+/** Where the orb sits inside `finale-sky.jpg`, measured off the file: the
+ *  glowing disc spans x 265..615 and y 362..700 of the 1920x1279 frame, and
+ *  the foreground terrace closes over the sky at y 1105. This module walks
+ *  the same `object-fit: cover` crop the browser does and hands the photo its
+ *  `object-position` back, which is what keeps the 3D globe hanging exactly
+ *  where the painted orb is at any window shape, instead of being parked at a
+ *  percentage that only holds for one aspect ratio. */
+export const FINALE_SKY = {
+  aspect: 1920 / 1279,
+  centerX: 441 / 1920,
+  centerY: 531 / 1279,
+  /** Painted orb diameter as a fraction of the frame width. */
+  diameter: 344 / 1920,
+  /** Where the foreground terrace closes: everything below it is painted
+   *  again on top of the globe, so the sphere rises out from behind it. */
+  ridge: 1105 / 1279,
+  /** Feather on that cut, in frame heights, so the seam never reads as a line. */
+  ridgeFade: 26 / 1279,
+} as const;
+
+/** Where in the card the orb should end up. The crop is solved for this
+ *  instead of a fixed `object-position`, because the orb sits at 23% of the
+ *  frame: any focus that keeps it on screen in a narrow card throws it off in
+ *  a wide one. Solving pins it at the same spot in every card shape, and the
+ *  focus that falls out is handed back to the `<img>` so photo and 3D globe
+ *  can never disagree about where the crop landed. */
+const FINALE_ANCHOR = { x: 0.42, y: 0.42 } as const;
+/** The 3D sphere sits *inside* the painted orb, not over it: a rim of the
+ *  photo's own fire stays visible all the way around, so the mesh reads as
+ *  something hanging in that sky rather than a decal on top of it. */
+const FINALE_GLOBE_OVERFILL = 0.92;
+
+export type FinaleGlobeFit = {
+  x: number;
+  y: number;
+  diameter: number;
+  /** Terrace cut and its feather, in px down from the floor's top edge. */
+  ridge: number;
+  ridgeFade: number;
+  /** `object-position` the photo must use for this crop, as fractions. */
+  focusX: number;
+  focusY: number;
+};
+
+/** The rectangle `object-fit: cover` paints the sky into, inside `floor`,
+ *  slid so the orb lands on `FINALE_ANCHOR` — and how far the slide is, as
+ *  the `object-position` fraction that produces it. */
+function finaleSkyCrop(floor: { width: number; height: number }) {
+  const wide = floor.width / floor.height > FINALE_SKY.aspect;
+  const width = wide ? floor.width : floor.height * FINALE_SKY.aspect;
+  const height = wide ? floor.width / FINALE_SKY.aspect : floor.height;
+  // Never past an edge: the crop may only slide within the overflow it has.
+  const slide = (box: number, drawn: number, want: number) =>
+    Math.max(box - drawn, Math.min(0, want));
+  const left = slide(
+    floor.width,
+    width,
+    floor.width * FINALE_ANCHOR.x - width * FINALE_SKY.centerX,
+  );
+  const top = slide(
+    floor.height,
+    height,
+    floor.height * FINALE_ANCHOR.y - height * FINALE_SKY.centerY,
+  );
+  const focus = (box: number, drawn: number, offset: number) =>
+    drawn > box ? offset / (box - drawn) : 0.5;
+  return {
+    width,
+    height,
+    left,
+    top,
+    focusX: focus(floor.width, width, left),
+    focusY: focus(floor.height, height, top),
+  };
+}
+
+/** Places the 3D globe on the painted orb, in `origin`'s coordinate space. */
+export function finaleGlobeFit(
+  floor: { left: number; top: number; width: number; height: number },
+  origin: { left: number; top: number },
+): FinaleGlobeFit {
+  if (!(floor.width > 0 && floor.height > 0)) {
+    return { x: 0, y: 0, diameter: 0, ridge: 0, ridgeFade: 0, focusX: 0.5, focusY: 0.5 };
+  }
+  const crop = finaleSkyCrop(floor);
+  return {
+    x: floor.left + crop.left + crop.width * FINALE_SKY.centerX - origin.left,
+    y: floor.top + crop.top + crop.height * FINALE_SKY.centerY - origin.top,
+    diameter: crop.width * FINALE_SKY.diameter * FINALE_GLOBE_OVERFILL,
+    ridge: crop.top + crop.height * FINALE_SKY.ridge,
+    ridgeFade: crop.height * FINALE_SKY.ridgeFade,
+    focusX: crop.focusX,
+    focusY: crop.focusY,
+  };
+}
+
+/** Clip `rect` to `box` (both in the same coordinate space). */
+export function clipRectToViewport(
+  rect: { top: number; right: number; bottom: number; left: number },
+  box: { top: number; right: number; bottom: number; left: number },
+  radius: number,
+) {
+  const top = Math.max(0, rect.top - box.top);
+  const right = Math.max(0, box.right - rect.right);
+  const bottom = Math.max(0, box.bottom - rect.bottom);
+  const left = Math.max(0, rect.left - box.left);
+  return `inset(${top}px ${right}px ${bottom}px ${left}px round ${radius}px)`;
 }
 
 /** Writes one frame's quads into `out` and returns how many were written.
  *  `glyphsOut`, when given, receives the character drawn by each quad — the
- *  only way to assert on what the lens actually decoded. */
+ *  only way to assert on how the field churns. */
 export function layoutGlobe(f: GlobeFrame, out: Float32Array, glyphsOut?: string[]): number {
-  const text = copy.heroGlobeText;
   const slice = f.reduced ? 1 : easeInOutQuad(f.t / INTRO_S);
   const paneW = f.width ?? f.size;
   const paneH = f.height ?? f.size;
@@ -203,11 +307,9 @@ export function layoutGlobe(f: GlobeFrame, out: Float32Array, glyphsOut?: string
   const spin = f.reduced ? 0 : f.t * UV_SPEED;
   const phase = f.reduced ? 0.5 / RINGS : f.t * SHAPE_SPEED;
   const bandOffset = spin + (f.yaw + f.pitch) * HIGHLIGHT_LEAN;
-  const hoverR = R * HOVER_R;
   const density = Math.min(DENSITY_MAX, f.size / COLS_REF_PX);
-  const px = f.pointerX;
-  const py = f.pointerY;
   const reduced = f.reduced;
+  const churn = reduced ? 0 : SPIN_RATE * Math.abs(f.churnRate ?? 0);
 
   const cosT = Math.cos(TILT);
   const sinT = Math.sin(TILT);
@@ -225,8 +327,6 @@ export function layoutGlobe(f: GlobeFrame, out: Float32Array, glyphsOut?: string
     const ry = (ring.t * 2 - 1) * R;
     const rr = ring.radius * R;
     const cols = Math.max(8, Math.round(COLS_EQ * ring.radius * density));
-    // Each ring picks up the sentence where the one below it left off.
-    const textStart = i * TEXT_ROW_STEP;
 
     for (let c = 0; c < cols; c++) {
       // u: where the cell sits around the ring, 0..1 — the coordinate the
@@ -251,35 +351,22 @@ export function layoutGlobe(f: GlobeFrame, out: Float32Array, glyphsOut?: string
       const depth = (z / R + 1) / 2; // 0 back, 1 front
 
       const seed = hash2(i, c);
-      const dx = sx - px;
-      const dy = sy - py;
-      const weight = reduced ? 0 : hoverWeight(Math.sqrt(dx * dx + dy * dy), hoverR);
       const band = Math.max(
         highlightAt(u + bandOffset, HL_POS, HL_SIZE, HL_EDGE),
         highlightAt(u + bandOffset, HL2_POS, HL2_SIZE, HL2_EDGE) * 0.8,
       );
-      const heat = Math.min(1, band * 0.12 + weight * 1.85);
+      const heat = Math.min(1, band * 0.12);
 
-      // Depth fade lifts under the lens so the far side shows through, while
-      // the near face stipple-dissolves — their hollow spotlight.
-      const hole = Math.min(1, weight * HOLE_GAIN);
-      const stipple = ((seed >>> 7) % 1000) / 1000;
-      const dissolve = hole > 0.12 + stipple * 0.5 ? hole : hole * 0.15;
-      const fade = BACK_ALPHA + (1 - BACK_ALPHA) * depth;
-      const seen = fade + (1 - fade) * (weight * LENS_SEE_THROUGH);
-      const punched = 1 - dissolve * Math.max(0, depth * 1.15 - 0.15);
-      const rest = ring.opacity * seen * REST_ALPHA * punched;
-      const alpha = rest + (ring.opacity * PEAK_ALPHA * punched - rest) * heat;
+      const seen = BACK_ALPHA + (1 - BACK_ALPHA) * depth;
+      const rest = ring.opacity * seen * REST_ALPHA;
+      const alpha = rest + (ring.opacity * PEAK_ALPHA - rest) * heat;
       if (alpha < CULL_ALPHA) continue;
 
       // Fractional phase: an integer offset would leave every cell crossing
       // its floor() boundary on the same tick — one strobe, not churn.
-      const churn = (seed % 1024) / 1024;
-      const step = Math.floor(f.t * (AMBIENT_RATE + HOVER_RATE * weight) + churn);
-      // Away from the cursor the field is scrambled; the lens decodes it.
-      const glyph = resolves(weight, seed, RESOLVE_MIN, RESOLVE_JITTER)
-        ? textAt(text, textStart + c)
-        : glyphAt(i, c, step);
+      const phaseOffset = (seed % 1024) / 1024;
+      const step = Math.floor(f.t * (AMBIENT_RATE + churn) + phaseOffset);
+      const glyph = glyphAt(i, c, step);
       const tile = CHAR_INDEX.get(glyph);
       if (tile === undefined) continue;
 

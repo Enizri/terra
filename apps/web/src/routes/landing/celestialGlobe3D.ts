@@ -12,7 +12,8 @@ export type CelestialGlobeFrame = {
   pitch: number;
   spin: number;
   opacity: number;
-  emergence: number;
+  /** Warm backlight so the hall composite reads as one object. */
+  hallLight?: number;
 };
 
 export type CelestialGlobeRenderer = {
@@ -50,6 +51,9 @@ export async function createCelestialGlobeRenderer(
   const key = new THREE.DirectionalLight(0xfff4dc, 2.8);
   key.position.set(-3, 4, 6);
   scene.add(key);
+  const hall = new THREE.DirectionalLight(0xff9a40, 0);
+  hall.position.set(0.2, -0.4, -6);
+  scene.add(hall);
 
   const globe = new THREE.Group();
   scene.add(globe);
@@ -58,14 +62,13 @@ export async function createCelestialGlobeRenderer(
   let modelDiameter = 1;
   let lastOpacity = -1;
   const materials: MeshStandardMaterial[] = [];
-  const shardUniforms: Array<{ value: number }> = [];
 
   new GLTFLoader().load(
     MODEL_URL,
     ({ scene: model }) => {
       if (disposed) return;
-      // The museum scan is the exposed upper hemisphere. Sketchfab rotates it
-      // upright inside the stand; face the authentic cap toward our camera.
+      // Photogrammetry of the museum sphere, minus the stand. Close any scan
+      // holes with a solid core so the hall never shows through the mesh.
       model.position.set(0, 0, 0);
       model.rotation.set(0, 0, 0);
       model.scale.set(1, 1, 1);
@@ -76,34 +79,31 @@ export async function createCelestialGlobeRenderer(
       const size = bounds.getSize(new THREE.Vector3());
       model.position.sub(center);
       modelDiameter = Math.max(size.x, size.y, size.z);
+      const coreMaterial = new THREE.MeshStandardMaterial({
+        color: 0xb8893a,
+        roughness: 1,
+        metalness: 0,
+        emissive: 0x4a2a08,
+        emissiveIntensity: 0.2,
+      });
+      const core = new THREE.Mesh(
+        new THREE.SphereGeometry(modelDiameter * 0.46, 64, 48),
+        coreMaterial,
+      );
+      core.renderOrder = -1;
+      globe.add(core);
+      materials.push(coreMaterial);
       model.traverse((object) => {
         if (!(object instanceof THREE.Mesh)) return;
         const list = Array.isArray(object.material) ? object.material : [object.material];
         for (const material of list) {
           if (material instanceof THREE.MeshStandardMaterial) {
-            material.transparent = true;
+            material.side = THREE.FrontSide;
+            material.depthWrite = true;
             material.metalnessMap?.dispose();
             material.metalnessMap = null;
             material.metalness = 0;
             material.roughness = 1;
-            material.onBeforeCompile = (shader) => {
-              shader.uniforms.uShardReveal = { value: 1 };
-              shader.fragmentShader = shader.fragmentShader.replace(
-                "#include <common>",
-                "uniform float uShardReveal;\n#include <common>",
-              ).replace(
-                "#include <dithering_fragment>",
-                `#ifdef USE_MAP
-                if (uShardReveal < 0.999) {
-                  vec2 shardCell = floor(vMapUv * 42.0);
-                  float shard = fract(sin(dot(shardCell, vec2(12.9898, 78.233))) * 43758.5453);
-                  if (shard > uShardReveal) discard;
-                }
-                #endif
-                #include <dithering_fragment>`,
-              );
-              shardUniforms.push(shader.uniforms.uShardReveal);
-            };
             material.needsUpdate = true;
             materials.push(material);
           }
@@ -132,11 +132,16 @@ export async function createCelestialGlobeRenderer(
       globe.position.set(frame.x - frame.width / 2, frame.height / 2 - frame.y, 0);
       globe.scale.setScalar(frame.diameter / modelDiameter);
       globe.rotation.set(frame.pitch, frame.yaw, frame.spin);
+      hall.intensity = frame.hallLight ?? 0;
       if (frame.opacity !== lastOpacity) {
         lastOpacity = frame.opacity;
-        for (const material of materials) material.opacity = frame.opacity;
+        const opaque = frame.opacity >= 0.999;
+        for (const material of materials) {
+          material.opacity = frame.opacity;
+          material.transparent = !opaque;
+          material.depthWrite = true;
+        }
       }
-      for (const uniform of shardUniforms) uniform.value = frame.emergence;
       renderer.render(scene, camera);
     },
     dispose() {

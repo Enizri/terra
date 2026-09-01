@@ -1,4 +1,6 @@
-/** Browser-only access token (never baked into the Vite build). */
+/** Browser-only access token leftover (never baked into the Vite build).
+ * The workspace no longer asks you to paste TERRA_TOKEN: Vite's proxy forwards
+ * it from `.env`, and the Go API sets an HttpOnly cookie when it serves the UI. */
 export const TOKEN_KEY = "terra_token";
 
 export function getToken(): string {
@@ -9,20 +11,6 @@ export function getToken(): string {
   }
 }
 
-export function setToken(token: string): void {
-  sessionStorage.setItem(TOKEN_KEY, token.trim());
-}
-
-const unauthorized = new Set<() => void>();
-
-/** Subscribe to API 401s — used by the unlock panel. */
-export function onUnauthorized(fn: () => void): () => void {
-  unauthorized.add(fn);
-  return () => {
-    unauthorized.delete(fn);
-  };
-}
-
 export function notifyUnauthorized(): void {
-  for (const fn of unauthorized) fn();
+  // 401s surface as request errors. There is no paste-token gate.
 }

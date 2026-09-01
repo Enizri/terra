@@ -92,3 +92,18 @@
   opacity: 0.45;
   cursor: not-allowed;
 }
+
+.sh-gate__choice.is-locked {
+  opacity: 0.72;
+  border-style: dashed;
+}
+
+.sh-gate__choice.is-locked .sh-gate__name svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.sh-gate__choice.is-selected {
+  border-color: color-mix(in srgb, currentColor 40%, transparent);
+}

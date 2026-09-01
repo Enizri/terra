@@ -1,34 +1,38 @@
 import { useState } from "react";
 import { faq } from "../data";
-import { useReveal } from "../useReveal";
+import { useRevealGroup } from "../useReveal";
 
 /** Sticky headline on the left, numbered accordion on the right. */
 export function Faq() {
-  const eyebrow = useReveal<HTMLParagraphElement>();
-  const title = useReveal(60);
-  const art = useReveal(160);
-  const list = useReveal(120);
+  // One sequence for the whole section: eyebrow, headline, then the
+  // questions in order. Tighter than the default so the list arrives as a
+  // cascade rather than a set of pops.
+  const reveal = useRevealGroup<HTMLElement>(70, 22);
   // One open at a time; the first is open on load.
   const [open, setOpen] = useState(0);
 
   return (
-    <section className="terra-section">
+    <section id="faq" className="terra-section" ref={reveal}>
       <div className="terra-faq">
         <div>
           <div className="terra-faq__aside">
-            <p ref={eyebrow} className="terra-eyebrow">
+            <p data-reveal className="terra-eyebrow">
               {faq.eyebrow}
             </p>
-            <div ref={title}>
+            <div data-reveal>
               <h3 className="terra-display terra-h3 terra-h3--faq">{faq.title}</h3>
             </div>
-            <div ref={art} className="terra-faq__art terra-art" aria-hidden style={{ aspectRatio: "1 / 1" }} />
+            <div
+              className="terra-faq__art terra-art"
+              aria-hidden
+              style={{ aspectRatio: "1 / 1" }}
+            />
           </div>
         </div>
-        <div ref={list}>
+        <div>
           <div className="terra-faq__list">
             {faq.items.map((item, i) => (
-              <div key={item.q} className="terra-faq__item">
+              <div data-reveal key={item.q} className="terra-faq__item">
                 <button
                   type="button"
                   className="terra-faq__q"

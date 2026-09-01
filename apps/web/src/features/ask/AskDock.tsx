@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
 import type { Component, TerraMap } from "../architecture-map";
 import type { ModelChoice, Selection } from "./api";
 import {
@@ -28,6 +28,7 @@ export function AskDock({
   onDropComponent,
   onDropElement,
   model,
+  modelPicker,
 }: {
   map: TerraMap | null;
   /** Selected cards, oldest first; last is the subject. */
@@ -38,6 +39,8 @@ export function AskDock({
   onDropComponent: (id: string) => void;
   onDropElement: (el: LiveSelection) => void;
   model?: ModelChoice;
+  /** Codex-style model chip, rendered under the prompt. */
+  modelPicker?: ReactNode;
 }) {
   const repoUrl = map?.project.repository_url ?? null;
   const { messages, ask, thinking } = useAsk(repoUrl, model);
@@ -187,31 +190,34 @@ export function AskDock({
           className={`sh-terra-chat__prompt sh-ws__ask${streaming ? " is-streaming" : ""}`}
           onSubmit={submit}
         >
-          {streaming && (
-            <span className="sh-terra-chat__stream sh-ws__ask-stream" aria-hidden>
-              {askHint.text}
-              <i className="sh-terra-chat__caret" />
-            </span>
-          )}
-          <input
-            className="sh-ws__ask-input"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={onPromptKeyDown}
-            placeholder={
-              streaming
-                ? ""
-                : !map
-                  ? "Map a repo first"
-                  : !askReady
-                    ? "Finishing the architecture map…"
-                    : hasSelection
-                      ? "Ask about this selection"
-                      : "Ask about this repo"
-            }
-            aria-label="Ask Terra about this repository"
-            disabled={!map || !askReady || thinking}
-          />
+          <div className="sh-ws__ask-field">
+            {streaming && (
+              <span className="sh-terra-chat__stream sh-ws__ask-stream" aria-hidden>
+                {askHint.text}
+                <i className="sh-terra-chat__caret" />
+              </span>
+            )}
+            <input
+              className="sh-ws__ask-input"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={onPromptKeyDown}
+              placeholder={
+                streaming
+                  ? ""
+                  : !map
+                    ? "Map a repo first"
+                    : !askReady
+                      ? "Finishing the architecture map…"
+                      : hasSelection
+                        ? "Ask about this selection"
+                        : "Ask about this repo"
+              }
+              aria-label="Ask Terra about this repository"
+              disabled={!map || !askReady || thinking}
+            />
+          </div>
+          {modelPicker}
         </form>
       </div>
     </div>

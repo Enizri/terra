@@ -16,6 +16,15 @@ export function CloseIcon() {
   );
 }
 
+export function LockIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" aria-hidden>
+      <rect x="3.5" y="7.5" width="9" height="6.5" rx="1.2" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M5.5 7.5V5.5a2.5 2.5 0 015 0v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function ArrowIcon() {
   return (
     <svg viewBox="0 0 16 16" fill="none" aria-hidden>

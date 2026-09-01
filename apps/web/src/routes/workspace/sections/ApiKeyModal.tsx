@@ -6,11 +6,13 @@ import "../../../shared/unlock.css";
 export function ApiKeyModal({
   provider,
   modelName,
+  submitLabel = "Save API key locally",
   onSubmit,
   onCancel,
 }: {
   provider: string;
   modelName: string;
+  submitLabel?: string;
   onSubmit: (key: string) => void;
   onCancel: () => void;
 }) {
@@ -28,8 +30,8 @@ export function ApiKeyModal({
       <form className="sh-unlock__card" onSubmit={submit}>
         <h2 id="sh-key-title">{provider} API key</h2>
         <p>
-          {modelName} runs on {provider}. The key stays in this browser and is sent only with
-          your analysis requests.
+          {modelName} is closed until a {provider} key is saved in this browser. Terra never
+          stores it on the server.
         </p>
         <input
           className="sh-unlock__input"
@@ -43,7 +45,7 @@ export function ApiKeyModal({
           onChange={(e) => setValue(e.target.value)}
         />
         <button className="sh-unlock__btn" type="submit">
-          Save and continue
+          {submitLabel}
         </button>
         <button className="sh-ws__stop" type="button" onClick={onCancel}>
           Cancel

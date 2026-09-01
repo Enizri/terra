@@ -23,7 +23,7 @@
 }
 
 .sh-stage--power .sh-window {
-  min-height: 980px;
+  min-height: 800px;
 }
 
 @media (min-width: 640px) {
@@ -35,15 +35,17 @@
 .sh-power-stage {
   position: relative;
   display: flex;
-  align-items: flex-start;
+  /* Reference row is `items-stretch` with `lg:gap-0` — the only gap between
+     the drawer and the card is the rail's own right padding. */
+  align-items: stretch;
   justify-content: space-between;
-  gap: clamp(20px, 2vw, 36px);
+  gap: 0;
   width: 100%;
 }
 
 .sh-power-cta {
   align-self: flex-start;
-  margin-top: 8px;
+  margin-top: 16px;
 }
 
 .sh-power-rail {
@@ -51,15 +53,19 @@
   flex-direction: column;
   /* Reference rail is `lg:w-1/2 max-w-[550px]`. */
   flex: 0 0 clamp(320px, 40%, 550px);
+  /* Reference centres the drawer against the media, which is taller than the
+     five rows; top-aligning it left the list stranded at the card's top edge. */
+  justify-content: center;
   gap: 16px;
   min-width: 0;
   /* Left inset gives the active-row marker somewhere to sit. */
-  padding: 8px 0 0 34px;
+  padding: 0 0 0 34px;
 }
 
 @media (min-width: 901px) {
   .sh-power-rail {
-    padding: 8px 32px 0 58px;
+    /* `lg:px-8` on the right — that 32px is the whole column gap. */
+    padding: 0 32px 0 58px;
   }
 }
 
@@ -72,9 +78,10 @@
 }
 
 @media (min-width: 901px) {
-  /* Reference insets the media on three sides and lets it bleed right. */
+  /* Reference insets the media on three sides (`p-12`) and lets it bleed
+     left towards the drawer (`lg:pl-0`). */
   .sh-power-stage > .sh-window-wrap {
-    padding: 48px 0 48px 48px;
+    padding: 48px 48px 48px 0;
   }
 }
 
@@ -82,7 +89,7 @@
 .sh-power-stage {
     flex-direction: column;
     align-items: stretch;
-    gap: 28px;
+    gap: 24px;
   }
 
 .sh-power-rail {
@@ -300,7 +307,7 @@
 /* Power card: full hero width, no 1280 cap. */
 .sh-section--power .sh-power-theater__screen .sh-window {
   max-width: none;
-  min-height: 980px;
+  min-height: 800px;
 }
 
 /* Ops screen inside the Power of Terra window: dark diagram shell, header

@@ -16,3 +16,15 @@ test("the shipped celestial globe contains only the painted sphere", () => {
   assert.equal(json.textures.length, 2);
   assert.doesNotMatch(JSON.stringify(json), /leg|ring|support|tablet|table/i);
 });
+
+test("the 3D globe is a closed sphere, not a dissolving shell", () => {
+  const src = readFileSync(new URL("./celestialGlobe3D.ts", import.meta.url), "utf8");
+  const journey = readFileSync(new URL("./sections/GlobeJourney.tsx", import.meta.url), "utf8");
+  assert.match(src, /SphereGeometry/);
+  assert.doesNotMatch(src, /uShardReveal/);
+  assert.doesNotMatch(src, /discard;/);
+  assert.match(journey, /finaleGlobeFit/);
+  assert.match(journey, /terra-finale__sun/);
+  assert.match(journey, /const cleanY = fit\.y \+ toss\.y/);
+  assert.doesNotMatch(journey, /emergence/);
+});

@@ -2,7 +2,6 @@
 // checked without a GPU: run a frame, read back the quads.
 import assert from "node:assert/strict";
 import test from "node:test";
-import { copy } from "./data.ts";
 import {
   INSTANCE_FLOATS,
   MAX_INSTANCES,
@@ -10,6 +9,11 @@ import {
   cleanGlobeJourneyProgress,
   cleanGlobeJourneyScale,
   cleanGlobeJourneyTravel,
+  clipRectToViewport,
+  FINALE_GLOBE_RISE,
+  FINALE_SKY,
+  FINALE_SUN_BLUR_RADIUS,
+  finaleGlobeFit,
   globeJourneyClockRate,
   globeJourneyProgress,
   layoutGlobe,
@@ -24,8 +28,6 @@ const buf = new Float32Array(MAX_INSTANCES * INSTANCE_FLOATS);
 const frame = (over: Partial<GlobeFrame> = {}): GlobeFrame => ({
   size: SIZE,
   t: 3,
-  pointerX: -1e4,
-  pointerY: -1e4,
   yaw: 0,
   pitch: 0,
   reduced: false,
@@ -68,43 +70,24 @@ test("a larger canvas packs more glyphs, still inside the budget", () => {
   assert.ok(huge <= MAX_INSTANCES, "never overruns the buffer");
 });
 
-test("the cursor lens decodes the scramble into readable copy", () => {
-  const glyphs: string[] = [];
-  layoutGlobe(frame(), buf, glyphs);
-  assert.ok(!glyphs.join("").includes(" "), "no spaces: nothing resolves off-cursor");
-
-  // Park the cursor on the middle of the globe.
-  const lit: string[] = [];
-  const n = layoutGlobe(frame({ pointerX: SIZE / 2, pointerY: SIZE / 2 }), buf, lit);
-  // Quads come out in ring order with cells in sequence — the order the
-  // sentence is laid down in — so read it back the same way.
-  const near = lit
-    .filter((_, i) => {
-      const o = i * INSTANCE_FLOATS;
-      return Math.hypot(buf[o] - SIZE / 2, buf[o + 1] - SIZE / 2) < SIZE * 0.15;
-    })
-    .join("");
+test("spinning the globe churns the field faster", () => {
+  const parked: string[] = [];
+  layoutGlobe(frame({ churnRate: 0 }), buf, parked);
+  const thrown: string[] = [];
+  const n = layoutGlobe(frame({ churnRate: 6 }), buf, thrown);
   assert.ok(n > 100);
-  // Which words land under the cursor depends on where the rings happen to be,
-  // so assert on the property that matters: a run of the sentence comes out
-  // intact rather than isolated letters in a sea of noise.
-  const RUN = 8;
-  const intact = Array.from({ length: Math.max(0, near.length - RUN) }, (_, i) =>
-    near.slice(i, i + RUN),
-  ).some((run) => copy.heroGlobeText.includes(run));
-  assert.ok(intact, `lens should resolve a readable run, got ${near.slice(0, 80)}`);
+  const changed = thrown.filter((g, i) => g !== parked[i]).length;
+  assert.ok(changed > n * 0.3, `spin should reshuffle the field, got ${changed}/${n}`);
 });
 
-test("reduced motion still lays out a full globe, with no lens", () => {
-  const glyphs: string[] = [];
-  const n = layoutGlobe(
-    frame({ reduced: true, pointerX: SIZE / 2, pointerY: SIZE / 2 }),
-    buf,
-    glyphs,
-  );
+test("reduced motion still lays out a full globe, with no spin churn", () => {
+  const still: string[] = [];
+  const n = layoutGlobe(frame({ reduced: true, churnRate: 6 }), buf, still);
+  const parked: string[] = [];
+  layoutGlobe(frame({ reduced: true, churnRate: 0 }), buf, parked);
   assert.ok(n > 1800);
   assert.ok(spread(n) > SIZE * 0.6, "opens immediately, no intro to wait through");
-  assert.ok(!glyphs.join("").includes(" "), "the lens is off");
+  assert.deepEqual(still, parked, "churn is off under reduced motion");
 });
 
 test("glyphs flip between dim, mid and white", () => {
@@ -225,5 +208,80 @@ test("the clean globe starts only after the character journey ends", () => {
   assert.equal(cleanGlobeJourneyOpacity(1), 1);
   assert.equal(cleanGlobeJourneyTravel(0), 0);
   assert.equal(cleanGlobeJourneyTravel(1), 1);
-  assert.ok(cleanGlobeJourneyScale(1) > cleanGlobeJourneyScale(0));
+  assert.equal(cleanGlobeJourneyScale(0), 1);
+  assert.equal(cleanGlobeJourneyScale(1), 1);
+  assert.equal(FINALE_GLOBE_RISE, 0);
+});
+
+test("the closing globe is clipped to the card", () => {
+  assert.equal(
+    clipRectToViewport(
+      { top: 50, right: 900, bottom: 700, left: 40 },
+      { top: 0, right: 1000, bottom: 800, left: 0 },
+      24,
+    ),
+    "inset(50px 100px 100px 40px round 24px)",
+  );
+});
+
+test("the sky globe lands on the painted orb in both crops of the floor", () => {
+  const origin = { left: 0, top: 0 };
+  const orbAt = (
+    fit: ReturnType<typeof finaleGlobeFit>,
+    box: { width: number; height: number },
+  ) => ({ x: fit.x / box.width, y: fit.y / box.height });
+
+  // Wide card: the photo is scaled to the width and cropped top/bottom.
+  const wideBox = { left: 0, top: 0, width: 1400, height: 800 };
+  const wide = finaleGlobeFit(wideBox, origin);
+  const drawnHeight = 1400 / FINALE_SKY.aspect;
+  assert.equal(wide.x, 1400 * FINALE_SKY.centerX);
+  assert.equal(wide.diameter, 1400 * FINALE_SKY.diameter * 0.92);
+  // Narrow card: scaled to the height and cropped on the sides instead.
+  const tallBox = { left: 0, top: 0, width: 400, height: 700 };
+  const tall = finaleGlobeFit(tallBox, origin);
+  const drawnWidth = 700 * FINALE_SKY.aspect;
+  assert.equal(tall.diameter, drawnWidth * FINALE_SKY.diameter * 0.92);
+
+  // The crop can only slide where it overflows, and it slides as far as it
+  // needs to: a wide card has no horizontal slack, so the orb keeps the
+  // photo's own 23%, while a narrow one — which would otherwise push the orb
+  // off the left edge entirely — pulls it back to the anchor.
+  assert.ok(Math.abs(orbAt(wide, wideBox).x - 441 / 1920) < 0.001);
+  assert.ok(Math.abs(orbAt(tall, tallBox).x - 0.42) < 0.01, `orb x ${orbAt(tall, tallBox).x}`);
+  for (const [fit, box] of [[wide, wideBox], [tall, tallBox]] as const) {
+    assert.ok(Math.abs(orbAt(fit, box).y - 0.42) < 0.01, `orb y ${orbAt(fit, box).y}`);
+  }
+
+  // The focus handed back to the <img> is what produced that crop, and it
+  // stays inside the image: no gap at either edge.
+  for (const fit of [wide, tall]) {
+    assert.ok(fit.focusX >= 0 && fit.focusX <= 1);
+    assert.ok(fit.focusY >= 0 && fit.focusY <= 1);
+  }
+
+  // The mesh stays inside the painted orb so its fire rings the 3D globe.
+  assert.ok(wide.diameter < 1400 * FINALE_SKY.diameter);
+  // The terrace cut sits well below the orb, and inside the visible card.
+  assert.ok(wide.ridge > wide.y + wide.diameter);
+  assert.ok(wide.ridge < 800);
+  assert.ok(tall.ridge > tall.y + tall.diameter && tall.ridge < 700);
+  // A crop with nowhere to slide keeps the photo centred.
+  assert.equal(
+    finaleGlobeFit({ left: 0, top: 0, width: 1400, height: drawnHeight }, origin).focusY,
+    0.5,
+  );
+
+  // The fit is stated relative to the canvas the globe is drawn into.
+  const shifted = finaleGlobeFit(
+    { left: 60, top: 40, width: 1400, height: 800 },
+    { left: 60, top: 40 },
+  );
+  assert.deepEqual(shifted, wide);
+
+  const empty = finaleGlobeFit({ left: 0, top: 0, width: 0, height: 800 }, origin);
+  assert.equal(empty.diameter, 0);
+
+  // Solid blur must cover the painted sun's limb (radius ~0.54 of the globe).
+  assert.ok(FINALE_SUN_BLUR_RADIUS * 0.64 > 0.54);
 });

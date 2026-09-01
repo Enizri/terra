@@ -51,8 +51,7 @@ func withToken(want string, next http.Handler) http.Handler {
 
 // requiresToken lists the gated routes. GET /models and GET /host/capabilities
 // are deliberately absent: both return constants about this binary and this
-// machine, not repo data, so they sit with /healthz on the open side and the
-// picker can populate before the user has pasted a token.
+// machine, not repo data, so they sit with /healthz on the open side.
 func requiresToken(r *http.Request) bool {
 	p := r.URL.Path
 	switch r.Method {
@@ -88,6 +87,9 @@ func tokenMatches(r *http.Request, want string) bool {
 	if got := r.Header.Get("X-Terra-Token"); got != "" {
 		return subtle.ConstantTimeCompare([]byte(got), []byte(want)) == 1
 	}
+	if c, err := r.Cookie(accessCookie); err == nil && c.Value != "" {
+		return subtle.ConstantTimeCompare([]byte(c.Value), []byte(want)) == 1
+	}
 	// Query ?token= is only for EventSource/SSE: browsers cannot set Authorization
 	// (or any custom header) on EventSource, so GET /traces uses this fallback.
 	if r.Method == http.MethodGet {
@@ -95,4 +97,21 @@ func tokenMatches(r *http.Request, want string) bool {
 		return subtle.ConstantTimeCompare([]byte(got), []byte(want)) == 1
 	}
 	return false
+}
+
+const accessCookie = "terra_token"
+
+// grantAccessCookie lets the workspace load without a paste-token panel.
+// Same-origin fetch and EventSource send it automatically.
+func grantAccessCookie(w http.ResponseWriter, token string) {
+	if token == "" {
+		return
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     accessCookie,
+		Value:    token,
+		Path:     "/",
+		SameSite: http.SameSiteLaxMode,
+		HttpOnly: true,
+	})
 }

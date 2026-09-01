@@ -74,7 +74,7 @@ test("saving a key stores it per provider and then continues", async () => {
   await pickTheRemote();
 
   fireEvent.change(screen.getByPlaceholderText("openai API key"), { target: { value: " sk-live " } });
-  fireEvent.click(screen.getByRole("button", { name: /Save and continue/ }));
+  fireEvent.click(screen.getByRole("button", { name: /Save API key locally/ }));
 
   expect(localStorage.getItem("terra_key_openai")).toBe("sk-live");
   expect(onContinue).toHaveBeenCalledWith("remote-a", "sk-live", "openai");
@@ -87,4 +87,14 @@ test("a remote whose key is already stored skips the modal", async () => {
 
   expect(screen.queryByRole("dialog")).toBeNull();
   expect(onContinue).toHaveBeenCalledWith("remote-a", "sk-stored", "openai");
+});
+
+test("a remote with no key is closed in the list but still opens the save modal", async () => {
+  mount();
+  fireEvent.click(await screen.findByRole("button", { name: /Change model/ }));
+
+  const remote = screen.getByRole("button", { name: /Remote A/ });
+  expect(remote.hasAttribute("disabled")).toBe(false);
+  expect(remote.className).toMatch(/is-locked/);
+  expect(remote.textContent).toMatch(/Closed — save an API key locally/);
 });

@@ -12,6 +12,7 @@ import { toHistory, type HistoryEntry } from "./history";
 import { WorkspaceHeader } from "../../shared/shell/WorkspaceHeader";
 import { Sidebar } from "../../shared/shell/Sidebar";
 import { DropStage } from "./sections/Stage";
+import { SessionModels } from "./sections/SessionModels";
 import "../../shared/styles/tokens.css";
 import "../../shared/styles/ui.css";
 import "../../shared/shell/shell.css";
@@ -26,8 +27,10 @@ export default function Workspace() {
   const [history, setHistory] = useState<HistoryEntry[]>(wsCache.history ?? []);
   /** Stored map from the rail — no pipeline re-run. */
   const [storedMap, setStoredMap] = useState<TerraMap | null>(wsCache.storedMap);
+  const [sessionModel, setSessionModel] = useState(wsCache.selectedModel);
   /** Keep deleted ids out of the rail until the server catches up / refetch lands. */
   const deletedIds = useRef(new Set<number>());
+  const autoOpened = useRef(false);
 
   const fixture =
     import.meta.env.DEV && new URLSearchParams(search).has("fixture")
@@ -73,10 +76,17 @@ export default function Workspace() {
   // land out of order (and a late response can't set state after unmount).
   const openAbort = useRef<AbortController | null>(null);
   useEffect(() => () => openAbort.current?.abort(), []);
+  const chooseModel = (choice: { modelId: string; apiKey?: string }) => {
+    wsCache.selectedModel = choice;
+    setSessionModel(choice);
+  };
+
   const open = async (entry: HistoryEntry) => {
     openAbort.current?.abort();
     const ac = new AbortController();
     openAbort.current = ac;
+    wsCache.selectedModel = null;
+    setSessionModel(null);
     try {
       const m = await analysis(entry.id, ac.signal);
       wsCache.storedMap = m;
@@ -85,6 +95,19 @@ export default function Workspace() {
       /* aborted or failed: leave stage as-is */
     }
   };
+
+  // Entering the workspace with maps already in storage should land on the
+  // newest one so the model picker can open against a real repo.
+  useEffect(() => {
+    if (autoOpened.current) return;
+    if (map || analyze.running || analyze.recommendation) return;
+    const latest = history[0];
+    if (!latest) return;
+    autoOpened.current = true;
+    void open(latest);
+    // open is recreated each render; the ref guard is the once-only rule.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [history, map, analyze.running, analyze.recommendation]);
 
   const remove = async (entry: HistoryEntry) => {
     deletedIds.current.add(entry.id);
@@ -140,13 +163,17 @@ export default function Workspace() {
         selectedIds={selectedIds}
         onSelect={select}
         onElements={setElements}
+        onModel={chooseModel}
       />
       <AskDock
         map={map}
         selected={selected}
         elements={elements}
         askReady={!!map && !analyze.partial}
-        model={wsCache.selectedModel ?? undefined}
+        model={sessionModel ?? undefined}
+        modelPicker={
+          map ? <SessionModels selected={sessionModel} onChoose={chooseModel} /> : null
+        }
         onDropComponent={(id) => setSelectedIds((prev) => prev.filter((x) => x !== id))}
         onDropElement={(el) => setElements((prev) => prev.filter((x) => x !== el))}
       />

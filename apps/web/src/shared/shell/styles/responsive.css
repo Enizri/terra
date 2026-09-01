@@ -2,8 +2,12 @@
 
 @media (max-width: 1100px) {
   .sh-ws {
+    --sh-ws-scale: 1;
+    zoom: 1;
+    transform: none;
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr) auto;
+    width: auto;
     height: auto;
     min-height: 100dvh;
     overflow: visible;
