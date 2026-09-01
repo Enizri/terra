@@ -62,8 +62,8 @@ so a laptop HF server, vLLM, or a hosted provider are drop-in replacements.
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) has the folder maps, the import
 rules between them, and what to add for a new product under this repo. See
 [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) for where new feature code goes,
-`make check`, and PR expectations — branch from **`staging`** and open PRs into
-**`staging`** (not `main`).
+`make check`, and PR expectations — GitHub default is **`main`**; branch from
+**`staging`**, open PRs into **`staging`**, then promote **`staging` → `main`**.
 
 ## Quickstart
 

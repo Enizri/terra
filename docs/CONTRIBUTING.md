@@ -1,13 +1,13 @@
 # Contributing
 
-## Branching (staging-first)
+## Branching
 
-Terra uses **`staging` as the default integration branch**:
+GitHub’s default branch is **`main`**. Feature work still integrates on **`staging`**, then `staging` is promoted into `main`.
 
 | Branch | Role |
 |---|---|
-| `staging` | Default branch. Branch from here; open PRs **into** `staging`. |
-| `main` | Release / promotion only. Do **not** open feature PRs against `main`. |
+| `main` | Default branch. Clone, repo homepage, and release. Do **not** open feature PRs against `main`. |
+| `staging` | Integration. Branch from here; open PRs **into** `staging`. When ready, merge `staging` → `main`. |
 
 ```bash
 git fetch origin
@@ -15,7 +15,7 @@ git checkout staging
 git pull origin staging
 git checkout -b issue/<n>-short-description   # or feat/…, fix/…
 # … commit, push …
-# Open a PR with base = staging (GitHub should default to this)
+# Open a PR with base = staging (GitHub’s PR base defaults to main — change it)
 ```
 
 Keep your branch rebased onto (or merged with) the latest `staging` before asking for review.

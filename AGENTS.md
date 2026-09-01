@@ -13,7 +13,7 @@ How to run the stack: [`README.md`](./README.md). Where code goes:
 1. **Go and Python never import each other.** They talk over HTTP.
 2. **The analyzer reaches a model only through OpenAI-compatible Chat Completions.**
 
-Branch from **`staging`**. Open PRs into **`staging`**. Before a PR: `make check`.
+GitHub default is **`main`**. Branch from **`staging`**. Open PRs into **`staging`**. Promote **`staging` → `main`**. Before a PR: `make check`.
 
 ## Where a change goes
 
