@@ -2,7 +2,6 @@
 // checked without a GPU: run a frame, read back the quads.
 import assert from "node:assert/strict";
 import test from "node:test";
-import { copy } from "./data.ts";
 import {
   INSTANCE_FLOATS,
   MAX_INSTANCES,
@@ -24,8 +23,6 @@ const buf = new Float32Array(MAX_INSTANCES * INSTANCE_FLOATS);
 const frame = (over: Partial<GlobeFrame> = {}): GlobeFrame => ({
   size: SIZE,
   t: 3,
-  pointerX: -1e4,
-  pointerY: -1e4,
   yaw: 0,
   pitch: 0,
   reduced: false,
@@ -68,43 +65,24 @@ test("a larger canvas packs more glyphs, still inside the budget", () => {
   assert.ok(huge <= MAX_INSTANCES, "never overruns the buffer");
 });
 
-test("the cursor lens decodes the scramble into readable copy", () => {
-  const glyphs: string[] = [];
-  layoutGlobe(frame(), buf, glyphs);
-  assert.ok(!glyphs.join("").includes(" "), "no spaces: nothing resolves off-cursor");
-
-  // Park the cursor on the middle of the globe.
-  const lit: string[] = [];
-  const n = layoutGlobe(frame({ pointerX: SIZE / 2, pointerY: SIZE / 2 }), buf, lit);
-  // Quads come out in ring order with cells in sequence — the order the
-  // sentence is laid down in — so read it back the same way.
-  const near = lit
-    .filter((_, i) => {
-      const o = i * INSTANCE_FLOATS;
-      return Math.hypot(buf[o] - SIZE / 2, buf[o + 1] - SIZE / 2) < SIZE * 0.15;
-    })
-    .join("");
+test("spinning the globe churns the field faster", () => {
+  const parked: string[] = [];
+  layoutGlobe(frame({ churnRate: 0 }), buf, parked);
+  const thrown: string[] = [];
+  const n = layoutGlobe(frame({ churnRate: 6 }), buf, thrown);
   assert.ok(n > 100);
-  // Which words land under the cursor depends on where the rings happen to be,
-  // so assert on the property that matters: a run of the sentence comes out
-  // intact rather than isolated letters in a sea of noise.
-  const RUN = 8;
-  const intact = Array.from({ length: Math.max(0, near.length - RUN) }, (_, i) =>
-    near.slice(i, i + RUN),
-  ).some((run) => copy.heroGlobeText.includes(run));
-  assert.ok(intact, `lens should resolve a readable run, got ${near.slice(0, 80)}`);
+  const changed = thrown.filter((g, i) => g !== parked[i]).length;
+  assert.ok(changed > n * 0.3, `spin should reshuffle the field, got ${changed}/${n}`);
 });
 
-test("reduced motion still lays out a full globe, with no lens", () => {
-  const glyphs: string[] = [];
-  const n = layoutGlobe(
-    frame({ reduced: true, pointerX: SIZE / 2, pointerY: SIZE / 2 }),
-    buf,
-    glyphs,
-  );
+test("reduced motion still lays out a full globe, with no spin churn", () => {
+  const still: string[] = [];
+  const n = layoutGlobe(frame({ reduced: true, churnRate: 6 }), buf, still);
+  const parked: string[] = [];
+  layoutGlobe(frame({ reduced: true, churnRate: 0 }), buf, parked);
   assert.ok(n > 1800);
   assert.ok(spread(n) > SIZE * 0.6, "opens immediately, no intro to wait through");
-  assert.ok(!glyphs.join("").includes(" "), "the lens is off");
+  assert.deepEqual(still, parked, "churn is off under reduced motion");
 });
 
 test("glyphs flip between dim, mid and white", () => {

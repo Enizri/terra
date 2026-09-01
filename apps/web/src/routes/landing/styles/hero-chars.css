@@ -296,96 +296,6 @@
   pointer-events: none;
 }
 
-.hx-orb__map {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  z-index: 3;
-  overflow: hidden;
-  width: 0;
-  height: 0;
-  opacity: 0;
-  pointer-events: none;
-  clip-path: circle(0px at 50% 50%);
-  transform: translate(-50%, -50%);
-  will-change: opacity, clip-path;
-  background: none;
-}
-
-.hx-orb__map.is-live {
-  pointer-events: auto;
-}
-
-.hx-orb__map .sh-diagram {
-  height: 100%;
-  padding: 4px;
-  border: none;
-  border-radius: 0;
-  background: transparent;
-}
-
-.hx-orb__map .sh-diagram__legend {
-  display: none;
-}
-
-.hx-orb__map .sh-diagram__canvas {
-  padding: 10px 8px;
-  border: none;
-  border-radius: 0;
-  background: none;
-}
-
-.hx-orb__map .sh-diagram__flow {
-  gap: 14px;
-}
-
-.hx-orb__map .sh-diagram__col {
-  gap: 8px;
-}
-
-.hx-orb__map .sh-diagram__group-body {
-  gap: 8px;
-}
-
-.hx-orb__map .sh-diagram__group-title {
-  margin-bottom: 2px;
-  font-size: 9px;
-}
-
-.hx-orb__map .sh-diagram__node {
-  min-width: 0;
-  max-width: 132px;
-  padding: 8px 9px 7px;
-  gap: 4px;
-  border-radius: 8px;
-}
-
-.hx-orb__map .sh-diagram__name {
-  font-size: 12px;
-}
-
-.hx-orb__map .sh-diagram__purpose {
-  font-size: 10px;
-  line-height: 1.3;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.hx-orb__map .sh-diagram__status {
-  display: none;
-}
-
-.hx-orb__map .sh-diagram__foot {
-  margin-top: 2px;
-  padding-top: 5px;
-}
-
-.hx-orb__map .sh-diagram__hint {
-  font-size: 9px;
-}
-
 /* One sticky bridge: the existing globe buffer unravels while the real Power
    screen scrolls up beneath it. The screen's own stacking layer is the mask. */
 .gx-journey {
@@ -450,6 +360,28 @@
   z-index: 2;
 }
 
+/* Press-and-spin handle: a disc riding the globe, inert until the globe is
+   parked in the hero (the sticky layer itself takes no pointer events). */
+.gx-journey__grab {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 4;
+  border-radius: 50%;
+  pointer-events: none;
+  touch-action: none;
+  will-change: transform;
+}
+
+.gx-journey__grab.is-grabbable {
+  pointer-events: auto;
+  cursor: grab;
+}
+
+.gx-journey__grab.is-dragging {
+  cursor: grabbing;
+}
+
 .gx-journey > .sh-section.sh-section--hero.sh-section--herochars,
 .gx-journey > .sh-section.sh-section--power {
   z-index: 2;
@@ -457,6 +389,13 @@
 
 .gx-journey > .sh-section.sh-section--hero.sh-section--herochars {
   background: transparent;
+  /* The hero sits above the sticky globe layer, so it would swallow the press
+     meant for the grab handle. Only the copy column takes pointer events. */
+  pointer-events: none;
+}
+
+.gx-journey > .sh-section.sh-section--herochars .hx-copy {
+  pointer-events: auto;
 }
 
 @media (prefers-reduced-motion: reduce) {

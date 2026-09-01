@@ -22,13 +22,24 @@ test("hero is a 1:1 split with the globe on charcoal", () => {
   assert.doesNotMatch(source, /from "\.\/HeroDemo"/);
 });
 
-test("hover hole shows the playground RepoDiagram, not glyph labels", () => {
-  assert.match(journeySource, /RepoDiagram/);
-  assert.match(journeySource, /hoverOnly/);
-  assert.match(journeySource, /HOVER_R/);
+test("the globe is grabbed and spun, with no hover effects left", () => {
+  // Every pointer-hover behaviour is gone: no decoder lens, no map hole, no
+  // mouse-look. The only pointer path is press, drag, release.
+  assert.doesNotMatch(journeySource, /RepoDiagram/);
+  assert.doesNotMatch(journeySource, /hoverOnly/);
+  assert.doesNotMatch(journeySource, /HOVER_R/);
+  assert.doesNotMatch(journeySource, /clipPath/);
   assert.doesNotMatch(journeySource, /layoutInterior/);
-  assert.match(css, /\.hx-orb__map/);
-  assert.match(css, /clip-path:\s*circle\(0px at 50% 50%\)/);
+  assert.match(journeySource, /gx-journey__grab/);
+  assert.match(journeySource, /pointerdown/);
+  assert.match(journeySource, /setPointerCapture/);
+  assert.match(journeySource, /\(pointer: fine\)/);
+  assert.doesNotMatch(css, /\.hx-orb__map/);
+  assert.match(css, /\.gx-journey__grab\.is-grabbable[\s\S]*?cursor: grab/);
+  // The hero paints above the sticky globe layer; if it took pointer events it
+  // would swallow every press aimed at the handle.
+  assert.match(css, /--herochars \{[\s\S]*?pointer-events: none/);
+  assert.match(css, /--herochars \.hx-copy \{\s*pointer-events: auto/);
   assert.doesNotMatch(css, /#101116/);
 });
 

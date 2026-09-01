@@ -4,19 +4,15 @@ import {
   glyphAt,
   hash2,
   highlightAt,
-  hoverWeight,
-  resolves,
   ringAt,
-  textAt,
   toneAt,
 } from "./glyphGrid.ts";
-import { copy } from "./data.ts";
 
 /* Geometry: a stack of rings that drift upward
    and wrap, scaled to a sphere silhouette, twisted along the stack, with two
    highlight bands sweeping the surface. Ours draws characters instead of a
-   mapped text texture, and the cursor works as a decoder lens — glyphs are
-   scrambled until it lands on them.
+   mapped text texture, and the field churns faster the harder the globe is
+   turning — see globeDrag.ts for where that spin comes from.
 
    This module is pure: it turns a moment in time into a flat buffer of quad
    instances. Nothing here touches the DOM or a GL context, so the whole look
@@ -31,9 +27,6 @@ export const COLS_EQ = 200;
 const COLS_REF_PX = 560;
 /** Cap on how tightly a large pane packs — 1 is the 560px look. */
 const DENSITY_MAX = 1.6;
-/** How far the sentence advances from one ring to the next. A prime keeps
- *  rings from lining up into vertical stripes of the same word. */
-const TEXT_ROW_STEP = 37;
 /** Total twist across the stack, radians. */
 const TWIST = Math.PI;
 /** Intro: the collapsed stack opens into the globe over this many seconds. */
@@ -51,7 +44,7 @@ const UV_SPEED = 0.054;
 const SHAPE_SPEED = 0.027;
 /** Fixed lean on the globe, radians. */
 const TILT = (10 * Math.PI) / 180;
-/** How far the highlight bands slide with the cursor, in turns. */
+/** How far the highlight bands slide with the globe's lean, in turns. */
 const HIGHLIGHT_LEAN = 0.06;
 /** Camera distance in sphere radii — drives the perspective spread. */
 const CAM_Z = 4;
@@ -64,14 +57,9 @@ const HL_EDGE = 0.16;
 const HL2_POS = 0.72;
 const HL2_SIZE = 0.42;
 const HL2_EDGE = 0.15;
-/** Glyph flips per second with the pointer away / right under it. */
+/** Glyph flips per second at rest, and per rad/s of spin on top of it. */
 const AMBIENT_RATE = 0.5;
-const HOVER_RATE = 24;
-/** Lens radius as a share of the globe radius — glyph hole and map flashlight. */
-export const HOVER_R = 0.55;
-/** Lens strength needed to resolve a cell, and the per-cell jitter on it. */
-const RESOLVE_MIN = 0.12;
-const RESOLVE_JITTER = 0.4;
+const SPIN_RATE = 3.6;
 /** Monospace cell size at the sphere's equator. */
 const FONT_PX = 12;
 /** Solid enough to read, not a wash. */
@@ -79,10 +67,6 @@ const REST_ALPHA = 1;
 const PEAK_ALPHA = 1;
 /** How far the back of the globe fades behind the front. */
 const BACK_ALPHA = 0.68;
-/** Inside the lens the depth fade lifts, so the far side shows through. */
-const LENS_SEE_THROUGH = 0.95;
-/** How hard the lens punches out the front face (their hover × 2.5 dissolve). */
-const HOLE_GAIN = 1.9;
 /** Discrete inks — dim, mid, white on charcoal (#232323), matching CA's field. */
 const INK = [
   [0.72, 0.72, 0.7],
@@ -106,12 +90,11 @@ export type GlobeFrame = {
   height?: number;
   /** Seconds since the globe mounted. */
   t: number;
-  /** Cursor in canvas px; far away when the pointer has left. */
-  pointerX: number;
-  pointerY: number;
-  /** Smoothed mouse-look, radians. */
+  /** Drag-driven orientation, radians. */
   yaw: number;
   pitch: number;
+  /** Extra glyph churn from how fast the globe is turning, rad/s. */
+  churnRate?: number;
   reduced: boolean;
 };
 
@@ -191,9 +174,8 @@ export function cleanGlobeJourneyScale(progress: number) {
 
 /** Writes one frame's quads into `out` and returns how many were written.
  *  `glyphsOut`, when given, receives the character drawn by each quad — the
- *  only way to assert on what the lens actually decoded. */
+ *  only way to assert on how the field churns. */
 export function layoutGlobe(f: GlobeFrame, out: Float32Array, glyphsOut?: string[]): number {
-  const text = copy.heroGlobeText;
   const slice = f.reduced ? 1 : easeInOutQuad(f.t / INTRO_S);
   const paneW = f.width ?? f.size;
   const paneH = f.height ?? f.size;
@@ -203,11 +185,9 @@ export function layoutGlobe(f: GlobeFrame, out: Float32Array, glyphsOut?: string
   const spin = f.reduced ? 0 : f.t * UV_SPEED;
   const phase = f.reduced ? 0.5 / RINGS : f.t * SHAPE_SPEED;
   const bandOffset = spin + (f.yaw + f.pitch) * HIGHLIGHT_LEAN;
-  const hoverR = R * HOVER_R;
   const density = Math.min(DENSITY_MAX, f.size / COLS_REF_PX);
-  const px = f.pointerX;
-  const py = f.pointerY;
   const reduced = f.reduced;
+  const churn = reduced ? 0 : SPIN_RATE * Math.abs(f.churnRate ?? 0);
 
   const cosT = Math.cos(TILT);
   const sinT = Math.sin(TILT);
@@ -225,8 +205,6 @@ export function layoutGlobe(f: GlobeFrame, out: Float32Array, glyphsOut?: string
     const ry = (ring.t * 2 - 1) * R;
     const rr = ring.radius * R;
     const cols = Math.max(8, Math.round(COLS_EQ * ring.radius * density));
-    // Each ring picks up the sentence where the one below it left off.
-    const textStart = i * TEXT_ROW_STEP;
 
     for (let c = 0; c < cols; c++) {
       // u: where the cell sits around the ring, 0..1 — the coordinate the
@@ -251,35 +229,22 @@ export function layoutGlobe(f: GlobeFrame, out: Float32Array, glyphsOut?: string
       const depth = (z / R + 1) / 2; // 0 back, 1 front
 
       const seed = hash2(i, c);
-      const dx = sx - px;
-      const dy = sy - py;
-      const weight = reduced ? 0 : hoverWeight(Math.sqrt(dx * dx + dy * dy), hoverR);
       const band = Math.max(
         highlightAt(u + bandOffset, HL_POS, HL_SIZE, HL_EDGE),
         highlightAt(u + bandOffset, HL2_POS, HL2_SIZE, HL2_EDGE) * 0.8,
       );
-      const heat = Math.min(1, band * 0.12 + weight * 1.85);
+      const heat = Math.min(1, band * 0.12);
 
-      // Depth fade lifts under the lens so the far side shows through, while
-      // the near face stipple-dissolves — their hollow spotlight.
-      const hole = Math.min(1, weight * HOLE_GAIN);
-      const stipple = ((seed >>> 7) % 1000) / 1000;
-      const dissolve = hole > 0.12 + stipple * 0.5 ? hole : hole * 0.15;
-      const fade = BACK_ALPHA + (1 - BACK_ALPHA) * depth;
-      const seen = fade + (1 - fade) * (weight * LENS_SEE_THROUGH);
-      const punched = 1 - dissolve * Math.max(0, depth * 1.15 - 0.15);
-      const rest = ring.opacity * seen * REST_ALPHA * punched;
-      const alpha = rest + (ring.opacity * PEAK_ALPHA * punched - rest) * heat;
+      const seen = BACK_ALPHA + (1 - BACK_ALPHA) * depth;
+      const rest = ring.opacity * seen * REST_ALPHA;
+      const alpha = rest + (ring.opacity * PEAK_ALPHA - rest) * heat;
       if (alpha < CULL_ALPHA) continue;
 
       // Fractional phase: an integer offset would leave every cell crossing
       // its floor() boundary on the same tick — one strobe, not churn.
-      const churn = (seed % 1024) / 1024;
-      const step = Math.floor(f.t * (AMBIENT_RATE + HOVER_RATE * weight) + churn);
-      // Away from the cursor the field is scrambled; the lens decodes it.
-      const glyph = resolves(weight, seed, RESOLVE_MIN, RESOLVE_JITTER)
-        ? textAt(text, textStart + c)
-        : glyphAt(i, c, step);
+      const phaseOffset = (seed % 1024) / 1024;
+      const step = Math.floor(f.t * (AMBIENT_RATE + churn) + phaseOffset);
+      const glyph = glyphAt(i, c, step);
       const tile = CHAR_INDEX.get(glyph);
       if (tile === undefined) continue;
 

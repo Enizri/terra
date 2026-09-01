@@ -1,14 +1,19 @@
 import { useReducedMotion } from "motion/react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { RepoDiagram } from "../../../features/architecture-map";
+import { useEffect, useRef, type ReactNode } from "react";
 import {
   createCelestialGlobeRenderer,
   type CelestialGlobeRenderer,
 } from "../celestialGlobe3D";
-import { diagramEdges, diagramGroups, diagramNodes } from "../data";
+import {
+  advanceSpin,
+  createSpin,
+  dragBy,
+  grab,
+  release,
+  spinChurn,
+} from "../globeDrag";
 import { createGlobeRenderer } from "../globeGL";
 import {
-  HOVER_R,
   cleanGlobeJourneyOpacity,
   cleanGlobeJourneyProgress,
   cleanGlobeJourneyScale,
@@ -21,10 +26,9 @@ import {
   smoothGlobeJourneyProgress,
 } from "../globeLayout";
 
-const MOUSE_LOOK = 0.22;
 const MAP_FILL = 0.72;
-const PRESENCE_IN = 0.4;
-const PRESENCE_OUT = 0.25;
+/** Past this the globe is flying into the screen and stops being a handle. */
+const GRAB_UNTIL = 0.03;
 
 /** One canvas owns the globe from the hero through its entry into the screen. */
 export function GlobeJourney({ children }: { children: ReactNode }) {
@@ -33,18 +37,7 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sphereCanvasRef = useRef<HTMLCanvasElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<HTMLDivElement>(null);
-  const [mapPx, setMapPx] = useState(0);
-  const mapPxRef = useRef(0);
-  const pointer = useRef({
-    x: -1e4,
-    y: -1e4,
-    nx: 0,
-    ny: 0,
-    sx: 0,
-    sy: 0,
-    presence: 0,
-  });
+  const grabRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const reduceMotion = Boolean(reduced);
@@ -52,8 +45,8 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
     const canvas = canvasRef.current;
     const sphereCanvas = sphereCanvasRef.current;
     const backdrop = backdropRef.current;
-    const map = mapRef.current;
-    if (!root || !canvas || !sphereCanvas || !backdrop || !map) return;
+    const pad = grabRef.current;
+    if (!root || !canvas || !sphereCanvas || !backdrop || !pad) return;
     const renderer = createGlobeRenderer(canvas);
     if (!renderer || renderer === "lost") return;
     let sphereRenderer: CelestialGlobeRenderer | null = null;
@@ -68,7 +61,13 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
     let cleanT = 0;
     let shownProgress = 0;
     let shownCleanProgress = 0;
-    const mouseFollow = (dt: number) => 1 - Math.pow(0.9, dt * 60);
+    const spin = createSpin();
+    let dragging = false;
+    let spinning = false;
+    let lastDragX = 0;
+    let lastDragY = 0;
+    let lastDragT = 0;
+    let grabRadius = 1;
 
     const draw = (dt: number) => {
       if (disposed || width <= 0 || height <= 0) return 1;
@@ -107,22 +106,9 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
       const startY = desktop ? height * 0.46 : height + size * 0.08;
       const targetX = screenRect.left + screenRect.width / 2 - canvasRect.left;
       const targetY = Math.min(height - 8, screenRect.top + 14 - canvasRect.top);
-      const p = pointer.current;
-      const k = mouseFollow(dt);
-      p.sx += (p.nx - p.sx) * k;
-      p.sy += (p.ny - p.sy) * k;
-
-      const overGlobe = Math.hypot(p.x - startX, p.y - startY) < size * 0.48;
-      const targetPresence = progress < 0.02 && overGlobe ? 1 : 0;
-      const tau = targetPresence > p.presence ? PRESENCE_IN : PRESENCE_OUT;
-      p.presence +=
-        (targetPresence - p.presence) * (1 - Math.exp(-dt / Math.max(tau, 0.001)));
-      const sourcePointerX =
-        progress < 0.03 ? p.x - (startX - width / 2) : -1e4;
-      const sourcePointerY =
-        progress < 0.03 ? p.y - (startY - height / 2) : -1e4;
-      const yaw = p.sx * MOUSE_LOOK + progress * 0.42;
-      const pitch = -p.sy * MOUSE_LOOK * 0.4 + progress * -0.08;
+      spinning = advanceSpin(spin, dt, dragging);
+      const yaw = spin.yaw + progress * 0.42;
+      const pitch = spin.pitch + progress * -0.08;
 
       const glyphs = layoutGlobeJourney(
         {
@@ -130,8 +116,7 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
           width,
           height,
           t: globeT,
-          pointerX: sourcePointerX,
-          pointerY: sourcePointerY,
+          churnRate: spinChurn(spin),
           yaw,
           pitch,
           reduced: reduceMotion,
@@ -183,22 +168,13 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
         emergence: cleanActive ? Math.max(0.03, cleanTravel) : 1,
       });
 
-      const mapD = size * MAP_FILL;
-      if (Math.round(mapD) !== mapPxRef.current) {
-        mapPxRef.current = Math.round(mapD);
-        setMapPx(Math.round(mapD));
-      }
-      map.style.width = `${mapD}px`;
-      map.style.height = `${mapD}px`;
-      map.style.left = `${startX}px`;
-      map.style.top = `${startY}px`;
-      map.style.opacity = String(p.presence * (1 - progress));
-      map.classList.toggle("is-live", p.presence > 0.2 && progress < 0.02);
-      const localX = p.x - (startX - mapD / 2);
-      const localY = p.y - (startY - mapD / 2);
-      map.style.clipPath = p.presence > 0.02
-        ? `circle(${size * 0.5 * HOVER_R}px at ${localX}px ${localY}px)`
-        : "circle(0px at 50% 50%)";
+      // The handle rides the globe exactly like the disc behind it.
+      grabRadius = size / 2;
+      pad.style.width = `${size}px`;
+      pad.style.height = `${size}px`;
+      pad.style.transform =
+        `translate3d(${centerX - size / 2}px, ${centerY - size / 2}px, 0)`;
+      pad.classList.toggle("is-grabbable", progress < GRAB_UNTIL);
       return Math.min(progress, shownCleanProgress);
     };
 
@@ -210,7 +186,11 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
       const progress = draw(dt);
       if (
         !reduceMotion &&
-        (progress < 1 || shownCleanProgress < 1 || cleanGlobeJourneyOpacity(shownCleanProgress) > 0)
+        (progress < 1 ||
+          dragging ||
+          spinning ||
+          shownCleanProgress < 1 ||
+          cleanGlobeJourneyOpacity(shownCleanProgress) > 0)
       ) {
         frame = requestAnimationFrame(tick);
       }
@@ -229,20 +209,40 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
       sphereRenderer?.resize(width, height, window.devicePixelRatio || 1);
       play();
     };
-    const onMove = (event: PointerEvent) => {
-      const p = pointer.current;
-      p.x = event.clientX;
-      p.y = event.clientY;
-      p.nx = (event.clientX / window.innerWidth) * 2 - 1;
-      p.ny = (event.clientY / window.innerHeight) * 2 - 1;
+    const onDown = (event: PointerEvent) => {
+      dragging = true;
+      grab(spin);
+      lastDragX = event.clientX;
+      lastDragY = event.clientY;
+      lastDragT = event.timeStamp;
+      pad.setPointerCapture(event.pointerId);
+      pad.classList.add("is-dragging");
       play();
     };
-    const onLeave = () => {
-      const p = pointer.current;
-      p.x = -1e4;
-      p.y = -1e4;
-      p.nx = 0;
-      p.ny = 0;
+    const onDrag = (event: PointerEvent) => {
+      if (!dragging) return;
+      const dt = Math.max(0.001, (event.timeStamp - lastDragT) / 1000);
+      dragBy(
+        spin,
+        event.clientX - lastDragX,
+        event.clientY - lastDragY,
+        grabRadius,
+        dt,
+      );
+      lastDragX = event.clientX;
+      lastDragY = event.clientY;
+      lastDragT = event.timeStamp;
+      play();
+    };
+    const onUp = (event: PointerEvent) => {
+      if (!dragging) return;
+      dragging = false;
+      release(spin);
+      if (pad.hasPointerCapture(event.pointerId)) {
+        pad.releasePointerCapture(event.pointerId);
+      }
+      pad.classList.remove("is-dragging");
+      play();
     };
 
     void createCelestialGlobeRenderer(sphereCanvas, play).then((created) => {
@@ -270,10 +270,17 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
         frame = 0;
       } else play();
     };
+    // Coarse pointers keep the globe inert so a swipe over it still scrolls.
+    const grabbable =
+      !reduceMotion && window.matchMedia("(pointer: fine)").matches;
     if (!reduceMotion) {
       window.addEventListener("scroll", play, { passive: true });
-      window.addEventListener("pointermove", onMove, { passive: true });
-      document.addEventListener("pointerleave", onLeave);
+    }
+    if (grabbable) {
+      pad.addEventListener("pointerdown", onDown);
+      pad.addEventListener("pointermove", onDrag);
+      pad.addEventListener("pointerup", onUp);
+      pad.addEventListener("pointercancel", onUp);
     }
     document.addEventListener("visibilitychange", onVisibility);
     resize();
@@ -291,10 +298,12 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
       if (frame) cancelAnimationFrame(frame);
       resizeObserver.disconnect();
       intersectionObserver.disconnect();
-      if (!reduceMotion) {
-        window.removeEventListener("scroll", play);
-        window.removeEventListener("pointermove", onMove);
-        document.removeEventListener("pointerleave", onLeave);
+      if (!reduceMotion) window.removeEventListener("scroll", play);
+      if (grabbable) {
+        pad.removeEventListener("pointerdown", onDown);
+        pad.removeEventListener("pointermove", onDrag);
+        pad.removeEventListener("pointerup", onUp);
+        pad.removeEventListener("pointercancel", onUp);
       }
       document.removeEventListener("visibilitychange", onVisibility);
       sphereRenderer?.dispose();
@@ -307,16 +316,8 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
       <div className="gx-journey__sticky" aria-hidden>
         <div ref={backdropRef} className="gx-journey__disc" />
         <canvas ref={sphereCanvasRef} className="gx-journey__sphere" />
-        <div ref={mapRef} className="hx-orb__map">
-          <RepoDiagram
-            nodes={diagramNodes}
-            edges={diagramEdges}
-            groups={diagramGroups}
-            hoverOnly
-            remeasureKey={mapPx}
-          />
-        </div>
         <canvas ref={canvasRef} className="gx-journey__canvas" />
+        <div ref={grabRef} className="gx-journey__grab" />
       </div>
       {children}
     </div>
