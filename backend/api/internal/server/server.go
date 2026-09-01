@@ -204,6 +204,9 @@ func (s *Server) hostCapabilities(w http.ResponseWriter, r *http.Request) {
 // TERRA_WEB_URL (make dev) or returns a small JSON liveness payload.
 func (s *Server) root(w http.ResponseWriter, r *http.Request) {
 	if s.StaticDir != "" {
+		if s.Cfg != nil {
+			grantAccessCookie(w, s.Cfg.Token)
+		}
 		http.ServeFile(w, r, filepath.Join(s.StaticDir, "index.html"))
 		return
 	}

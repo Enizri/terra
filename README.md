@@ -127,8 +127,9 @@ Troubleshooting (`docker compose logs analyzer`):
 | `serving X, not Y` | `TERRA_MODEL` doesn't match what the endpoint serves |
 | `points at localhost, but inside a container` | Use a hosted URL or `http://llm:8020/v1` — `localhost` inside Compose is the analyzer itself |
 
-Open `http://127.0.0.1:8080/`. If `TERRA_TOKEN` is set, paste it in the unlock
-panel after a 401.
+Open `http://127.0.0.1:8080/`. The workspace opens without pasting a token:
+the API sets an HttpOnly cookie when it serves the UI (`make up`). `make dev`
+forwards `TERRA_TOKEN` from `.env` through the Vite proxy.
 
 `TERRA_TOKEN` is required for `make up` — the api container binds `0.0.0.0`
 inside Compose and `terra serve` refuses a non-loopback bind with an empty

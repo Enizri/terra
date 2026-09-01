@@ -52,7 +52,9 @@ no per-user authorization.
 **An empty `TERRA_TOKEN` leaves the API fully open.** That is deliberate for
 loopback development, and `terra serve` refuses to bind a non-loopback address with
 an empty token. `GET /models`, `GET /host/capabilities` and `/healthz` stay open even
-when a token is set, so the model picker can populate before you unlock.
+when a token is set. The workspace does not ask you to paste it: when the API serves
+the UI it sets an HttpOnly cookie, and `make dev` forwards `TERRA_TOKEN` from `.env`
+through the Vite proxy. CLI and curl still send `Authorization: Bearer`.
 
 Terra is built to run locally or on a trusted network. Publishing it to the internet
 means exposing an endpoint that fetches arbitrary repositories and, with preview

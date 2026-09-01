@@ -471,6 +471,22 @@ func TestTokenGate(t *testing.T) {
 		t.Fatalf("x-terra-token: status = %d, want 200", resp.StatusCode)
 	}
 
+	req, err = http.NewRequest("POST", ts.URL+"/analyze",
+		strings.NewReader(`{"repo_url":"https://github.com/acme/notes"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: "terra_token", Value: "test-secret"})
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != 200 {
+		t.Fatalf("cookie: status = %d, want 200", resp.StatusCode)
+	}
+
 	resp, err = http.Get(ts.URL + "/healthz")
 	if err != nil {
 		t.Fatal(err)
@@ -620,6 +636,47 @@ func TestStaticSPA(t *testing.T) {
 	}
 	if hz["status"] != "ok" {
 		t.Fatalf("healthz overridden by static: %v", hz)
+	}
+}
+
+func TestAccessCookieOnSPA(t *testing.T) {
+	t.Setenv("TERRA_TOKEN", "test-secret")
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte("<html>terra</html>"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s := &Server{StaticDir: dir, DB: filepath.Join(t.TempDir(), "terra.db")}
+	ts := httptest.NewServer(s.Handler())
+	t.Cleanup(ts.Close)
+
+	resp, err := http.Get(ts.URL + "/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	var got string
+	for _, c := range resp.Cookies() {
+		if c.Name == "terra_token" {
+			got = c.Value
+		}
+	}
+	if got != "test-secret" {
+		t.Fatalf("GET / cookie = %q, want test-secret", got)
+	}
+
+	resp, err = http.Get(ts.URL + "/new/s/abc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	got = ""
+	for _, c := range resp.Cookies() {
+		if c.Name == "terra_token" {
+			got = c.Value
+		}
+	}
+	if got != "test-secret" {
+		t.Fatalf("SPA fallback cookie = %q, want test-secret", got)
 	}
 }
 

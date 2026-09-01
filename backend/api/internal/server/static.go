@@ -37,5 +37,8 @@ func (s *Server) static(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	if s.Cfg != nil {
+		grantAccessCookie(w, s.Cfg.Token)
+	}
 	http.ServeFile(w, r, filepath.Join(s.StaticDir, "index.html"))
 }

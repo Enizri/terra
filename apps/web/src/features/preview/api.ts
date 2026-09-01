@@ -37,7 +37,7 @@ export function traces(repoUrl: string, onSpan: (span: TraceSpan) => void): () =
   };
   // EventSource hides status codes: without this, a bad token is a silently
   // dead pulse stream retry-looping in the background. Probe once on error so
-  // a 401 opens the unlock panel and stops the retries.
+  // a 401 stops the retries.
   let probed = false;
   es.onerror = () => {
     if (probed) return;
