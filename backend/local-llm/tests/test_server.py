@@ -388,9 +388,14 @@ def test_pick_device_auto_ignores_broken_nvidia_smi(monkeypatch):
 def test_grammar_compiles_for_the_architecture_schema():
     """The draft schema must stay GBNF-compilable: if it silently stops
     compiling, generation falls back to prompt-only and small models overrun
-    the output cap again."""
+    the output cap again.
+
+    CI uses `make venv` (no llama-cpp-python). This assertion needs the real
+    LlamaGrammar compiler from `make venv-local`.
+    """
     import json
 
+    pytest.importorskip("llama_cpp")
     schema = {
         "type": "object",
         "properties": {
