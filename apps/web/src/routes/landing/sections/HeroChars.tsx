@@ -5,7 +5,11 @@ import { CircleArrowIcon } from "../primitives";
 
 export function HeroChars() {
   return (
-    <section className="sh-section sh-section--hero sh-section--herochars" aria-label="Hero">
+    <section
+      id="top"
+      className="sh-section sh-section--hero sh-section--herochars"
+      aria-label="Hero"
+    >
       <div className="hx-grid">
         <div className="hx-copy">
           <p className="hx-eyebrow">{copy.heroEyebrow}</p>

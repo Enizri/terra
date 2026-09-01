@@ -12,7 +12,7 @@ export function Faq() {
   const [open, setOpen] = useState(0);
 
   return (
-    <section className="terra-section">
+    <section id="faq" className="terra-section">
       <div className="terra-faq">
         <div>
           <div className="terra-faq__aside">

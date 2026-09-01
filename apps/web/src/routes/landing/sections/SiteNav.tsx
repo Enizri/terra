@@ -44,7 +44,7 @@ export function SiteNav() {
   return (
     <nav className="sh-nav">
       <div className="sh-nav__pill">
-        <a className="sh-nav__logo" href="#">
+        <a className="sh-nav__logo" href="#top">
           <TerraMark className={collapsed ? "sh-terra-mark--collapsed" : ""} />
           <span>Terra</span>
         </a>
@@ -60,10 +60,10 @@ export function SiteNav() {
           aria-hidden={collapsed}
           style={{ pointerEvents: collapsed ? "none" : "auto" }}
         >
-          <a className="sh-nav__link" href="#" tabIndex={collapsed ? -1 : undefined}>
+          <a className="sh-nav__link" href="#power" tabIndex={collapsed ? -1 : undefined}>
             How it works
           </a>
-          <a className="sh-nav__link" href="#" tabIndex={collapsed ? -1 : undefined}>
+          <a className="sh-nav__link" href="#faq" tabIndex={collapsed ? -1 : undefined}>
             Case study
           </a>
         </motion.div>
