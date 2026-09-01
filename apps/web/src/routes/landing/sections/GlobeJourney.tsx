@@ -17,7 +17,10 @@ import {
   cleanGlobeJourneyOpacity,
   cleanGlobeJourneyProgress,
   cleanGlobeJourneyScale,
-  cleanGlobeJourneyTravel,
+  clipRectToViewport,
+  FINALE_HAZE_SPREAD,
+  FINALE_SUN_BLUR_RADIUS,
+  finaleGlobeFit,
   globeJourneyClockRate,
   globeJourneyInk,
   globeJourneyProgress,
@@ -29,6 +32,8 @@ import {
 const MAP_FILL = 0.72;
 /** Past this the globe is flying into the screen and stops being a handle. */
 const GRAB_UNTIL = 0.03;
+/** Matches `.terra-finale__floor` so the clip and the card share a corner. */
+const FINALE_RADIUS = 24;
 
 /** One canvas owns the globe from the hero through its entry into the screen. */
 export function GlobeJourney({ children }: { children: ReactNode }) {
@@ -77,6 +82,10 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
         ".sh-power-theater__screen .sh-window",
       );
       const dock = root.querySelector<HTMLElement>(".gx-journey__footer-dock");
+      const glow = root.querySelector<HTMLElement>(".terra-finale__glow");
+      const sun = root.querySelector<HTMLElement>(".terra-finale__sun");
+      const fore = root.querySelector<HTMLElement>(".terra-finale__fore");
+      const haze = root.querySelector<HTMLElement>(".terra-finale__haze");
       if (!screen || !dock) return 1;
 
       const canvasRect = canvas.getBoundingClientRect();
@@ -87,14 +96,14 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
         : globeJourneyProgress(window.scrollY, screenRect.top, height);
       shownProgress = smoothGlobeJourneyProgress(shownProgress, targetProgress, dt);
       const progress = shownProgress;
-      const targetCleanProgress = reduceMotion
-        ? 0
-        : cleanGlobeJourneyProgress(dockRect.top, height);
-      shownCleanProgress = smoothGlobeJourneyProgress(
-        shownCleanProgress,
-        targetCleanProgress,
-        dt,
-      );
+      const targetCleanProgress = cleanGlobeJourneyProgress(dockRect.top, height);
+      shownCleanProgress = reduceMotion
+        ? targetCleanProgress
+        : smoothGlobeJourneyProgress(
+          shownCleanProgress,
+          targetCleanProgress,
+          dt,
+        );
       if (!reduceMotion) globeT += dt * globeJourneyClockRate(progress);
       const desktop = width > 900;
       const size = desktop
@@ -138,57 +147,120 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
       backdrop.style.height = `${size}px`;
       backdrop.style.opacity = String(discFade);
       backdrop.style.transform = `translate3d(${centerX - size / 2}px, ${centerY - size / 2}px, 0)`;
-      const cleanTravel = cleanGlobeJourneyTravel(shownCleanProgress);
-      const cleanArc = Math.sin(cleanTravel * Math.PI);
-      if (!reduceMotion && shownCleanProgress > 0) cleanT += dt;
-      const cleanStartX = width * (desktop ? 0.5 : 0.5);
-      const cleanStartY = height + size * 0.28;
-      const cleanTargetX = width * (desktop ? 0.62 : 0.5);
-      // Keep the finished sphere fully inside the light bridge; the footer
-      // begins before the sticky viewport ends.
-      const cleanTargetY = height * (desktop ? 0.30 : 0.28);
-      const cleanX = cleanStartX + (cleanTargetX - cleanStartX) * cleanTravel +
-        cleanArc * size * (desktop ? 0.08 : 0.03);
-      const cleanY = cleanStartY + (cleanTargetY - cleanStartY) * cleanTravel;
+      if (!reduceMotion && shownCleanProgress > 0 && !dragging) cleanT += dt;
+      const fit = finaleGlobeFit(dockRect, canvasRect);
+      const cleanX = fit.x;
+      // Parked on the painted sun from the first frame — the blur is the
+      // backdrop, not a disc the globe has to climb onto.
+      const cleanY = fit.y;
       const cleanOpacity = cleanGlobeJourneyOpacity(shownCleanProgress);
+      const cleanDiameter = fit.diameter * cleanGlobeJourneyScale(shownCleanProgress);
       const cleanActive = cleanOpacity > 0.001;
-      sphereCanvas.parentElement?.classList.toggle("is-clean-flight", cleanActive);
+      const sticky = sphereCanvas.parentElement;
+      sticky?.classList.toggle("is-clean-flight", cleanActive);
+      if (sticky) {
+        sticky.style.setProperty(
+          "clip-path",
+          cleanActive ? clipRectToViewport(dockRect, canvasRect, FINALE_RADIUS) : "",
+        );
+      }
+      // The photo's crop is solved in one place and handed to both copies of
+      // the <img>, so the picture and the globe can never drift apart.
+      const focus = `${(fit.focusX * 100).toFixed(3)}% ${(fit.focusY * 100).toFixed(3)}%`;
+      for (const sky of root.querySelectorAll<HTMLElement>(".terra-finale__sky")) {
+        sky.style.objectPosition = focus;
+      }
+      if (fore) {
+        fore.style.setProperty("--fore-cut", `${fit.ridge}px`);
+        fore.style.setProperty("--fore-fade", `${fit.ridgeFade}px`);
+      }
+      if (haze) {
+        haze.style.setProperty(
+          "--gx",
+          `${cleanX + canvasRect.left - dockRect.left}px`,
+        );
+        haze.style.setProperty(
+          "--gy",
+          `${cleanY + canvasRect.top - dockRect.top}px`,
+        );
+        haze.style.setProperty("--gd", `${cleanDiameter * FINALE_HAZE_SPREAD}px`);
+        haze.style.opacity = String(cleanActive ? cleanOpacity : 0);
+      }
+      if (sun) {
+        // Stay on the painted sun: the disc is the out-of-focus backdrop
+        // sitting behind the mesh.
+        const sunX = fit.x + canvasRect.left - dockRect.left;
+        const sunY = fit.y + canvasRect.top - dockRect.top;
+        sun.style.setProperty("--sun-x", `${sunX}px`);
+        sun.style.setProperty("--sun-y", `${sunY}px`);
+        sun.style.setProperty(
+          "--sun-r",
+          `${fit.diameter * FINALE_SUN_BLUR_RADIUS}px`,
+        );
+        sun.style.opacity = String(cleanActive ? cleanOpacity : 0);
+      }
+      if (glow) {
+        // The sky is lit by the sphere, so the spill tracks it frame by frame.
+        glow.style.width = `${cleanDiameter * 2.6}px`;
+        glow.style.height = `${cleanDiameter * 2.6}px`;
+        glow.style.opacity = String(cleanActive ? cleanOpacity : 0);
+        glow.style.transform = `translate3d(${
+          cleanX + canvasRect.left - dockRect.left - cleanDiameter * 1.3
+        }px, ${cleanY + canvasRect.top - dockRect.top - cleanDiameter * 1.3}px, 0)`;
+      }
       sphereRenderer?.render({
         width,
         height,
-        diameter: size * MAP_FILL * (
-          cleanActive ? cleanGlobeJourneyScale(shownCleanProgress) : 1
-        ),
+        diameter: cleanActive ? cleanDiameter : size * MAP_FILL,
         x: cleanActive ? cleanX : centerX,
         y: cleanActive ? cleanY : centerY,
         yaw,
-        pitch,
-        spin: reduceMotion ? 0.35 : globeT * 0.22 + cleanT * 0.18,
+        // A ground-level view of a sphere hung high in the sky: the reader is
+        // looking slightly up at it, like the figures on the terrace.
+        pitch: cleanActive ? pitch + 0.12 : pitch,
+        spin: reduceMotion ? 0.35 : cleanActive ? 0.22 : globeT * 0.22 + cleanT * 0.18,
         opacity: cleanActive ? cleanOpacity : discFade,
-        emergence: cleanActive ? Math.max(0.03, cleanTravel) : 1,
+        hallLight: cleanActive ? 2.6 * cleanOpacity : 0,
       });
 
-      // The handle rides the globe exactly like the disc behind it.
-      grabRadius = size / 2;
-      pad.style.width = `${size}px`;
-      pad.style.height = `${size}px`;
-      pad.style.transform =
-        `translate3d(${centerX - size / 2}px, ${centerY - size / 2}px, 0)`;
-      pad.classList.toggle("is-grabbable", progress < GRAB_UNTIL);
+      // Same press-and-spin handle as the hero: it rides whichever globe is
+      // on screen. The finale chrome is pointer-events none except its links,
+      // so the press reaches this disc instead of the photo.
+      const finaleGrab = cleanActive && cleanOpacity > 0.35;
+      if (finaleGrab) {
+        grabRadius = cleanDiameter / 2;
+        pad.style.width = `${cleanDiameter}px`;
+        pad.style.height = `${cleanDiameter}px`;
+        pad.style.transform =
+          `translate3d(${cleanX - cleanDiameter / 2}px, ${cleanY - cleanDiameter / 2}px, 0)`;
+      } else {
+        grabRadius = size / 2;
+        pad.style.width = `${size}px`;
+        pad.style.height = `${size}px`;
+        pad.style.transform =
+          `translate3d(${centerX - size / 2}px, ${centerY - size / 2}px, 0)`;
+      }
+      pad.classList.toggle("is-grabbable", finaleGrab || progress < GRAB_UNTIL);
       return Math.min(progress, shownCleanProgress);
     };
 
     const tick = (now: number) => {
       frame = 0;
-      if (disposed || !visible || document.hidden) return;
+      if (disposed || document.hidden) return;
       const dt = last ? Math.min(0.05, (now - last) / 1000) : 1 / 60;
       last = now;
       const progress = draw(dt);
+      const dockNow = root.querySelector(".gx-journey__footer-dock");
+      const dockBox = dockNow?.getBoundingClientRect();
+      const dockInView = Boolean(
+        dockBox && dockBox.bottom > 0 && dockBox.top < (height || window.innerHeight),
+      );
       if (
         !reduceMotion &&
         (progress < 1 ||
           dragging ||
           spinning ||
+          dockInView ||
           shownCleanProgress < 1 ||
           cleanGlobeJourneyOpacity(shownCleanProgress) > 0)
       ) {
@@ -196,7 +268,8 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
       }
     };
     const play = () => {
-      if (frame || disposed || !visible || document.hidden) return;
+      if (disposed || document.hidden) return;
+      if (frame) return;
       last = 0;
       frame = requestAnimationFrame(tick);
     };
@@ -263,7 +336,7 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
         frame = 0;
       }
     });
-    intersectionObserver.observe(root);
+    intersectionObserver.observe(canvas);
     const onVisibility = () => {
       if (document.hidden && frame) {
         cancelAnimationFrame(frame);
@@ -276,6 +349,7 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
     if (!reduceMotion) {
       window.addEventListener("scroll", play, { passive: true });
     }
+    window.addEventListener("resize", resize);
     if (grabbable) {
       pad.addEventListener("pointerdown", onDown);
       pad.addEventListener("pointermove", onDrag);
@@ -299,6 +373,7 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
       resizeObserver.disconnect();
       intersectionObserver.disconnect();
       if (!reduceMotion) window.removeEventListener("scroll", play);
+      window.removeEventListener("resize", resize);
       if (grabbable) {
         pad.removeEventListener("pointerdown", onDown);
         pad.removeEventListener("pointermove", onDrag);
@@ -308,6 +383,7 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
       document.removeEventListener("visibilitychange", onVisibility);
       sphereRenderer?.dispose();
       renderer.dispose();
+      sphereCanvas.parentElement?.style.removeProperty("clip-path");
     };
   }, [reduced]);
 

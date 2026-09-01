@@ -168,8 +168,130 @@ export function cleanGlobeJourneyTravel(progress: number) {
   return easeInOutQuad(smoothstep(0.05, 0.92, progress));
 }
 
-export function cleanGlobeJourneyScale(progress: number) {
-  return mix(0.06, 0.5, cleanGlobeJourneyTravel(progress));
+/** The globe sits on the painted sun at full size — the blur is behind it,
+ *  so growing in from a smaller disc would read as coming up from below. */
+export function cleanGlobeJourneyScale(_progress: number) {
+  return 1;
+}
+
+/** Kept at zero: the mesh is already in its socket, not rising from the terrace. */
+export const FINALE_GLOBE_RISE = 0;
+
+/** Distance haze over the sphere: how far the warm veil reaches past it. */
+export const FINALE_HAZE_SPREAD = 1.5;
+
+/** Out-of-focus sun behind the 3D globe: mask radius in globe diameters.
+ *  The painted disc's radius is ~0.54 of the globe diameter; this stays
+ *  larger so the solid blur covers the sharp limb instead of fading on it. */
+export const FINALE_SUN_BLUR_RADIUS = 1.2;
+
+/** Where the orb sits inside `finale-sky.jpg`, measured off the file: the
+ *  glowing disc spans x 265..615 and y 362..700 of the 1920x1279 frame, and
+ *  the foreground terrace closes over the sky at y 1105. This module walks
+ *  the same `object-fit: cover` crop the browser does and hands the photo its
+ *  `object-position` back, which is what keeps the 3D globe hanging exactly
+ *  where the painted orb is at any window shape, instead of being parked at a
+ *  percentage that only holds for one aspect ratio. */
+export const FINALE_SKY = {
+  aspect: 1920 / 1279,
+  centerX: 441 / 1920,
+  centerY: 531 / 1279,
+  /** Painted orb diameter as a fraction of the frame width. */
+  diameter: 344 / 1920,
+  /** Where the foreground terrace closes: everything below it is painted
+   *  again on top of the globe, so the sphere rises out from behind it. */
+  ridge: 1105 / 1279,
+  /** Feather on that cut, in frame heights, so the seam never reads as a line. */
+  ridgeFade: 26 / 1279,
+} as const;
+
+/** Where in the card the orb should end up. The crop is solved for this
+ *  instead of a fixed `object-position`, because the orb sits at 23% of the
+ *  frame: any focus that keeps it on screen in a narrow card throws it off in
+ *  a wide one. Solving pins it at the same spot in every card shape, and the
+ *  focus that falls out is handed back to the `<img>` so photo and 3D globe
+ *  can never disagree about where the crop landed. */
+const FINALE_ANCHOR = { x: 0.42, y: 0.42 } as const;
+/** The 3D sphere sits *inside* the painted orb, not over it: a rim of the
+ *  photo's own fire stays visible all the way around, so the mesh reads as
+ *  something hanging in that sky rather than a decal on top of it. */
+const FINALE_GLOBE_OVERFILL = 0.92;
+
+export type FinaleGlobeFit = {
+  x: number;
+  y: number;
+  diameter: number;
+  /** Terrace cut and its feather, in px down from the floor's top edge. */
+  ridge: number;
+  ridgeFade: number;
+  /** `object-position` the photo must use for this crop, as fractions. */
+  focusX: number;
+  focusY: number;
+};
+
+/** The rectangle `object-fit: cover` paints the sky into, inside `floor`,
+ *  slid so the orb lands on `FINALE_ANCHOR` — and how far the slide is, as
+ *  the `object-position` fraction that produces it. */
+function finaleSkyCrop(floor: { width: number; height: number }) {
+  const wide = floor.width / floor.height > FINALE_SKY.aspect;
+  const width = wide ? floor.width : floor.height * FINALE_SKY.aspect;
+  const height = wide ? floor.width / FINALE_SKY.aspect : floor.height;
+  // Never past an edge: the crop may only slide within the overflow it has.
+  const slide = (box: number, drawn: number, want: number) =>
+    Math.max(box - drawn, Math.min(0, want));
+  const left = slide(
+    floor.width,
+    width,
+    floor.width * FINALE_ANCHOR.x - width * FINALE_SKY.centerX,
+  );
+  const top = slide(
+    floor.height,
+    height,
+    floor.height * FINALE_ANCHOR.y - height * FINALE_SKY.centerY,
+  );
+  const focus = (box: number, drawn: number, offset: number) =>
+    drawn > box ? offset / (box - drawn) : 0.5;
+  return {
+    width,
+    height,
+    left,
+    top,
+    focusX: focus(floor.width, width, left),
+    focusY: focus(floor.height, height, top),
+  };
+}
+
+/** Places the 3D globe on the painted orb, in `origin`'s coordinate space. */
+export function finaleGlobeFit(
+  floor: { left: number; top: number; width: number; height: number },
+  origin: { left: number; top: number },
+): FinaleGlobeFit {
+  if (!(floor.width > 0 && floor.height > 0)) {
+    return { x: 0, y: 0, diameter: 0, ridge: 0, ridgeFade: 0, focusX: 0.5, focusY: 0.5 };
+  }
+  const crop = finaleSkyCrop(floor);
+  return {
+    x: floor.left + crop.left + crop.width * FINALE_SKY.centerX - origin.left,
+    y: floor.top + crop.top + crop.height * FINALE_SKY.centerY - origin.top,
+    diameter: crop.width * FINALE_SKY.diameter * FINALE_GLOBE_OVERFILL,
+    ridge: crop.top + crop.height * FINALE_SKY.ridge,
+    ridgeFade: crop.height * FINALE_SKY.ridgeFade,
+    focusX: crop.focusX,
+    focusY: crop.focusY,
+  };
+}
+
+/** Clip `rect` to `box` (both in the same coordinate space). */
+export function clipRectToViewport(
+  rect: { top: number; right: number; bottom: number; left: number },
+  box: { top: number; right: number; bottom: number; left: number },
+  radius: number,
+) {
+  const top = Math.max(0, rect.top - box.top);
+  const right = Math.max(0, box.right - rect.right);
+  const bottom = Math.max(0, box.bottom - rect.bottom);
+  const left = Math.max(0, rect.left - box.left);
+  return `inset(${top}px ${right}px ${bottom}px ${left}px round ${radius}px)`;
 }
 
 /** Writes one frame's quads into `out` and returns how many were written.

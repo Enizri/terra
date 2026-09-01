@@ -345,6 +345,8 @@ export const faq = {
 };
 
 export const footer = {
+  headline: ["One map of", "your repo."],
+  cta: { label: "Get started", href: "/new" },
   tagline: "One map of your repo. A human approves every merge.",
   cols: [
     {

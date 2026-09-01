@@ -9,6 +9,11 @@ import {
   cleanGlobeJourneyProgress,
   cleanGlobeJourneyScale,
   cleanGlobeJourneyTravel,
+  clipRectToViewport,
+  FINALE_GLOBE_RISE,
+  FINALE_SKY,
+  FINALE_SUN_BLUR_RADIUS,
+  finaleGlobeFit,
   globeJourneyClockRate,
   globeJourneyProgress,
   layoutGlobe,
@@ -203,5 +208,80 @@ test("the clean globe starts only after the character journey ends", () => {
   assert.equal(cleanGlobeJourneyOpacity(1), 1);
   assert.equal(cleanGlobeJourneyTravel(0), 0);
   assert.equal(cleanGlobeJourneyTravel(1), 1);
-  assert.ok(cleanGlobeJourneyScale(1) > cleanGlobeJourneyScale(0));
+  assert.equal(cleanGlobeJourneyScale(0), 1);
+  assert.equal(cleanGlobeJourneyScale(1), 1);
+  assert.equal(FINALE_GLOBE_RISE, 0);
+});
+
+test("the closing globe is clipped to the card", () => {
+  assert.equal(
+    clipRectToViewport(
+      { top: 50, right: 900, bottom: 700, left: 40 },
+      { top: 0, right: 1000, bottom: 800, left: 0 },
+      24,
+    ),
+    "inset(50px 100px 100px 40px round 24px)",
+  );
+});
+
+test("the sky globe lands on the painted orb in both crops of the floor", () => {
+  const origin = { left: 0, top: 0 };
+  const orbAt = (
+    fit: ReturnType<typeof finaleGlobeFit>,
+    box: { width: number; height: number },
+  ) => ({ x: fit.x / box.width, y: fit.y / box.height });
+
+  // Wide card: the photo is scaled to the width and cropped top/bottom.
+  const wideBox = { left: 0, top: 0, width: 1400, height: 800 };
+  const wide = finaleGlobeFit(wideBox, origin);
+  const drawnHeight = 1400 / FINALE_SKY.aspect;
+  assert.equal(wide.x, 1400 * FINALE_SKY.centerX);
+  assert.equal(wide.diameter, 1400 * FINALE_SKY.diameter * 0.92);
+  // Narrow card: scaled to the height and cropped on the sides instead.
+  const tallBox = { left: 0, top: 0, width: 400, height: 700 };
+  const tall = finaleGlobeFit(tallBox, origin);
+  const drawnWidth = 700 * FINALE_SKY.aspect;
+  assert.equal(tall.diameter, drawnWidth * FINALE_SKY.diameter * 0.92);
+
+  // The crop can only slide where it overflows, and it slides as far as it
+  // needs to: a wide card has no horizontal slack, so the orb keeps the
+  // photo's own 23%, while a narrow one — which would otherwise push the orb
+  // off the left edge entirely — pulls it back to the anchor.
+  assert.ok(Math.abs(orbAt(wide, wideBox).x - 441 / 1920) < 0.001);
+  assert.ok(Math.abs(orbAt(tall, tallBox).x - 0.42) < 0.01, `orb x ${orbAt(tall, tallBox).x}`);
+  for (const [fit, box] of [[wide, wideBox], [tall, tallBox]] as const) {
+    assert.ok(Math.abs(orbAt(fit, box).y - 0.42) < 0.01, `orb y ${orbAt(fit, box).y}`);
+  }
+
+  // The focus handed back to the <img> is what produced that crop, and it
+  // stays inside the image: no gap at either edge.
+  for (const fit of [wide, tall]) {
+    assert.ok(fit.focusX >= 0 && fit.focusX <= 1);
+    assert.ok(fit.focusY >= 0 && fit.focusY <= 1);
+  }
+
+  // The mesh stays inside the painted orb so its fire rings the 3D globe.
+  assert.ok(wide.diameter < 1400 * FINALE_SKY.diameter);
+  // The terrace cut sits well below the orb, and inside the visible card.
+  assert.ok(wide.ridge > wide.y + wide.diameter);
+  assert.ok(wide.ridge < 800);
+  assert.ok(tall.ridge > tall.y + tall.diameter && tall.ridge < 700);
+  // A crop with nowhere to slide keeps the photo centred.
+  assert.equal(
+    finaleGlobeFit({ left: 0, top: 0, width: 1400, height: drawnHeight }, origin).focusY,
+    0.5,
+  );
+
+  // The fit is stated relative to the canvas the globe is drawn into.
+  const shifted = finaleGlobeFit(
+    { left: 60, top: 40, width: 1400, height: 800 },
+    { left: 60, top: 40 },
+  );
+  assert.deepEqual(shifted, wide);
+
+  const empty = finaleGlobeFit({ left: 0, top: 0, width: 0, height: 800 }, origin);
+  assert.equal(empty.diameter, 0);
+
+  // Solid blur must cover the painted sun's limb (radius ~0.54 of the globe).
+  assert.ok(FINALE_SUN_BLUR_RADIUS * 0.64 > 0.54);
 });

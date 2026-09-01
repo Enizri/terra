@@ -40,4 +40,11 @@ test("every nav link lands on a section that exists", () => {
   // wheel uses, so a click never fights a native smooth scroll.
   assert.match(read("TerraLanding.tsx"), /useSmoothAnchors\(useSmoothScroll\(\)\)/);
   assert.doesNotMatch(read("TerraLanding.tsx"), /behavior: "smooth"/);
+  // Closing card lives inside the journey so the last globe can dock in it.
+  assert.match(read("TerraLanding.tsx"), /<Faq \/>\s*<Final \/>/);
+  assert.match(read("sections/Final.tsx"), /gx-journey__footer-dock/);
+  // The foreground is painted a second time, over the globe, so it sits behind it.
+  assert.match(read("sections/Final.tsx"), /terra-finale__fore/);
+  assert.match(read("sections/Final.tsx"), /terra-finale__sun/);
+  assert.match(read("sections/Final.tsx"), /finale-sky\.jpg/);
 });

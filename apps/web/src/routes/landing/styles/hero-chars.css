@@ -304,11 +304,6 @@
   background: var(--wl-bg);
 }
 
-.gx-journey__footer-dock {
-  height: min(70svh, 640px);
-  background: var(--wl-bg);
-}
-
 .gx-journey__sticky {
   position: sticky;
   top: 0;
@@ -356,12 +351,25 @@
   background: transparent;
 }
 
+/* Atmospheric perspective. Hung in the night sky the sphere is far away and
+   behind a landscape's worth of lit air, so it loses contrast and edge before
+   the foreground does: softened, desaturated and pulled toward the orb's
+   amber, and it throws a real halo because it is the scene's light source.
+   Anything sharper reads as a render pasted on the photo. The hero globe on
+   paper stays neutral — only the flight is graded. */
+.gx-journey__sticky.is-clean-flight .gx-journey__sphere {
+  filter: blur(0.7px) contrast(0.86) saturate(0.9) brightness(0.96)
+    sepia(0.18) drop-shadow(0 0 48px rgba(255, 168, 76, 0.5))
+    drop-shadow(0 0 130px rgba(255, 132, 40, 0.3));
+}
+
 .gx-journey__canvas {
   z-index: 2;
 }
 
 /* Press-and-spin handle: a disc riding the globe, inert until the globe is
-   parked in the hero (the sticky layer itself takes no pointer events). */
+   parked in the hero or the finale (the sticky layer itself takes no pointer
+   events). */
 .gx-journey__grab {
   position: absolute;
   top: 0;
@@ -382,9 +390,28 @@
   cursor: grabbing;
 }
 
+/* Every journey child has to sit above the sticky globe layer: that layer is
+   opaque and pinned for the whole journey, so anything left at the default
+   z-index is painted over. The FAQ was, and only became visible when the
+   closing flight turned the layer transparent — the section appeared to tear
+   open mid-scroll. `z-index` only stacks a positioned box, so FAQ must be
+   `relative` here; Power already is, via `.sh-section`. Raised, it reads
+   normally, and the flight still passes over it because `is-clean-flight`
+   lifts the layer to 3. */
+
 .gx-journey > .sh-section.sh-section--hero.sh-section--herochars,
-.gx-journey > .sh-section.sh-section--power {
+.gx-journey > .sh-section.sh-section--power,
+.gx-journey > .terra-section {
+  position: relative;
   z-index: 2;
+}
+
+/* Opaque floor so the pinned globe sheet cannot show through the FAQ
+   column. Full-bleed (the inner `.terra-faq` keeps the 1100px measure) so
+   neither gutter shows the globe, and no `overflow` so the rise is not clipped. */
+.gx-journey > .terra-section {
+  max-width: none;
+  background: var(--wl-bg);
 }
 
 .gx-journey > .sh-section.sh-section--hero.sh-section--herochars {
