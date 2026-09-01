@@ -1,9 +1,5 @@
 # Fail the PR unless `make check` (workflow job "check") and `actionlint`
 # both completed with conclusion "success".
-#
-# actionlint is a temporary second required check while Cursor Bugbot is not
-# wired for this repo. Swap the second name here when Bugbot (or another
-# reviewer) is enabled again.
 name: merge-gate
 
 on:

@@ -2,7 +2,7 @@
 
 <!-- What changed and why. Link the tracking issue. -->
 
-**Base branch:** `staging` (not `main`)
+**Base branch:** `staging` (GitHub defaults to `main` — switch the PR base)
 
 Fixes #
 

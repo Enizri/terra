@@ -4,6 +4,8 @@ package preview
 
 import (
 	"bytes"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,10 +14,23 @@ import (
 	"time"
 )
 
-const (
-	demoUser = "terra"
-	demoPass = "terra-demo-2026"
-)
+const demoUser = "terra"
+
+// demoPass is minted once per API process, not checked in: the same value has
+// to seed the account and sign back in later, but it never has to outlive the
+// process — preview containers are torn down with it. A literal here would be
+// a published credential for every deployment running this code.
+var demoPass = randomDemoPass()
+
+func randomDemoPass() string {
+	buf := make([]byte, 24)
+	if _, err := rand.Read(buf); err != nil {
+		// crypto/rand failing is fatal-adjacent; a demo container is not worth
+		// panicking over, so fall back to a value that is still process-local.
+		return fmt.Sprintf("terra-demo-%d", time.Now().UnixNano())
+	}
+	return "terra-demo-" + hex.EncodeToString(buf)
+}
 
 // demoRepos lists normalized repo URLs with a demo-auth hook.
 var demoRepos = map[string]bool{

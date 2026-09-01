@@ -3,6 +3,35 @@
 Turns a GitHub repository into an architecture map a non-engineer can read:
 components, relationships, and the evidence for them.
 
+## Status
+
+Terra is pre-1.0 and built in the open. The full loop works end to end today:
+
+**Paste or drop a GitHub URL → Terra fetches and scans it → recommends a model and
+stops at a hard gate (no LLM call, no tokens spent, until you pick one) → analyzes
+and streams the map in as it builds → you get a diagram whose every component links
+back to the files that prove it → ask questions answered against that map → boot the
+analyzed repo's own dev server in a live preview and select elements in it.**
+
+Run it yourself with [Quickstart](#quickstart), or read a real map with no setup at
+all: [`case-studies/memos.map.json`](case-studies/memos.map.json) is Terra's output
+for [usememos/memos](https://github.com/usememos/memos), checked in as the golden
+fixture the test suite runs against.
+
+What is **not** done, so you don't go looking for it:
+
+| Gap | Where |
+|---|---|
+| **Export JSON** and **Share map** are placeholder chips — visibly present, not wired | `apps/web/src/shared/shell/WorkspaceHeader.tsx` |
+| The workspace session is not persisted. The URL slug is cosmetic, never sent to the server, and in-memory state is lost on reload | `apps/web/src/routes/workspace/cache.ts` |
+| The step list under an Ask answer is a client-side animation, not real tool telemetry | `apps/web/src/features/ask/useAsk.ts` |
+| Live preview supports `package.json` frontends only; other repos need host-exec `make dev` | `backend/api/internal/preview/` |
+| No user accounts. `TERRA_TOKEN` is one shared secret, and empty leaves the API open | [`docs/SECURITY.md`](docs/SECURITY.md) |
+
+Live preview runs the analyzed repository's own code — in host-exec mode, directly on
+your machine. Read [`docs/SECURITY.md`](docs/SECURITY.md) before pointing it at a repository you
+don't trust.
+
 ## Architecture
 
 ```
@@ -30,10 +59,11 @@ Go and Python never import each other — they talk over HTTP. The analyzer
 talks to the model only through the **OpenAI-compatible** Chat Completions API,
 so a laptop HF server, vLLM, or a hosted provider are drop-in replacements.
 
-`ARCHITECTURE.md` has the folder maps, the import rules between them, and what
-to add for a new product under this repo. See `CONTRIBUTING.md` for where new
-feature code goes, `make check`, and PR expectations — branch from **`staging`**
-and open PRs into **`staging`** (not `main`).
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) has the folder maps, the import
+rules between them, and what to add for a new product under this repo. See
+[`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) for where new feature code goes,
+`make check`, and PR expectations — GitHub default is **`main`**; branch from
+**`staging`**, open PRs into **`staging`**, then promote **`staging` → `main`**.
 
 ## Quickstart
 
@@ -233,3 +263,10 @@ the enums and model JSON schema live only in
 `backend/analyzer/terra_analyzer/tasks/architecture/schema.py`.
 `case-studies/memos.map.json` is the golden answer key and is checked by
 `backend/analyzer/tests/test_app.py` and `backend/api/internal/analysis/contract_test.go`.
+
+## License
+
+MIT — see [`LICENSE`](LICENSE).
+
+The bundled celestial globe model is CC0 (Virtual Museums of Małopolska); its
+provenance is recorded in `apps/web/public/terra/models/celestial-globe-license.txt`.

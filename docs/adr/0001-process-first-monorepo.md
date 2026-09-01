@@ -14,10 +14,10 @@ languages in one feature directory.
 
 Keep one repository, three deployable processes, and organize *inside* each
 process by feature/module. Share vocabulary via root `packages/contracts/` and
-`CONTEXT.md`.
+[`CONTEXT.md`](../CONTEXT.md).
 
 ## Consequences
 
 - Tooling stays native (Go modules, pip, npm).
 - HTTP seams stay explicit.
-- Contributors look up “which process?” first, then the module table in ARCHITECTURE.md.
+- Contributors look up “which process?” first, then the module table in [`ARCHITECTURE.md`](../ARCHITECTURE.md).

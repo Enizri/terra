@@ -79,7 +79,7 @@ func Publish(span Span) {
 	mu.Lock()
 	defer mu.Unlock()
 	if _, ok := recent[span.Repo]; !ok && len(recent) >= maxRepos {
-		// ponytail: evict an arbitrary ring (map order); LRU if it ever matters.
+		// Evict an arbitrary ring (map order); LRU if it ever matters.
 		for k := range recent {
 			delete(recent, k)
 			break

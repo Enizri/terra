@@ -11,6 +11,34 @@ from .prompt import SYSTEM_PROMPT, build_prompt
 from .validate import count_files, known_paths, retry_message, validate
 
 
+def unfence(content: str) -> str:
+    """Strip a markdown code fence around a JSON reply.
+
+    The schema and the system prompt both say "a single JSON object and nothing
+    else", and most models comply — but a chat-tuned model reaching for its
+    instinct to format code will wrap the object in ```json … ```, and pydantic
+    rejects the whole thing over the backticks. Cheaper to unwrap here than to
+    spend a retry asking again.
+
+    Only applied to this task: `qa` answers are prose, where a fence is content.
+    """
+    s = content.strip()
+    if not s.startswith("```"):
+        return content
+    body = s[3:]
+    nl = body.find("\n")
+    if nl == -1:
+        return content
+    # The info string, if any, is a bare language tag ("json"). Anything else
+    # means these backticks are part of the payload, not a fence around it.
+    info = body[:nl].strip()
+    if info and not info.isalnum():
+        return content
+    body = body[nl + 1 :]
+    close = body.rfind("```")
+    return body[:close] if close != -1 else body
+
+
 class ArchitectureMapper:
     name = "architecture"
 
@@ -59,7 +87,7 @@ class ArchitectureMapper:
             content = chat(cfg, msgs)
 
             try:
-                draft = Draft.model_validate_json(content)
+                draft = Draft.model_validate_json(unfence(content))
             except ValidationError as e:
                 if not strict:
                     raise LLMError(

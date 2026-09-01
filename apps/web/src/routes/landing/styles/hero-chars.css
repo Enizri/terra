@@ -1,4 +1,5 @@
-/* Hero: 1:1 split — gray floor | black globe. Nav stays on Inter above. */
+/* Hero: 1:1 split — off-white floor | charcoal globe. Serif headline on the
+   left, Nav stays on Inter above. */
 
 .sh-section.sh-section--hero.sh-section--herochars {
   display: grid;
@@ -9,8 +10,8 @@
   min-height: calc(100svh - 5.5rem);
   padding: 0;
   overflow: hidden;
-  background: var(--sh-bg);
-  color: #232323;
+  background: var(--wl-bg);
+  color: var(--wl-ink);
 }
 
 .hx-grid {
@@ -36,7 +37,7 @@
   justify-content: center;
   padding: 48px 24px 40px;
   font-family: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
-  color: #232323;
+  color: var(--wl-ink);
 }
 
 @media (min-width: 901px) {
@@ -45,27 +46,37 @@
   }
 }
 
+/* Demoted to a tag: the serif headline is the first thing read now. */
 .hx-eyebrow {
   margin: 0 0 20px;
   font-family: "Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 16px;
+  font-size: 12px;
   font-weight: 400;
-  line-height: 20px;
-  letter-spacing: 0;
+  line-height: 16px;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #232323;
+  color: var(--wl-grey-150);
 }
 
+/* `.sh-root h1.hx-title` — the specificity is load-bearing. `global.css` sets
+   `h1,h2,h3 { font-family: var(--font-display) }` (Fraunces) document-wide;
+   weaken this selector and the headline silently flips to the serif skin the
+   footer uses. No `max-width`/`text-wrap` — the line break is explicit. */
 .sh-root h1.hx-title {
   margin: 0 0 32px;
-  max-width: 14ch;
-  font-family: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
-  font-size: clamp(40px, 5.2vw, 80px);
-  font-weight: 500;
+  font-family: var(--font-heading);
+  /* Sized so "humans can understand." holds one line in the half-column;
+     the explicit break is the design, a third line is not. */
+  font-size: clamp(34px, 3.6vw, 64px);
+  /* Gilda Display ships 400 only; anything heavier would synthesise. */
+  font-weight: 400;
   line-height: 1;
-  letter-spacing: 0;
-  text-wrap: balance;
-  color: #232323;
+  letter-spacing: -0.05em;
+  color: var(--wl-ink);
+}
+
+.hx-title__muted {
+  color: var(--wl-grey);
 }
 
 .hx-body {
@@ -73,38 +84,207 @@
   max-width: 46ch;
   font-size: 18px;
   font-weight: 400;
-  line-height: 1.25;
-  color: #5b5a56;
+  line-height: 1.5;
+  color: var(--wl-grey-150);
 }
 
 .hx-cta {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 12px;
   margin-top: 32px;
 }
 
-.hx-cta__btn {
+/* Shared pill — the hero and the drawer CTA are the same control.
+   Selector carries `.sh-root a` weight on purpose: `tokens.css` sets
+   `.sh-root a { color: inherit }` (0,1,1), which beats a bare class and
+   would paint the label in the copy ink, i.e. invisible on the dark fill. */
+.sh-root a.hx-cta__btn,
+.sh-root a.sh-power-cta {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 48px;
-  padding: 0 24px;
-  border-radius: 8px;
-  background: #232323;
-  color: #fff;
-  font-family: "Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
+  gap: 8px;
+  padding: 16px 20px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: var(--wl-ink);
+  color: var(--wl-bg);
+  font-family: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
   font-size: 16px;
   font-weight: 400;
-  line-height: 20px;
+  /* `leading-none`: the pill's height is its padding, not its line box. */
+  line-height: 1;
   letter-spacing: 0;
-  text-transform: uppercase;
   text-decoration: none;
+  cursor: pointer;
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
 }
 
-.hx-cta__btn:hover {
-  filter: brightness(1.18);
+.sh-root a.hx-cta__btn:hover,
+.sh-root a.sh-power-cta:hover {
+  /* Not `brightness()` — lifting #2e2e38 is invisible at this size. */
+  opacity: 0.95;
+}
+
+.sh-root a.hx-cta__btn:active,
+.sh-root a.sh-power-cta:active {
+  transform: scale(0.98);
+}
+
+.sh-root a.hx-cta__btn--ghost {
+  background: transparent;
+  color: var(--wl-ink);
+  border-color: color-mix(in srgb, var(--wl-grey) 40%, transparent);
+}
+
+.sh-circle-arrow {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  margin-bottom: -2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sh-root a.hx-cta__btn,
+  .sh-root a.sh-power-cta {
+    transition: none;
+  }
+
+  .sh-root a.hx-cta__btn:active,
+  .sh-root a.sh-power-cta:active {
+    transform: none;
+  }
+}
+
+/* Demo card — last block in the copy column, under the CTAs.
+
+   The width is capped against the viewport HEIGHT, not just its own column.
+   `.gx-journey__sticky` pins the globe to a 100svh box while the hero scrolls
+   over it, so a copy column taller than the fold slides the headline away from
+   the globe it is composed against. `32svh * 1.6` is the 16:10 frame that keeps
+   eyebrow + headline + body + CTA + demo inside the fold on short laptops. */
+.hx-demo {
+  width: min(100%, 30rem, calc(32svh * 1.6));
+  margin: 28px 0 0;
+}
+
+.hx-demo__poster,
+.hx-demo__video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  border-radius: 12px;
+  background: var(--wl-ink);
+  box-shadow: var(--wl-card-shadow);
+}
+
+/* `.sh-root button` in tokens.css resets the frame; this re-establishes it as a
+   media surface rather than a control. */
+.sh-root button.hx-demo__poster {
+  position: relative;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--wl-grey) 32%, transparent);
+  cursor: pointer;
+  transition:
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.sh-root button.hx-demo__poster:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 32px rgba(46, 46, 56, 0.14);
+}
+
+.hx-demo__still {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hx-demo__play {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--wl-bg) 92%, transparent);
+  color: var(--wl-ink);
+  /* The still is a dark app screenshot; the ring keeps the affordance legible
+     whatever frame we end up shipping as the poster. */
+  box-shadow: 0 4px 18px rgba(20, 20, 24, 0.35);
+  transform: translate(-50%, -50%);
+  transition: transform 0.2s ease;
+}
+
+.hx-demo__play svg {
+  width: 24px;
+  height: 24px;
+  /* Optical centring: the triangle's visual mass sits left of its box. */
+  margin-left: 3px;
+}
+
+.sh-root button.hx-demo__poster:hover .hx-demo__play {
+  transform: translate(-50%, -50%) scale(1.06);
+}
+
+.hx-demo__video {
+  border: 1px solid color-mix(in srgb, var(--wl-grey) 32%, transparent);
+}
+
+.hx-demo__cap {
+  margin: 10px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--wl-grey-150);
+}
+
+/* Reduced motion: the hover lift and the play-badge pop are decorative, and
+   `useReducedMotion` also stamps `.is-still` for anything JS-driven later. */
+.hx-demo.is-still .hx-demo__poster,
+.hx-demo.is-still .hx-demo__play {
+  transition: none;
+}
+
+.hx-demo.is-still .hx-demo__poster:hover,
+.hx-demo.is-still .hx-demo__poster:hover .hx-demo__play {
+  transform: none;
+}
+
+.hx-demo.is-still .hx-demo__play {
+  transform: translate(-50%, -50%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sh-root button.hx-demo__poster,
+  .hx-demo__play {
+    transition: none;
+  }
+
+  .sh-root button.hx-demo__poster:hover {
+    transform: none;
+  }
+
+  .sh-root button.hx-demo__poster:hover .hx-demo__play {
+    transform: translate(-50%, -50%);
+  }
+}
+
+/* Single column: the copy row is `auto`, so the card sets its own height and
+   the globe keeps its 80vh row. No svh cap here — nothing is pinned behind it. */
+@media (max-width: 900px) {
+  .hx-demo {
+    width: 100%;
+    max-width: 34rem;
+  }
 }
 
 .hx-orb {
@@ -113,24 +293,7 @@
   min-height: 0;
   height: 100%;
   background: transparent;
-}
-
-.hx-orb::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 0;
   pointer-events: none;
-  /* Charcoal must cover the full glyph sphere (~0.74 of closest-side on a
-     square pane). Stopping the solid fill earlier left outer glyphs on the
-     page gray — a washed smudge instead of a code globe. */
-  background: radial-gradient(
-    circle closest-side at 50% 50%,
-    #232323 0%,
-    #232323 78%,
-    color-mix(in srgb, #232323 35%, var(--sh-bg)) 90%,
-    transparent 100%
-  );
 }
 
 .hx-orb__map {
@@ -223,13 +386,82 @@
   font-size: 9px;
 }
 
-.hx-orb__canvas {
+/* One sticky bridge: the existing globe buffer unravels while the real Power
+   screen scrolls up beneath it. The screen's own stacking layer is the mask. */
+.gx-journey {
+  position: relative;
+  isolation: isolate;
+  background: var(--wl-bg);
+}
+
+.gx-journey__footer-dock {
+  height: min(70svh, 640px);
+  background: var(--wl-bg);
+}
+
+.gx-journey__sticky {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100svh;
+  margin-bottom: -100svh;
+  overflow: hidden;
+  pointer-events: none;
+  background: var(--wl-bg);
+}
+
+.gx-journey__disc,
+.gx-journey__sphere,
+.gx-journey__canvas {
   position: absolute;
   inset: 0;
-  z-index: 2;
+}
+
+.gx-journey__disc {
+  border-radius: 50%;
+  background: radial-gradient(
+    circle closest-side,
+    #232323 0%,
+    #232323 78%,
+    color-mix(in srgb, #232323 35%, var(--wl-bg)) 90%,
+    transparent 100%
+  );
+  will-change: transform, opacity;
+}
+
+.gx-journey__sphere,
+.gx-journey__canvas {
   display: block;
   width: 100%;
   height: 100%;
-  background: none;
-  pointer-events: none;
+}
+
+.gx-journey__sphere {
+  z-index: 1;
+}
+
+.gx-journey__sticky.is-clean-flight {
+  z-index: 3;
+  background: transparent;
+}
+
+.gx-journey__canvas {
+  z-index: 2;
+}
+
+.gx-journey > .sh-section.sh-section--hero.sh-section--herochars,
+.gx-journey > .sh-section.sh-section--power {
+  z-index: 2;
+}
+
+.gx-journey > .sh-section.sh-section--hero.sh-section--herochars {
+  background: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gx-journey__sticky {
+    position: absolute;
+    margin-bottom: 0;
+  }
 }

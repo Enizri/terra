@@ -205,6 +205,13 @@ export const copy = {
   },
   heroEyebrow: "Built for agentic development.",
   heroHeadline: "Software that only humans can understand.",
+  /** Two-tone hero headline: `lead` in ink, `muted` in grey, split on an
+      explicit line break. Distinct from `heroTitle`, which feeds the retired
+      word-swap hero in `sections/Hero.tsx`. */
+  heroHeadlineParts: {
+    lead: "Software that only",
+    muted: "humans can understand.",
+  },
   heroSubtitle:
     "Terra maps your repo, then runs it in the cloud so you can change the live software — no local setup.",
   /** Wrapped around the hero globe as one glyph per cell. Away from the
@@ -250,14 +257,18 @@ export const copy = {
     "ONE MAP OF YOUR REPO · ASK IT ANYTHING · SHIP ON THE FLY · ",
   ].join(""),
   heroCta: {
-    primary: { label: "Get started", href: "#" },
+    primary: { label: "Get started", href: "/new" },
     secondary: { label: "See how teams use Terra", href: "#power" },
   },
-  powerTitle: "The power of Terra",
-  power:
-    "One map of your repo. Select any component, chat with it, and the change lands on the fly — no cloning, no local setup. Ask questions, implement with Terra in the loop, and monitor what the architecture says is alive.",
-  /** Fallback demo clip when an op has no dedicated video. */
-  opsVideo: "/videos/landing/ask-terra.mp4",
+  /** Screen capture of a real run: memos dropped on the workspace, mapped by a
+      local Qwen2.5 7B, then asked about. Poster-first — see `HeroDemo`. */
+  heroDemo: {
+    src: "/videos/landing/workspace-demo.mp4",
+    poster: "/videos/landing/workspace-demo-poster.jpg",
+    play: "Play the Terra workspace demo",
+    alt: "The Terra workspace showing the mapped architecture of the memos repository",
+    caption: "A real run: drop a repo, watch Terra map it, then ask the map anything.",
+  },
   ops: [
     {
       id: "ask",
@@ -331,12 +342,6 @@ export const faq = {
       a: "No. It's the layer above it — the part where you decide what to change and see what it did.",
     },
   ],
-};
-
-export const closing = {
-  title: "Put your repo on the map.",
-  copy: "Point Terra at a repo and it draws the architecture in a couple of minutes. No install.",
-  cta: "Map your repo",
 };
 
 export const footer = {

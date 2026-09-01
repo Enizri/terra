@@ -1,7 +1,7 @@
 import type { TerraMap } from "../../features/architecture-map";
 import type { HistoryEntry } from "./history";
 
-// ponytail: module-level cache so the workspace keeps its contents across
+// Module-level cache so the workspace keeps its contents across
 // route changes (landing <-> /new remounts everything). Dies on page reload;
 // move to sessionStorage if that ever matters.
 export const wsCache: {

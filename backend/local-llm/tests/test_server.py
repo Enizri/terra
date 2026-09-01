@@ -1,11 +1,15 @@
 """Unit tests for the local OpenAI-compatible server helpers (no model load)."""
 
+import subprocess
+
 from terra_local_llm.server import (
     ChatCompletionRequest,
     ChatMessage,
     JsonSchemaFormat,
     ResponseFormat,
+    _grammar_for,
     _messages_for_generate,
+    pick_device,
     root,
 )
 
@@ -341,3 +345,66 @@ def test_asking_for_the_resident_model_abandons_a_competing_switch(monkeypatch):
     out = local.admin_load(local.LoadRequest(model_id="Qwen/Resident"))
     assert out["state"] == "ready"
     assert local.state.loading == ""
+
+
+def _fake_nvidia(monkeypatch, *, present: bool, returncode: int = 0):
+    monkeypatch.setattr(local.shutil, "which", lambda _n: "/usr/bin/nvidia-smi" if present else None)
+
+    def run(*_a, **_kw):
+        return subprocess.CompletedProcess(args=[], returncode=returncode)
+
+    monkeypatch.setattr(local.subprocess, "run", run)
+
+
+def test_pick_device_explicit_request_wins(monkeypatch):
+    _fake_nvidia(monkeypatch, present=True)
+    assert pick_device("cpu") == "cpu"
+
+
+def test_pick_device_auto_detects_cuda(monkeypatch):
+    """Regression: `auto` used to fall straight to cpu on Linux, so an NVIDIA
+    box served every token from the CPU while /host/capabilities said cuda."""
+    monkeypatch.setattr(local.sys, "platform", "linux")
+    monkeypatch.delenv("TERRA_DEVICE", raising=False)
+    _fake_nvidia(monkeypatch, present=True)
+    assert pick_device("auto") == "cuda"
+
+
+def test_pick_device_auto_falls_back_to_cpu_without_nvidia_smi(monkeypatch):
+    monkeypatch.setattr(local.sys, "platform", "linux")
+    monkeypatch.delenv("TERRA_DEVICE", raising=False)
+    _fake_nvidia(monkeypatch, present=False)
+    assert pick_device("auto") == "cpu"
+
+
+def test_pick_device_auto_ignores_broken_nvidia_smi(monkeypatch):
+    """A stray nvidia-smi with no working driver must not claim cuda."""
+    monkeypatch.setattr(local.sys, "platform", "linux")
+    monkeypatch.delenv("TERRA_DEVICE", raising=False)
+    _fake_nvidia(monkeypatch, present=True, returncode=9)
+    assert pick_device("auto") == "cpu"
+
+
+def test_grammar_compiles_for_the_architecture_schema():
+    """The draft schema must stay GBNF-compilable: if it silently stops
+    compiling, generation falls back to prompt-only and small models overrun
+    the output cap again.
+
+    CI uses `make venv` (no llama-cpp-python). This assertion needs the real
+    LlamaGrammar compiler from `make venv-local`.
+    """
+    import json
+
+    pytest.importorskip("llama_cpp")
+    schema = {
+        "type": "object",
+        "properties": {
+            "files": {"type": "array", "maxItems": 8, "items": {"type": "string"}},
+        },
+        "required": ["files"],
+    }
+    assert _grammar_for(json.dumps(schema)) is not None
+
+
+def test_grammar_returns_none_for_uncompilable_schema():
+    assert _grammar_for("not json at all") is None

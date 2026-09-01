@@ -221,7 +221,7 @@ func structuralRels(components []Component, res *scan.Result) []Relationship {
 		rels = append(rels, Relationship{From: from, To: to, Type: verb, Because: because})
 	}
 
-	// ponytail: typed edges first so the 18-edge cap only ever truncates the
+	// Typed edges first so the 18-edge cap only ever truncates the
 	// sibling tail — connectivity is guaranteed up to 18 non-core components.
 	for _, c := range components {
 		switch c.Type {

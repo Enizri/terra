@@ -1,9 +1,16 @@
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { inView, rise, stagger } from "../../../shared/motion";
 import { copy, diagramNodes, MONITOR_DEMO_SPANS } from "../data";
 import { ASK_HINTS, IMPLEMENT_HINTS, TheaterPanel } from "../theater";
-import { PENCIL_INK, RepoMapDiagram, RepoWindowHeader, WindowChrome } from "../primitives";
+import {
+  CircleArrowIcon,
+  MotionLink,
+  RepoMapDiagram,
+  RepoWindowHeader,
+  TerraMark,
+  WindowChrome,
+} from "../primitives";
 import { PlaygroundStage } from "./PlaygroundStage";
 
 /** Instant marketing preview + Terra chat (Ask / Implement — no live iframe). */
@@ -130,7 +137,10 @@ function OpsStage({
   );
 }
 
-/** Left capability list — active expands caption; inactive stay slightly blurred. */
+/** Left capability drawer — rows separated by rules; the active row goes from
+ *  grey to ink and unrolls its caption. The reveal is CSS-only: a `0fr -> 1fr`
+ *  grid row animates height without measuring, so the caption can play in both
+ *  directions instead of being torn down by an exit animation. */
 function OpsCapabilityList({
   active,
   onSelect,
@@ -138,17 +148,20 @@ function OpsCapabilityList({
   active: OpsTabId;
   onSelect: (id: OpsTabId) => void;
 }) {
-  const reduced = useReducedMotion();
-
   return (
-    <div className="sh-power-list" role="tablist" aria-label="Terra operations">
+    <ul className="sh-power-list" role="tablist" aria-label="Terra operations">
       {OPS_ITEMS.map((item) => {
         const isActive = active === item.id;
         return (
-          <div
+          <li
             key={item.id}
+            // `tablist` children must be tabs; the row is scaffolding.
+            role="presentation"
             className={`sh-power-list__item${isActive ? " is-active" : ""}`}
           >
+            {/* Marker lives inside its own row rather than being offset from
+                the top of the list — a wrapped label can't desync it. */}
+            <TerraMark className="sh-power-list__mark" />
             <button
               type="button"
               id={`power-tab-${item.id}`}
@@ -160,115 +173,15 @@ function OpsCapabilityList({
             >
               {item.label}
             </button>
-            <AnimatePresence initial={false}>
-              {isActive && (
-                <motion.p
-                  key={item.id}
-                  className="sh-power-list__caption"
-                  initial={reduced ? false : { height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={reduced ? undefined : { height: 0, opacity: 0 }}
-                  transition={{ duration: 0.28, ease: "easeOut" }}
-                >
-                  <span>{item.caption}</span>
-                </motion.p>
-              )}
-            </AnimatePresence>
-          </div>
+            <div className="sh-power-list__reveal">
+              <div className="sh-power-list__reveal-inner">
+                <p className="sh-power-list__caption">{item.caption}</p>
+              </div>
+            </div>
+          </li>
         );
       })}
-    </div>
-  );
-}
-
-/** "The Power of Terra" sketched into the blank gap above the section. */
-const GAP_TITLE_WORDS = ["The", "Power", "of", "Terra"];
-
-function GapTitle() {
-  const reduced = useReducedMotion();
-  return (
-    <div className="sh-power-gap-title" aria-hidden>
-      {GAP_TITLE_WORDS.map((word, i) => (
-        <motion.span
-          key={word}
-          className="sh-power-gap-title__word"
-          // Fills in left-to-right like the curl draws — never `y`/`opacity`,
-          // which would overwrite the staircase transform the CSS sets.
-          initial={reduced ? false : { clipPath: "inset(0% 100% 0% 0%)" }}
-          whileInView={{ clipPath: "inset(0% 0% 0% 0%)" }}
-          // Default `amount` only: the gap title overflows the section box, so
-          // its intersection ratio never reaches a fractional threshold.
-          viewport={{ once: true }}
-          transition={{ duration: 0.55, ease: "easeOut", delay: i * 0.22 }}
-        >
-          {word}
-        </motion.span>
-      ))}
-    </div>
-  );
-}
-
-/** Hand-drawn "Try it yourself" note that drops onto the demo card's top edge. */
-/* Drops from under the words on the right, loops once, then descends into the
-   card — so the arrow lands pointing down at the top edge, not sideways. */
-const NOTE_CURL_D =
-  "M 158 4 C 176 46, 150 78, 140 104" +
-  " C 132 126, 106 142, 96 128 C 88 116, 108 100, 122 114" +
-  " C 140 132, 122 176, 94 206 C 91 210, 89 216, 88 224";
-
-/** Seconds the curl takes to draw itself once the note scrolls into view. */
-const NOTE_DRAW_S = 1.7;
-
-function TryItNote() {
-  const reduced = useReducedMotion();
-  // Draws once when the note comes into view — the pencil writes, it doesn't pop.
-  const draw = reduced
-    ? {}
-    : {
-        initial: { pathLength: 0 },
-        whileInView: { pathLength: 1 },
-        viewport: { once: true, amount: 0.6 },
-      };
-
-  return (
-    <div className="sh-power-note" aria-hidden>
-      <motion.span
-        className="sh-power-note__text"
-        initial={reduced ? false : { opacity: 0 }}
-        whileInView={{ opacity: 1 }}
-        viewport={{ once: true, amount: 0.6 }}
-        transition={{ duration: 0.5 }}
-      >
-        Try it yourself
-      </motion.span>
-      <svg className="sh-power-note__line" viewBox="0 0 200 230" fill="none">
-        <g filter="url(#sh-pencil)" stroke={PENCIL_INK} strokeLinecap="round" fill="none">
-          <motion.path
-            d={NOTE_CURL_D}
-            strokeWidth={3.4}
-            opacity={0.72}
-            {...draw}
-            transition={{ duration: NOTE_DRAW_S, ease: "easeInOut", delay: 0.25 }}
-          />
-          <motion.path
-            d={NOTE_CURL_D}
-            strokeWidth={7}
-            opacity={0.12}
-            {...draw}
-            transition={{ duration: NOTE_DRAW_S, ease: "easeInOut", delay: 0.25 }}
-          />
-          {/* Arrowhead lands only once the line has reached the card. */}
-          <motion.path
-            d="M 72 206 L 88 227 L 104 208"
-            strokeWidth={3.4}
-            initial={reduced ? false : { opacity: 0 }}
-            whileInView={{ opacity: 0.7 }}
-            viewport={{ once: true, amount: 0.6 }}
-            transition={{ duration: 0.3, delay: NOTE_DRAW_S }}
-          />
-        </g>
-      </svg>
-    </div>
+    </ul>
   );
 }
 
@@ -302,6 +215,8 @@ export function PowerSection() {
   return (
     <motion.section
       ref={sectionRef}
+      // The hero's secondary CTA targets `#power`.
+      id="power"
       className="sh-section sh-section--power"
       initial="hidden"
       whileInView="show"
@@ -310,14 +225,14 @@ export function PowerSection() {
     >
       <div className="sh-stage sh-stage--power">
         <motion.div className="sh-power-stage" variants={rise}>
-          <GapTitle />
           <div className="sh-power-rail">
-            {/* No headline — the capability list is the section's own title. */}
-            <h3 className="sh-sr-only">{copy.powerTitle}</h3>
             <OpsCapabilityList active={active} onSelect={selectTab} />
+            <MotionLink className="sh-power-cta" to="/new" whileTap={{ scale: 0.98 }}>
+              Try Terra
+              <CircleArrowIcon />
+            </MotionLink>
           </div>
           <div className="sh-window-wrap">
-            <TryItNote />
             <div className="sh-power-theater">
               <img
                 className="sh-power-theater__wallpaper"

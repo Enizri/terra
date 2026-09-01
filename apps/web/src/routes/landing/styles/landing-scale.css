@@ -6,8 +6,24 @@
   --sh-section-canvas-max: min(calc(100vw - 32px), 1400px);
   /* Power runs wider than the copy sections — the demo card is the subject. */
   --sh-power-canvas-max: calc(100vw - 32px);
-  /* Cool gray pastel — gray first, no purple. */
-  --sh-bg: #e3e4e7;
+  /* Page floor. Same off-white as the hero and Power sections — one floor for
+     the whole landing, not a gray page with two lighter panels cut into it. */
+  --sh-bg: var(--wl-bg);
+
+  /* Display serif for the hero headline and the capability list. Deliberately
+     NOT `--font-display` — that token is declared twice at `:root` and the
+     `faq-footer.css` copy wins for the whole `.terra-*` skin, whose
+     `.terra-display` sets Fraunces' SOFT/WONK axes. Gilda has no such axes. */
+  --font-heading: "Gilda Display", ui-serif, Georgia, serif;
+
+  /* Hero + Power palette. `--wl-grey` is display-only (~2.9:1 on the floor);
+     body copy uses `--wl-grey-150` (~4.6:1). */
+  --wl-ink: #2e2e38;
+  --wl-bg: #f9f9fb;
+  --wl-grey: #9494a8;
+  --wl-grey-150: #73738c;
+  --wl-grey-200: #5f5f75;
+  --wl-card-shadow: 0 8px 24px rgba(46, 46, 56, 0.05);
 }
 
 /* Desktop at 100% should read like the previous 150% view without
@@ -18,23 +34,19 @@
     --sh-flight-tile: 164px;
   }
 
-  .sh-root--landing .sh-caption {
-    font-size: 18px;
-    line-height: 24px;
-  }
-
-  .sh-root--landing .sh-caption--md {
-    font-size: 21px;
-    line-height: 30px;
-  }
-
+  /* The drawer runs at the reference `lg:text-3xl` / `lg:text-md`; the
+     `--sh-read` inflation the rest of the page uses would blow it past the
+     card beside it. */
   .sh-root--landing .sh-power-list__btn {
-    font-size: clamp(33px, 3.9vw, 51px);
+    font-size: 30px;
   }
+}
 
-  .sh-root--landing .sh-power-list__caption span {
-    font-size: 22.5px;
-  }
+/* `.sh-root` covers the viewport, but the overscroll gutter paints `body`,
+   which `global.css` keeps warm for the app routes. Scoped so only the landing
+   changes — rubber-banding shouldn't reveal a warm sliver under a cool page. */
+body:has(.sh-root--landing) {
+  background: var(--wl-bg, #f9f9fb);
 }
 
 .sh-root--landing > .sh-nav {
