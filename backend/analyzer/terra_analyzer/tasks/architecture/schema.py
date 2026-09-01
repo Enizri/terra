@@ -12,8 +12,12 @@ RELATION_VERBS = [
 DRAFT_SCHEMA = {
     "type": "object",
     "properties": {
-        "description": {"type": "string"},
-        "kind": {"type": "string"},
+        # Upper bounds match what prompt.py already asks for in prose ("one or
+        # two sentences", "a short phrase"). Unbounded strings are what let a
+        # small model ramble past MAX_OUTPUT_TOKENS and fail the whole job:
+        # the grammar can only hold a field to a length the schema states.
+        "description": {"type": "string", "maxLength": 400},
+        "kind": {"type": "string", "maxLength": 60},
         "components": {
             "type": "array",
             "minItems": 6,
@@ -23,12 +27,12 @@ DRAFT_SCHEMA = {
                 "properties": {
                     "id": {"type": "string", "minLength": 2, "maxLength": 30},
                     "parent_id": {"type": "string", "maxLength": 30},
-                    "name": {"type": "string", "minLength": 2},
-                    "purpose": {"type": "string", "minLength": 20},
+                    "name": {"type": "string", "minLength": 2, "maxLength": 60},
+                    "purpose": {"type": "string", "minLength": 20, "maxLength": 300},
                     "importance": {"type": "string", "enum": IMPORTANCE_VALUES},
                     "type": {"type": "string", "enum": TYPE_VALUES},
-                    "tech": {"type": "array", "maxItems": 8, "items": {"type": "string"}},
-                    "files": {"type": "array", "minItems": 1, "maxItems": 8, "items": {"type": "string"}},
+                    "tech": {"type": "array", "maxItems": 8, "items": {"type": "string", "maxLength": 40}},
+                    "files": {"type": "array", "minItems": 1, "maxItems": 8, "items": {"type": "string", "maxLength": 200}},
                 },
                 "required": ["id", "parent_id", "name", "purpose", "importance", "type", "tech", "files"],
             },
@@ -43,12 +47,12 @@ DRAFT_SCHEMA = {
                     "from": {"type": "string", "minLength": 2, "maxLength": 30},
                     "to": {"type": "string", "minLength": 2, "maxLength": 30},
                     "type": {"type": "string", "enum": RELATION_VERBS},
-                    "because": {"type": "array", "minItems": 1, "maxItems": 3, "items": {"type": "string"}},
+                    "because": {"type": "array", "minItems": 1, "maxItems": 3, "items": {"type": "string", "maxLength": 200}},
                 },
                 "required": ["from", "to", "type", "because"],
             },
         },
-        "suggested_questions": {"type": "array", "minItems": 3, "maxItems": 6, "items": {"type": "string"}},
+        "suggested_questions": {"type": "array", "minItems": 3, "maxItems": 6, "items": {"type": "string", "maxLength": 200}},
     },
     "required": ["description", "kind", "components", "relationships", "suggested_questions"],
 }

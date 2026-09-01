@@ -1,12 +1,13 @@
 # Terra architecture
 
 How the pieces fit, which direction imports are allowed to point, and where new
-code goes. `README.md` covers running it; [`CONTRIBUTING.md`](CONTRIBUTING.md)
-covers the change recipes. Domain terms live in [`CONTEXT.md`](CONTEXT.md).
+code goes. [`README.md`](../README.md) covers running it;
+[`CONTRIBUTING.md`](CONTRIBUTING.md) covers the change recipes. Domain terms
+live in [`CONTEXT.md`](CONTEXT.md).
 
-Deep dives: [`docs/architecture/modules.md`](docs/architecture/modules.md),
-[`docs/architecture/data.md`](docs/architecture/data.md),
-[`docs/architecture/contracts.md`](docs/architecture/contracts.md).
+Deep dives: [`architecture/modules.md`](architecture/modules.md),
+[`architecture/data.md`](architecture/data.md),
+[`architecture/contracts.md`](architecture/contracts.md).
 
 ## The three processes
 
@@ -102,7 +103,7 @@ Import direction: `app/routes → features → shared`. Enforced by
 
 ## Contracts and fixtures
 
-- Canonical schemas: [`packages/contracts/`](packages/contracts/README.md)
+- Canonical schemas: [`packages/contracts/`](../packages/contracts/README.md)
 - Golden map: `case-studies/memos.map.json`
 - Web copy: `apps/web/src/data/memos.map.json` via `make sync-fixtures`
 - Gate: `make check-contracts` (part of `make check`)

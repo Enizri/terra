@@ -160,6 +160,133 @@
   }
 }
 
+/* Demo card — last block in the copy column, under the CTAs.
+
+   The width is capped against the viewport HEIGHT, not just its own column.
+   `.gx-journey__sticky` pins the globe to a 100svh box while the hero scrolls
+   over it, so a copy column taller than the fold slides the headline away from
+   the globe it is composed against. `32svh * 1.6` is the 16:10 frame that keeps
+   eyebrow + headline + body + CTA + demo inside the fold on short laptops. */
+.hx-demo {
+  width: min(100%, 30rem, calc(32svh * 1.6));
+  margin: 28px 0 0;
+}
+
+.hx-demo__poster,
+.hx-demo__video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  border-radius: 12px;
+  background: var(--wl-ink);
+  box-shadow: var(--wl-card-shadow);
+}
+
+/* `.sh-root button` in tokens.css resets the frame; this re-establishes it as a
+   media surface rather than a control. */
+.sh-root button.hx-demo__poster {
+  position: relative;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--wl-grey) 32%, transparent);
+  cursor: pointer;
+  transition:
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.sh-root button.hx-demo__poster:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 32px rgba(46, 46, 56, 0.14);
+}
+
+.hx-demo__still {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hx-demo__play {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--wl-bg) 92%, transparent);
+  color: var(--wl-ink);
+  /* The still is a dark app screenshot; the ring keeps the affordance legible
+     whatever frame we end up shipping as the poster. */
+  box-shadow: 0 4px 18px rgba(20, 20, 24, 0.35);
+  transform: translate(-50%, -50%);
+  transition: transform 0.2s ease;
+}
+
+.hx-demo__play svg {
+  width: 24px;
+  height: 24px;
+  /* Optical centring: the triangle's visual mass sits left of its box. */
+  margin-left: 3px;
+}
+
+.sh-root button.hx-demo__poster:hover .hx-demo__play {
+  transform: translate(-50%, -50%) scale(1.06);
+}
+
+.hx-demo__video {
+  border: 1px solid color-mix(in srgb, var(--wl-grey) 32%, transparent);
+}
+
+.hx-demo__cap {
+  margin: 10px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--wl-grey-150);
+}
+
+/* Reduced motion: the hover lift and the play-badge pop are decorative, and
+   `useReducedMotion` also stamps `.is-still` for anything JS-driven later. */
+.hx-demo.is-still .hx-demo__poster,
+.hx-demo.is-still .hx-demo__play {
+  transition: none;
+}
+
+.hx-demo.is-still .hx-demo__poster:hover,
+.hx-demo.is-still .hx-demo__poster:hover .hx-demo__play {
+  transform: none;
+}
+
+.hx-demo.is-still .hx-demo__play {
+  transform: translate(-50%, -50%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sh-root button.hx-demo__poster,
+  .hx-demo__play {
+    transition: none;
+  }
+
+  .sh-root button.hx-demo__poster:hover {
+    transform: none;
+  }
+
+  .sh-root button.hx-demo__poster:hover .hx-demo__play {
+    transform: translate(-50%, -50%);
+  }
+}
+
+/* Single column: the copy row is `auto`, so the card sets its own height and
+   the globe keeps its 80vh row. No svh cap here — nothing is pinned behind it. */
+@media (max-width: 900px) {
+  .hx-demo {
+    width: 100%;
+    max-width: 34rem;
+  }
+}
+
 .hx-orb {
   position: relative;
   overflow: hidden;

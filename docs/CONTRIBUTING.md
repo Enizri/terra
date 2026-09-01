@@ -2,7 +2,7 @@
 
 ## Branching (staging-first)
 
-Terra uses **`staging` as the default integration branch** (same idea as sim):
+Terra uses **`staging` as the default integration branch**:
 
 | Branch | Role |
 |---|---|
@@ -50,12 +50,12 @@ See the table in [`ARCHITECTURE.md`](ARCHITECTURE.md). Domain terms:
 
 ### Change a wire field
 
-Follow the checklist in [`packages/contracts/README.md`](packages/contracts/README.md), then
+Follow the checklist in [`packages/contracts/README.md`](../packages/contracts/README.md), then
 `make check-contracts && make check`.
 
 ### Add a SQLite migration
 
-1. Append a new entry to `migrations` in [`backend/api/internal/store/migrate.go`](backend/api/internal/store/migrate.go).
+1. Append a new entry to `migrations` in [`backend/api/internal/store/migrate.go`](../backend/api/internal/store/migrate.go).
 2. Never edit a shipped version.
 3. Add/extend a test under `backend/api/internal/store/` (prefer a legacy DB fixture for shape changes).
 4. `(cd backend/api && go test ./internal/store/)`.

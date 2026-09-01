@@ -1,10 +1,12 @@
 # Design history (non-canonical)
 
-Older design notes and phase plans. **Do not treat these as current architecture.**
-Canonical docs: [`ARCHITECTURE.md`](../ARCHITECTURE.md), [`CONTRIBUTING.md`](../CONTRIBUTING.md),
-[`docs/architecture/`](../architecture/).
+Design notes and phase plans kept for the reasoning behind decisions, not as a
+description of the system today. **Do not treat these as current architecture.**
+
+Canonical docs: [`ARCHITECTURE.md`](../ARCHITECTURE.md),
+[`CONTRIBUTING.md`](../CONTRIBUTING.md),
+[`architecture/`](../architecture/), and the ADRs in [`adr/`](../adr/).
 
 | Document | Notes |
 |---|---|
-| [superpowers/](superpowers/) | Early compose / preview / model-selection designs |
-| Duplicate copies under `docs/superpowers/` (if present) | Prefer this history folder; remove duplicates when convenient |
+| [design-notes/](design-notes/) | Dated design notes: Compose/preview phases, workspace model selection, and the landing globe work |

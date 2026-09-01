@@ -5,11 +5,14 @@ from __future__ import annotations
 import json
 import os
 import platform
+import shutil
+import subprocess
 import sys
 import threading
 import time
 import uuid
 from contextlib import asynccontextmanager
+from functools import lru_cache
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
@@ -94,6 +97,19 @@ def pick_device(requested: str = "") -> str:
         # "mps" is what Go's detectDevice reports and what TERRA_DEVICE is set
         # to across the stack; llama.cpp's own name for it is Metal.
         return "mps"
+    # Same probe as Go's detectDevice in catalog/host.go, and it has to stay the
+    # same: the two disagreeing is how "auto" ended up reporting cuda on
+    # /host/capabilities while the sidecar quietly served every token from the
+    # CPU. `-L` (list devices) is the cheap call that fails when the driver is
+    # absent, so a stray nvidia-smi on a machine with no usable GPU still lands
+    # on cpu rather than a load error.
+    nvidia_smi = shutil.which("nvidia-smi")
+    if nvidia_smi:
+        try:
+            if subprocess.run([nvidia_smi, "-L"], capture_output=True, timeout=5, check=False).returncode == 0:
+                return "cuda"
+        except (OSError, subprocess.SubprocessError):
+            pass
     return "cpu"
 
 
@@ -219,11 +235,42 @@ def _ensure_loaded() -> None:
         raise HTTPException(status_code=503, detail=state.load_error or "model not loaded")
 
 
-def _messages_for_generate(req: ChatCompletionRequest) -> list[dict[str, str]]:
-    msgs = [{"role": message.role, "content": message.content} for message in req.messages]
+@lru_cache(maxsize=8)
+def _grammar_for(schema_text: str):
+    """Compile a JSON Schema into a GBNF grammar, or None if it won't compile.
+
+    Without this the schema reaches the model as prose only, which a small
+    model treats as advice: the architecture draft caps `files` at 8 entries
+    and a 0.5B would happily emit hundreds, overrunning MAX_OUTPUT_TOKENS and
+    failing the whole job on `finish_reason == "length"`. A grammar makes the
+    cap structural — the tokens that would break it can't be sampled.
+
+    Cached because compilation is per-schema work and the same handful of
+    schemas repeat for the life of the process.
+    """
+    try:
+        from llama_cpp import LlamaGrammar
+
+        return LlamaGrammar.from_json_schema(schema_text, verbose=False)
+    except Exception as e:  # noqa: BLE001 — any failure here must degrade, not break inference
+        print(f"grammar: falling back to prompt-only schema: {e}", file=sys.stderr)
+        return None
+
+
+def _schema_text(req: ChatCompletionRequest) -> str:
+    """The requested JSON Schema as text, or "" when none was asked for."""
     rf = req.response_format
     if rf and rf.type == "json_schema" and rf.json_schema and rf.json_schema.schema_:
-        schema_text = json.dumps(rf.json_schema.schema_)
+        return json.dumps(rf.json_schema.schema_)
+    return ""
+
+
+def _messages_for_generate(req: ChatCompletionRequest) -> list[dict[str, str]]:
+    msgs = [{"role": message.role, "content": message.content} for message in req.messages]
+    schema_text = _schema_text(req)
+    # Kept even when a grammar is in force: the grammar constrains shape, while
+    # the schema text still carries the field descriptions that explain intent.
+    if schema_text:
         hint = (
             "Your reply must be a single JSON object and nothing else. "
             f"It must conform to this JSON Schema:\n{schema_text}"
@@ -250,10 +297,13 @@ def generate_chat(req: ChatCompletionRequest) -> tuple[str, str]:
         model = state.model
         if model is None:  # swapped out while this request waited its turn
             raise HTTPException(status_code=503, detail="model not loaded")
+        schema_text = _schema_text(req)
+        grammar = _grammar_for(schema_text) if schema_text else None
         out = model.create_chat_completion(
             messages=msgs,
             temperature=req.temperature or 0.0,
             max_tokens=max_new,
+            grammar=grammar,
         )
     choice = out["choices"][0]
     content = (choice["message"].get("content") or "").strip()

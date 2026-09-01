@@ -645,7 +645,7 @@
   position: relative;
   overflow: hidden;
   width: 100%;
-  /* Native ask-terra.mp4 ratio — contain fills edge-to-edge, no letterbox. */
+  /* 16:9-ish stage ratio — contain fills edge-to-edge, no letterbox. */
   aspect-ratio: 2330 / 1390;
   border-radius: 16px;
   background: #111318;

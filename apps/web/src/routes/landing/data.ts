@@ -257,11 +257,18 @@ export const copy = {
     "ONE MAP OF YOUR REPO · ASK IT ANYTHING · SHIP ON THE FLY · ",
   ].join(""),
   heroCta: {
-    primary: { label: "Get started", href: "#" },
+    primary: { label: "Get started", href: "/new" },
     secondary: { label: "See how teams use Terra", href: "#power" },
   },
-  /** Fallback demo clip when an op has no dedicated video. */
-  opsVideo: "/videos/landing/ask-terra.mp4",
+  /** Screen capture of a real run: memos dropped on the workspace, mapped by a
+      local Qwen2.5 7B, then asked about. Poster-first — see `HeroDemo`. */
+  heroDemo: {
+    src: "/videos/landing/workspace-demo.mp4",
+    poster: "/videos/landing/workspace-demo-poster.jpg",
+    play: "Play the Terra workspace demo",
+    alt: "The Terra workspace showing the mapped architecture of the memos repository",
+    caption: "A real run: drop a repo, watch Terra map it, then ask the map anything.",
+  },
   ops: [
     {
       id: "ask",

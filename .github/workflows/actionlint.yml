@@ -1,4 +1,4 @@
-# Lightweight workflow lint — temporary second merge-gate signal (replaces Bugbot).
+# Lightweight workflow lint — the second required signal for merge-gate.
 name: actionlint
 
 on:

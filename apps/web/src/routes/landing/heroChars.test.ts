@@ -18,6 +18,8 @@ test("hero is a 1:1 split with the globe on charcoal", () => {
   assert.match(css, /#232323 78%/);
   assert.doesNotMatch(source, /HeroTitle/);
   assert.doesNotMatch(source, /sh-hero-pin/);
+  // Clip is not in public/ yet — HeroDemo.tsx stays, but must not mount.
+  assert.doesNotMatch(source, /from "\.\/HeroDemo"/);
 });
 
 test("hover hole shows the playground RepoDiagram, not glyph labels", () => {

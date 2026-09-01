@@ -1,7 +1,7 @@
 # Terra domain language
 
 Implementation-free glossary. Use these terms in docs, APIs, and code names.
-Storage details live in `docs/architecture/data.md`.
+Storage details live in [`architecture/data.md`](architecture/data.md).
 
 ## Terms
 

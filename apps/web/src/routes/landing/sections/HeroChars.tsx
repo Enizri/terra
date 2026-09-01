@@ -1,5 +1,7 @@
 import { copy } from "../data";
 import { CircleArrowIcon } from "../primitives";
+// HeroDemo stays in this folder (and copy.heroDemo in data.ts) until the
+// workspace-demo clip exists. Do not mount it against a missing mp4.
 
 export function HeroChars() {
   return (

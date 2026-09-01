@@ -1,7 +1,7 @@
 # Terra web
 
 React 19 + Vite SPA for Terra. Root docs: [`../../README.md`](../../README.md) (run)
-and [`../../ARCHITECTURE.md`](../../ARCHITECTURE.md) (change).
+and [`../../docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) (change).
 
 ## Layout
 
