@@ -69,6 +69,24 @@ func TestCancelStopsWorker(t *testing.T) {
 	}
 }
 
+func TestRetrieveAndToolStagesRoundTrip(t *testing.T) {
+	h := NewHub()
+	j := h.Start(func(ctx context.Context, emit func(Event)) {
+		emit(Event{Stage: "retrieve", Label: "lookup_component"})
+		emit(Event{Stage: "tool", Label: "read_snippet"})
+		emit(Event{Stage: "done", Answer: "ok"})
+	})
+	waitDone(t, j)
+	hist, _, cancel := j.Subscribe()
+	defer cancel()
+	if len(hist) != 3 || hist[0].Stage != "retrieve" || hist[1].Stage != "tool" {
+		t.Fatalf("history = %+v", hist)
+	}
+	if hist[0].Label != "lookup_component" || hist[1].Label != "read_snippet" {
+		t.Fatalf("labels = %q %q", hist[0].Label, hist[1].Label)
+	}
+}
+
 func waitDone(t *testing.T, j *Job) {
 	t.Helper()
 	deadline := time.Now().Add(2 * time.Second)

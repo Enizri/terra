@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ask as askServer, type ModelChoice, type Selection } from "./api";
+import { askEvents, type ModelChoice, type Selection } from "./api";
 import {
   buildProcess,
-  advanceProcess,
   completeProcess,
+  applyJobEvent,
   updateTerraParts,
   hasMeaningfulSelection,
   type AskMessage,
@@ -14,31 +14,21 @@ export type { AskMessage, AskPart, ProcessStep, ProcessStepStatus } from "./askP
 
 const THINKING_COPY = "Considering the map and what you selected…";
 
-/** Ask job for one repo; client-stages thinking/process; abort cancels. */
+/** Ask job for one repo; process steps follow job events; abort cancels. */
 export function useAsk(repoUrl: string | null, model?: ModelChoice) {
   const [messages, setMessages] = useState<AskMessage[]>([]);
   const [thinking, setThinking] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   // Ref avoids stale `thinking` in a stable callback (double-send).
   const busyRef = useRef(false);
-  const stageTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const clearStageTimer = () => {
-    if (stageTimerRef.current) {
-      clearInterval(stageTimerRef.current);
-      stageTimerRef.current = null;
-    }
-  };
 
   useEffect(() => () => {
     abortRef.current?.abort();
-    clearStageTimer();
   }, []);
 
   // New repo → new conversation; drop in-flight answers from the previous.
   useEffect(() => {
     abortRef.current?.abort();
-    clearStageTimer();
     setMessages([]);
     setThinking(false);
     busyRef.current = false;
@@ -50,7 +40,6 @@ export function useAsk(repoUrl: string | null, model?: ModelChoice) {
       if (!q || !repoUrl || busyRef.current) return;
 
       abortRef.current?.abort();
-      clearStageTimer();
       const ac = new AbortController();
       abortRef.current = ac;
       busyRef.current = true;
@@ -68,30 +57,33 @@ export function useAsk(repoUrl: string | null, model?: ModelChoice) {
       ]);
       setThinking(true);
 
-      // Advance process steps while /ask is in flight (client-staged, not tools).
-      stageTimerRef.current = setInterval(() => {
+      const applyEvent = (ev: { stage: string; label?: string }) => {
         setMessages((msgs) => {
           const idx = msgs.length - 1;
           if (idx < 0 || msgs[idx].role !== "terra") return msgs;
           return updateTerraParts(msgs, idx, (parts) =>
             parts.map((p) =>
-              p.type === "process" ? { ...p, steps: advanceProcess(p.steps) } : p,
+              p.type === "process" ? { ...p, steps: applyJobEvent(p.steps, ev) } : p,
             ),
           );
         });
-      }, 700);
+      };
 
       try {
-        // Reuse the model this workspace analyzed with; null falls back to
-        // whatever TERRA_LLM_* the analyzer was started with.
-        const answer = await askServer(
+        let answer = "No answer.";
+        for await (const ev of askEvents(
           repoUrl,
           q,
           selections ?? (selection ? [selection] : []),
           ac.signal,
           model,
-        );
-        clearStageTimer();
+        )) {
+          if (ev.stage === "done") {
+            answer = ev.answer ?? "No answer.";
+            break;
+          }
+          applyEvent(ev);
+        }
         setMessages((msgs) => {
           const idx = msgs.length - 1;
           if (idx < 0 || msgs[idx].role !== "terra") {
@@ -108,7 +100,6 @@ export function useAsk(repoUrl: string | null, model?: ModelChoice) {
         });
       } catch (e) {
         if ((e as Error).name === "AbortError") return;
-        clearStageTimer();
         const text = (e as Error).message;
         setMessages((msgs) => {
           const idx = msgs.length - 1;

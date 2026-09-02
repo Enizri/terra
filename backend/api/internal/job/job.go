@@ -16,6 +16,10 @@ import (
 
 // Event is one progress update (NDJSON / SSE wire shape).
 //
+// Stage is a coarse job phase. Known values include fetch, clone, scan,
+// recommend, ensure_model, analyze, store, ask, retrieve, tool, done, error.
+// For retrieve/tool events Label is the tool name — never an API key.
+//
 // Nothing secret goes here: events are replayed to every subscriber and to
 // the browser. In particular a request's API key must never reach an Event,
 // not even inside Label.

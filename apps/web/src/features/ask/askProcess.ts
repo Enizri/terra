@@ -48,6 +48,37 @@ export function completeProcess(steps: ProcessStep[]): ProcessStep[] {
   );
 }
 
+/** Drive process steps from live job events instead of a client-side timer. */
+export function applyJobEvent(
+  steps: ProcessStep[],
+  event: { stage: string; label?: string },
+): ProcessStep[] {
+  switch (event.stage) {
+    case "ensure_model":
+    case "ask":
+      return steps.map((s) =>
+        s.id === "map" && s.status === "pending" ? { ...s, status: "active" as const } : s,
+      );
+    case "retrieve":
+    case "tool":
+      return steps.map((s) => {
+        if (s.id === "map") return { ...s, status: "done" as const };
+        if (s.id === "files") {
+          return {
+            ...s,
+            status: "active" as const,
+            label: event.label?.trim() || s.label,
+          };
+        }
+        return s;
+      });
+    case "done":
+      return completeProcess(steps);
+    default:
+      return steps;
+  }
+}
+
 export function updateTerraParts(
   messages: AskMessage[],
   terraIndex: number,

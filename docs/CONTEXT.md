@@ -14,8 +14,8 @@ Storage details live in [`architecture/data.md`](architecture/data.md).
 | **Component** | A named subsystem inside an Architecture Map (for example a frontend app or API layer), with purpose, importance, type, tech, and file evidence. |
 | **Relationship** | A directed edge between two Components explaining how they connect (calls, uses, reads, …) with evidence. |
 | **Draft** | The LLM judgement portion of a map (description, kind, components, relationships, suggested questions) before Go merges it with Scan facts. |
-| **Job** | An in-process async unit of work (probe, analyze, ask) that streams NDJSON stage events to the client. Owned by Go `internal/job`. |
-| **Task** | A named analyzer HTTP capability (`architecture`, `qa`). Public names live under Python `tasks/`. |
+| **Job** | An in-process async unit of work (probe, analyze, ask, agent) that streams NDJSON stage events to the client. Owned by Go `internal/job`. |
+| **Task** | A named analyzer HTTP capability (`architecture`, `qa`, `agent`). Public names live under Python `tasks/`. |
 | **Runtime / item** | The analyzer's bounded turn loop. Items are the conversation units the runtime thinks in; Completions stays the model wire. Owned by Python `runtime/`. |
 | **Role** | System-prompt copy for a kind of work (mapper, guide, editor). Owned by Python `roles/`. |
 | **Tool** | A JSON schema the model may call. Schemas live in Python `tools/`; **effects** run in Go over HTTP. |

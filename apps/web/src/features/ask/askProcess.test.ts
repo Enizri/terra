@@ -4,6 +4,7 @@ import {
   buildProcess,
   advanceProcess,
   completeProcess,
+  applyJobEvent,
   updateTerraParts,
   hasMeaningfulSelection,
   type AskMessage,
@@ -62,4 +63,37 @@ test("hasMeaningfulSelection ignores empty objects", () => {
   assert.equal(hasMeaningfulSelection({ name: "x" }), true);
   assert.equal(hasMeaningfulSelection(undefined, [{}]), false);
   assert.equal(hasMeaningfulSelection({}, [{ name: "x" }]), true);
+});
+
+test("applyJobEvent drives files from retrieve/tool instead of a timer", () => {
+  let steps = buildProcess(true);
+  steps = applyJobEvent(steps, { stage: "ask", label: "Terra is reading the selection" });
+  assert.equal(steps.find((s) => s.id === "map")?.status, "active");
+
+  steps = applyJobEvent(steps, { stage: "retrieve", label: "lookup_component" });
+  assert.deepEqual(
+    steps.map((s) => [s.id, s.status, s.label]),
+    [
+      ["map", "done", "Reading map"],
+      ["files", "active", "lookup_component"],
+      ["answer", "pending", "Answering"],
+    ],
+  );
+
+  steps = applyJobEvent(steps, { stage: "tool", label: "read_snippet" });
+  assert.equal(steps.find((s) => s.id === "files")?.status, "active");
+  assert.equal(steps.find((s) => s.id === "files")?.label, "read_snippet");
+
+  steps = applyJobEvent(steps, { stage: "done", label: "" });
+  assert.deepEqual(
+    steps.map((s) => s.status),
+    ["done", "done", "done"],
+  );
+});
+
+test("applyJobEvent unskips files when a retrieve event arrives", () => {
+  const steps = applyJobEvent(buildProcess(false), { stage: "retrieve", label: "retrieve_files" });
+  const files = steps.find((s) => s.id === "files");
+  assert.equal(files?.status, "active");
+  assert.equal(files?.label, "retrieve_files");
 });

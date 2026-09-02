@@ -21,7 +21,7 @@ User (CLI / browser)
         | POST /analyze  {scan, model}   (packages/contracts/analyzer/v1)
         v
    Python analyzer (FastAPI, :8010)
-   tasks (architecture, qa), validate, retry
+   tasks (architecture, qa, agent), validate, retry
         |
         | OpenAI-compatible POST /v1/chat/completions
         v
@@ -89,13 +89,13 @@ terra_analyzer/
   roles/              mapper.py, guide.py, editor.py
   tools/              schemas; effects in Go
   retrieve/           map as index (BM25/keyword)
-  tasks/              architecture/, qa/ (+ agent later)
+  tasks/              architecture/, qa/, agent/
   evals/              programmatic checkers
 ../local-llm/
   terra_local_llm/    optional GGUF /v1 server (:8020)
 ```
 
-HTTP task names stay `architecture` and `qa`. Completions stays the model wire
+HTTP task names stay `architecture` and `qa`; `agent` is additive. Completions stays the model wire
 (llama.cpp / Hugging Face GGUF). Do not add LangGraph, a vector DB, or
 `/v1/responses` on llama.cpp. Register tasks in `tasks/registry.py`
 `default_registry()`.

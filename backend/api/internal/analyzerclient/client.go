@@ -2,6 +2,7 @@
 package analyzerclient
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -138,6 +139,86 @@ func RunTask(ctx context.Context, base, name string, payload any) (json.RawMessa
 		return nil, fmt.Errorf("analyzer: %s: %s", resp.Status, strings.TrimSpace(string(data)))
 	}
 	return data, nil
+}
+
+// TaskEvent is one NDJSON line from a streaming analyzer task.
+// Stage/Label are progress; Answer is the terminal payload; Error is a
+// mid-stream failure. API keys must never be copied into Stage or Label.
+type TaskEvent struct {
+	Stage  string `json:"stage,omitempty"`
+	Label  string `json:"label,omitempty"`
+	Answer string `json:"answer,omitempty"`
+	Error  string `json:"error,omitempty"`
+}
+
+const streamLineCap = 1 << 20
+
+// StreamTask posts payload to /tasks/{name} and reads NDJSON events.
+// Progress lines are forwarded to emit; the final {answer} is returned.
+func StreamTask(ctx context.Context, base, name string, payload any, emit func(TaskEvent)) (string, error) {
+	base = strings.TrimSuffix(base, "/")
+	if base == "" {
+		base = DefaultAnalyzerURL
+	}
+	if err := preflight(ctx, base); err != nil {
+		return "", err
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return "", err
+	}
+	resp, err := post(ctx, base+"/tasks/"+name, body)
+	if err != nil {
+		return "", fmt.Errorf("analyzer: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		data, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+		return "", taskHTTPError(resp.Status, data)
+	}
+
+	sc := bufio.NewScanner(resp.Body)
+	sc.Buffer(make([]byte, 64*1024), streamLineCap)
+	answer := ""
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+		if line == "" {
+			continue
+		}
+		var ev TaskEvent
+		if err := json.Unmarshal([]byte(line), &ev); err != nil {
+			return "", fmt.Errorf("analyzer: unexpected reply: %w", err)
+		}
+		if ev.Error != "" {
+			return "", fmt.Errorf("analyzer: %s", ev.Error)
+		}
+		if ev.Stage != "" && emit != nil {
+			emit(TaskEvent{Stage: ev.Stage, Label: ev.Label})
+		}
+		if ev.Answer != "" {
+			answer = ev.Answer
+		}
+	}
+	if err := sc.Err(); err != nil {
+		if ctx.Err() != nil {
+			return "", ctx.Err()
+		}
+		return "", fmt.Errorf("analyzer: %w", err)
+	}
+	if answer == "" {
+		return "", fmt.Errorf("analyzer: streaming task %s ended without an answer", name)
+	}
+	return answer, nil
+}
+
+func taskHTTPError(status string, data []byte) error {
+	var errBody struct {
+		Detail any `json:"detail"`
+	}
+	if json.Unmarshal(data, &errBody) == nil && errBody.Detail != nil {
+		return fmt.Errorf("analyzer: %v", errBody.Detail)
+	}
+	return fmt.Errorf("analyzer: %s: %s", status, strings.TrimSpace(string(data)))
 }
 
 func post(ctx context.Context, url string, body []byte) (*http.Response, error) {
