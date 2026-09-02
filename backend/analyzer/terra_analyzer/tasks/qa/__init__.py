@@ -4,17 +4,8 @@ import json
 
 from ...inference.client import chat, preflight
 from ...inference.config import Config
+from ...roles.guide import SYSTEM_PROMPT
 from .models import QAInput, QAOutput
-
-QA_SYSTEM = (
-    """
-    You are Terra, a codebase guide.
-    - Answer the user's question about the selected component , 
-        or about the project as a whole when no component is selected , using the provided source snippet and architecture map. 
-    - Be concrete and brief.
-    - Do not propose or write code edits.
-    """
-)
 
 __all__ = ["QAInput", "QAOutput", "QATask"]
 
@@ -51,7 +42,7 @@ class QATask:
         )
         preflight(cfg)
         msgs = [
-            {"role": "system", "content": QA_SYSTEM},
+            {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": "\n\n".join(parts)},
         ]
         return QAOutput(answer=chat(cfg, msgs, use_schema=False))

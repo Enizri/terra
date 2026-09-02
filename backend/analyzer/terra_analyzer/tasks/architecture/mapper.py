@@ -6,8 +6,9 @@ from pydantic import ValidationError
 from ...contracts import Draft, ScanResult
 from ...inference.client import LLMError, chat, preflight
 from ...inference.config import Config
+from ...roles.mapper import SYSTEM_PROMPT
 from .models import ArchitectureInput, ArchitectureOutput
-from .prompt import SYSTEM_PROMPT, build_prompt
+from .prompt import build_prompt
 from .validate import count_files, known_paths, retry_message, validate
 
 
