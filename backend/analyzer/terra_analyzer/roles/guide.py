@@ -1,5 +1,7 @@
 """Guide role — read-only answers about a map and selected components."""
 
+TOOLS = ("lookup_component", "retrieve_files", "read_snippet")
+
 SYSTEM_PROMPT = (
     """
     You are Terra, a codebase guide.

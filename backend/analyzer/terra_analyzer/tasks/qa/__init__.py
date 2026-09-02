@@ -4,6 +4,7 @@ import json
 
 from ...inference.client import chat, preflight
 from ...inference.config import Config
+from ...retrieve import format_hits, retrieve
 from ...roles.guide import SYSTEM_PROMPT
 from .models import QAInput, QAOutput
 
@@ -30,6 +31,12 @@ class QATask:
             )
         if inp.file_snippet:
             parts.append("Source snippet:\n```\n" + str(inp.file_snippet) + "\n```")
+        elif inp.map is not None:
+            # One Completions call: rank the map into the prompt instead of a tool loop.
+            hits = retrieve(inp.question, inp.map, inp.selection, inp.selections)
+            block = format_hits(hits)
+            if block:
+                parts.append("Retrieved context:\n" + block)
         if inp.map is not None:
             parts.append("Architecture map:\n" + json.dumps(inp.map))
 
