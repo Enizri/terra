@@ -1,6 +1,10 @@
 """OpenAI-compatible Chat Completions client."""
 
+from __future__ import annotations
+
 import json
+from dataclasses import dataclass, field
+from typing import Any
 from urllib.parse import urlparse
 
 import httpx
@@ -10,6 +14,24 @@ from .config import MAX_OUTPUT_TOKENS, Config
 
 class LLMError(Exception):
     """Surfaces to Go as a 502 detail."""
+
+
+@dataclass
+class ToolCall:
+    """One Completions function call, already parsed off the wire."""
+
+    id: str
+    name: str
+    arguments: str
+
+
+@dataclass
+class Turn:
+    """One model step: text, tool calls, or both."""
+
+    content: str
+    tool_calls: list[ToolCall] = field(default_factory=list)
+    finish_reason: str = ""
 
 
 def _draft_schema():
@@ -175,3 +197,207 @@ def chat(cfg: Config, msgs: list[dict], *, use_schema: bool = True) -> str:
     if not content or not str(content).strip():
         raise LLMError(f"chat: model {cfg.model} returned an empty message")
     return content
+
+
+def _arguments_json(value: Any) -> str:
+    if value is None:
+        return "{}"
+    if isinstance(value, str):
+        return value
+    return json.dumps(value)
+
+
+def _block_text(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, list):
+        parts: list[str] = []
+        for part in value:
+            if isinstance(part, str):
+                parts.append(part)
+            elif isinstance(part, dict):
+                parts.append(str(part.get("text") or part.get("content") or ""))
+        return "".join(parts)
+    return str(value)
+
+
+def _function_tool_call(item: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": item.get("id") or item.get("call_id") or "",
+        "type": "function",
+        "function": {
+            "name": item.get("name") or "",
+            "arguments": _arguments_json(item.get("input") if "input" in item else item.get("arguments")),
+        },
+    }
+
+
+def _tool_result_message(item: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "role": "tool",
+        "tool_call_id": item.get("tool_use_id") or item.get("call_id") or item.get("id") or item.get("tool_call_id") or "",
+        "content": _block_text(item.get("content") if "content" in item else item.get("output")),
+    }
+
+
+def _flatten_blocks(role: str, blocks: list[Any]) -> list[dict[str, Any]]:
+    """Anthropic content blocks → Completions messages."""
+    texts: list[str] = []
+    tool_calls: list[dict[str, Any]] = []
+    results: list[dict[str, Any]] = []
+    for block in blocks:
+        if isinstance(block, str):
+            texts.append(block)
+            continue
+        if not isinstance(block, dict):
+            continue
+        btype = block.get("type")
+        if btype in ("text", "output_text", "input_text") or btype is None and "text" in block:
+            texts.append(str(block.get("text") or ""))
+        elif btype in ("tool_use", "function_call"):
+            tool_calls.append(_function_tool_call(block))
+        elif btype in ("tool_result", "function_call_output"):
+            results.append(_tool_result_message(block))
+        else:
+            texts.append(_block_text(block.get("text") or block.get("content")))
+    messages: list[dict[str, Any]] = []
+    if texts or tool_calls:
+        msg: dict[str, Any] = {"role": role}
+        msg["content"] = "".join(texts) if texts else (None if tool_calls else "")
+        if tool_calls:
+            msg["tool_calls"] = tool_calls
+        messages.append(msg)
+    messages.extend(results)
+    return messages
+
+
+def _flatten_item(item: dict[str, Any]) -> list[dict[str, Any]]:
+    """One Anthropic/Responses item → one or more Completions messages."""
+    kind = item.get("type")
+    if kind == "function_call":
+        return [{
+            "role": "assistant",
+            "content": None,
+            "tool_calls": [_function_tool_call(item)],
+        }]
+    if kind == "function_call_output":
+        return [_tool_result_message(item)]
+    if kind == "message":
+        item = {
+            "role": item.get("role") or "user",
+            "content": item.get("content"),
+            **({k: item[k] for k in ("tool_calls", "tool_call_id") if k in item}),
+        }
+    elif kind and "role" not in item:
+        return []
+
+    role = item.get("role") or "user"
+    content = item.get("content")
+
+    if role == "tool" or item.get("tool_call_id"):
+        return [{
+            "role": "tool",
+            "tool_call_id": item.get("tool_call_id") or "",
+            "content": _block_text(content),
+        }]
+
+    if item.get("tool_calls"):
+        msg: dict[str, Any] = {"role": role, "tool_calls": list(item["tool_calls"])}
+        if isinstance(content, list):
+            msg["content"] = "".join(
+                b if isinstance(b, str) else str((b or {}).get("text") or "")
+                for b in content
+            ) or None
+        else:
+            msg["content"] = content
+        return [msg]
+
+    if isinstance(content, list):
+        return _flatten_blocks(role, content)
+
+    return [{"role": role, "content": "" if content is None else content}]
+
+
+def _flatten_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Convert internal items to Chat Completions messages. Does not mutate items."""
+    messages: list[dict[str, Any]] = []
+    for item in items:
+        for msg in _flatten_item(item):
+            prev = messages[-1] if messages else None
+            if (
+                prev
+                and msg.get("role") == "assistant"
+                and msg.get("tool_calls")
+                and not (msg.get("content") or "")
+                and prev.get("role") == "assistant"
+                and prev.get("tool_calls")
+                and not (prev.get("content") or "")
+            ):
+                prev["tool_calls"] = list(prev["tool_calls"]) + list(msg["tool_calls"])
+            else:
+                messages.append(msg)
+    return messages
+
+
+def _parse_tool_calls(raw: Any) -> list[ToolCall]:
+    calls: list[ToolCall] = []
+    for tc in raw or []:
+        if not isinstance(tc, dict):
+            continue
+        fn = tc.get("function") if isinstance(tc.get("function"), dict) else {}
+        calls.append(ToolCall(
+            id=str(tc.get("id") or ""),
+            name=str(fn.get("name") or tc.get("name") or ""),
+            arguments=_arguments_json(fn.get("arguments") if "arguments" in fn else tc.get("arguments")),
+        ))
+    return calls
+
+
+def complete(
+    cfg: Config,
+    items: list[dict[str, Any]],
+    tools: list[dict[str, Any]] | None = None,
+    tool_choice: Any = None,
+) -> Turn:
+    """POST /v1/chat/completions with optional tools. Flattening stays in inference."""
+    msgs = _flatten_items(items)
+    body: dict[str, Any] = {
+        "model": cfg.model,
+        "messages": msgs,
+        "stream": False,
+        "temperature": 0,
+        "max_tokens": MAX_OUTPUT_TOKENS,
+    }
+    if tools:
+        body["tools"] = tools
+        body["tool_choice"] = "auto" if tool_choice is None else tool_choice
+    elif tool_choice is not None:
+        body["tool_choice"] = tool_choice
+
+    resp = _post(cfg, body)
+    if resp.status_code != 200:
+        raise _provider_error(cfg, resp)
+    try:
+        out = resp.json()
+    except ValueError as e:
+        raise LLMError(f"complete: unexpected reply: {e}") from e
+    if out.get("error"):
+        err = out["error"]
+        detail = err.get("message", err) if isinstance(err, dict) else err
+        raise LLMError(f"complete: {detail}")
+
+    choices = out.get("choices") or []
+    if not choices:
+        raise LLMError(f"complete: model {cfg.model} returned no choices")
+    message = choices[0].get("message") or {}
+    raw_content = message.get("content")
+    content = "" if raw_content is None else str(raw_content)
+    tool_calls = _parse_tool_calls(message.get("tool_calls"))
+    reason = choices[0].get("finish_reason") or ""
+    if tool_calls and not reason:
+        reason = "tool_calls"
+    if not content.strip() and not tool_calls:
+        raise LLMError(f"complete: model {cfg.model} returned an empty message")
+    return Turn(content=content, tool_calls=tool_calls, finish_reason=reason)

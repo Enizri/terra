@@ -153,7 +153,9 @@ app = FastAPI(title="terra-local-llm", lifespan=lifespan)
 
 class ChatMessage(BaseModel):
     role: str
-    content: str
+    content: str | None = None
+    tool_calls: list[Any] | None = None
+    tool_call_id: str | None = None
 
 
 class JsonSchemaFormat(BaseModel):
@@ -175,6 +177,8 @@ class ChatCompletionRequest(BaseModel):
     temperature: float = 0
     max_tokens: int = MAX_OUTPUT_TOKENS
     response_format: ResponseFormat | None = None
+    tools: list[dict[str, Any]] | None = None
+    tool_choice: Any = None
 
 
 def _ensure_loaded() -> None:
@@ -204,8 +208,18 @@ def _schema_text(req: ChatCompletionRequest) -> str:
     return ""
 
 
-def _messages_for_generate(req: ChatCompletionRequest) -> list[dict[str, str]]:
-    msgs = [{"role": message.role, "content": message.content} for message in req.messages]
+def _messages_for_generate(req: ChatCompletionRequest) -> list[dict[str, Any]]:
+    msgs: list[dict[str, Any]] = []
+    for message in req.messages:
+        m: dict[str, Any] = {"role": message.role}
+        if message.tool_call_id:
+            m["tool_call_id"] = message.tool_call_id
+        if message.tool_calls:
+            m["tool_calls"] = message.tool_calls
+            m["content"] = message.content
+        else:
+            m["content"] = "" if message.content is None else message.content
+        msgs.append(m)
     schema_text = _schema_text(req)
     if schema_text:
         hint = (
@@ -214,16 +228,17 @@ def _messages_for_generate(req: ChatCompletionRequest) -> list[dict[str, str]]:
         )
         if msgs and msgs[0]["role"] == "system":
             msgs[0] = {
+                **msgs[0],
                 "role": "system",
-                "content": msgs[0]["content"] + "\n\n" + hint,
+                "content": (msgs[0].get("content") or "") + "\n\n" + hint,
             }
         else:
             msgs.insert(0, {"role": "system", "content": hint})
     return msgs
 
 
-def generate_chat(req: ChatCompletionRequest) -> tuple[str, str]:
-    """Returns (content, finish_reason)."""
+def generate_chat(req: ChatCompletionRequest) -> tuple[str, str, list[Any] | None]:
+    """Returns (content, finish_reason, tool_calls)."""
     _ensure_loaded()
     msgs = _messages_for_generate(req)
     max_new = min(req.max_tokens or MAX_OUTPUT_TOKENS, MAX_OUTPUT_TOKENS)
@@ -233,15 +248,24 @@ def generate_chat(req: ChatCompletionRequest) -> tuple[str, str]:
             raise HTTPException(status_code=503, detail="model not loaded")
         schema_text = _schema_text(req)
         grammar = _grammar_for(schema_text) if schema_text else None
-        out = model.create_chat_completion(
-            messages=msgs,
-            temperature=req.temperature or 0.0,
-            max_tokens=max_new,
-            grammar=grammar,
-        )
+        call_kw: dict[str, Any] = {
+            "messages": msgs,
+            "temperature": req.temperature or 0.0,
+            "max_tokens": max_new,
+            "grammar": grammar,
+        }
+        if req.tools:
+            call_kw["tools"] = req.tools
+            call_kw["tool_choice"] = "auto" if req.tool_choice is None else req.tool_choice
+        elif req.tool_choice is not None:
+            call_kw["tool_choice"] = req.tool_choice
+        out = model.create_chat_completion(**call_kw)
     choice = out["choices"][0]
-    content = (choice["message"].get("content") or "").strip()
-    return content, choice.get("finish_reason") or "stop"
+    message = choice.get("message") or {}
+    content = (message.get("content") or "").strip()
+    tool_calls = message.get("tool_calls") or None
+    finish = choice.get("finish_reason") or ("tool_calls" if tool_calls else "stop")
+    return content, finish, tool_calls
 
 
 @app.get("/")
@@ -348,11 +372,17 @@ def chat_completions(req: ChatCompletionRequest) -> dict:
         )
 
     try:
-        content, finish = generate_chat(req)
+        content, finish, tool_calls = generate_chat(req)
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"generation failed: {e}") from e
+
+    message: dict[str, Any] = {"role": "assistant", "content": content}
+    if tool_calls:
+        message["tool_calls"] = tool_calls
+        if not content:
+            message["content"] = None
 
     return {
         "id": f"chatcmpl-{uuid.uuid4().hex[:12]}",
@@ -362,7 +392,7 @@ def chat_completions(req: ChatCompletionRequest) -> dict:
         "choices": [
             {
                 "index": 0,
-                "message": {"role": "assistant", "content": content},
+                "message": message,
                 "finish_reason": finish,
             }
         ],
