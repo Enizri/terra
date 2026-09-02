@@ -41,5 +41,5 @@ if ((want_slow == 1)); then
     exit 1
   fi
   echo "integration: Python live LLM (TERRA_SLOW)"
-  cd backend/analyzer && TERRA_SLOW=1 ../.venv/bin/python -m pytest -q tests/test_slow_llm.py
+  cd backend/analyzer && TERRA_SLOW=1 ../.venv/bin/python -m pytest -q -m slow
 fi

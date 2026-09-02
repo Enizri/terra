@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 from ..inference.client import ToolCall, Turn
 from ..inference.config import Config
-from ..runtime import iter_loop
+from ..runtime import DEFAULT_MAX_TURNS, iter_loop
 
 
 def fixtures_dir() -> Path:
@@ -48,6 +48,7 @@ def replay(
     tools: list[dict[str, Any]],
     allowed: frozenset[str],
     dispatch: Any = None,
+    max_turns: int = DEFAULT_MAX_TURNS,
 ) -> tuple[list[str], str]:
     """Return (tool names in order, final answer). Uses recorded turns only."""
     remaining = list(turns)
@@ -72,6 +73,7 @@ def replay(
             tools=tools,
             allowed=allowed,
             dispatch=_dispatch,
+            max_turns=max_turns,
         ))
 
     answer = ""

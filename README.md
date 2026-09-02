@@ -153,8 +153,9 @@ Supports `package.json` frontends only; runfile/Go-only repos need `make dev`
 | `make up` | Docker Compose: build/start api + analyzer (detached) |
 | `make up-llm` | Same as `make up` with local HF `llm` profile |
 | `make down` | Docker Compose: stop and remove containers |
-| `make check` | Fixtures + Go/Python/web tests + lint (CI entry point) |
+| `make check` | Fixtures + Go/Python/web tests + lint (CI entry point; Python `-m 'not slow'`) |
 | `make test` | Fixtures + Go/Python/web tests |
+| `make eval` | Harness evals in `terra_analyzer/evals/` (no live LLM) |
 | `make sync-fixtures` | Copy `case-studies/memos.map.json` → `apps/web/src/data/` |
 | `terra scan <url>` | Clone + deterministic scan, JSON to stdout |
 | `terra map <url>` | Scan, ask the analyzer for a map, store in `terra.db` |
@@ -247,6 +248,7 @@ Local model sidecar (`make run-llm`, port 8020):
 ```sh
 make check              # fixtures + Go + Python + web + lint (CI entry point)
 make test               # fixtures + Go + Python + web (no lint)
+make eval               # harness evals (ask goldens, trajectories, policy; no live LLM)
 make test-integration   # opt-in live suites (needs TERRA_INTEGRATION=1)
 make sync-fixtures      # copy case-studies/memos.map.json → apps/web/src/data/
 ```
@@ -255,11 +257,12 @@ make sync-fixtures      # copy case-studies/memos.map.json → apps/web/src/data
 |---|---|---|
 | Go unit/integration | `backend/api/internal/*/*_test.go` (colocated) | `make test-go` |
 | Python | `backend/analyzer/tests/` | `make test-py` (excludes `@pytest.mark.slow`) |
+| Harness evals | `backend/analyzer/terra_analyzer/evals/` + `case-studies/memos.ask.json` | `make eval` (same `-m 'not slow'`) |
 | Web logic | `apps/web/src/**/*.test.ts` | `make test-web` (`node --test`) |
 | Web components | `apps/web/src/**/*.test.tsx` | part of `make test-web` (vitest) |
 | Fixture sync | `case-studies/` ↔ `apps/web/src/data/` | `make test-fixtures` |
 | Live GitHub | `backend/api/internal/scan/live_test.go` | `TERRA_INTEGRATION=1 make test-integration` |
-| Live LLM | `backend/analyzer/tests/test_slow_llm.py` | same (`TERRA_SLOW=1` still works alone) |
+| Live LLM | `backend/analyzer/tests/test_slow_llm.py` + `evals/test_live_llama.py` | same (`TERRA_SLOW=1` still works alone) |
 
 The wire contract between Go and Python is the draft JSON in
 `backend/analyzer/terra_analyzer/contracts/models.py` mirrored by `backend/api/internal/analysis/types.go`;
