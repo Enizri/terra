@@ -746,9 +746,11 @@ type stubPreview struct {
 	url      string
 }
 
-func (s stubPreview) Start(string) (string, error)       { return s.url, s.startErr }
-func (stubPreview) Lookup(string) (string, string, bool) { return "", "", false }
-func (stubPreview) StopAll()                             {}
+func (s stubPreview) Start(string) (string, error)          { return s.url, s.startErr }
+func (stubPreview) Lookup(string) (string, string, bool)    { return "", "", false }
+func (stubPreview) ApplyPatch(string, string, string) error { return nil }
+func (stubPreview) Restart(string) error                    { return nil }
+func (stubPreview) StopAll()                                {}
 
 func TestPreviewUsesServerRunner(t *testing.T) {
 	s, ts := testServer(t)
@@ -1171,7 +1173,7 @@ func TestBodyTooLarge(t *testing.T) {
 	_, ts := testServer(t)
 	huge := `{"repo_url":"https://github.com/acme/notes","pad":"` +
 		strings.Repeat("x", 2<<20) + `"}`
-	for _, path := range []string{"/analyze", "/jobs/analyze", "/preview", "/jobs/ask", "/jobs/agent", "/traces/ingest"} {
+	for _, path := range []string{"/analyze", "/jobs/analyze", "/preview", "/preview/patch", "/preview/restart", "/jobs/ask", "/jobs/agent", "/traces/ingest"} {
 		resp, err := http.Post(ts.URL+path, "application/json", strings.NewReader(huge))
 		if err != nil {
 			t.Fatal(err)

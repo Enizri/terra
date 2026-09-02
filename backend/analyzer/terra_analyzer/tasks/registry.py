@@ -33,10 +33,12 @@ class TaskRegistry:
 def default_registry() -> TaskRegistry:
     from .agent import AgentTask
     from .architecture import ArchitectureMapper
+    from .editor import EditorTask
     from .qa import QATask
 
     reg = TaskRegistry()
     reg.register(ArchitectureMapper())
     reg.register(QATask())
     reg.register(AgentTask())
+    reg.register(EditorTask())
     return reg

@@ -11,6 +11,8 @@ import (
 type Runner interface {
 	Start(repoURL string) (proxyURL string, err error)
 	Lookup(repoURL string) (root, appDir string, ok bool)
+	ApplyPatch(repoURL, path, unifiedDiff string) error
+	Restart(repoURL string) error
 	StopAll()
 }
 
@@ -51,5 +53,9 @@ func (r invalidRunner) Start(string) (string, error) {
 }
 
 func (r invalidRunner) Lookup(string) (string, string, bool) { return "", "", false }
+
+func (r invalidRunner) Restart(string) error {
+	return fmt.Errorf("unknown TERRA_PREVIEW_MODE %q (want host or docker)", r.mode)
+}
 
 func (r invalidRunner) StopAll() {}

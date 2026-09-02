@@ -195,6 +195,31 @@ func (r *hostRunner) boot(key string) (string, *instance, error) {
 	return proxyURL, inst, nil
 }
 
+// Restart stops a live preview for repoURL and boots it again. A miss is a
+// Start: there is nothing to kill. Does not git commit checkout writes.
+func (r *hostRunner) Restart(repoURL string) error {
+	key, _, err := scan.NormalizeURL(repoURL)
+	if err != nil {
+		return err
+	}
+	for {
+		r.mu.Lock()
+		if ch, ok := r.boots[key]; ok {
+			r.mu.Unlock()
+			<-ch
+			continue
+		}
+		if inst, ok := r.byRepo[key]; ok {
+			r.stopInstanceLocked(inst)
+			delete(r.byRepo, key)
+		}
+		r.mu.Unlock()
+		break
+	}
+	_, err = r.Start(repoURL)
+	return err
+}
+
 // Lookup returns the checkout root and frontend dir of a running preview.
 func (r *hostRunner) Lookup(repoURL string) (root, appDir string, ok bool) {
 	key, _, err := scan.NormalizeURL(repoURL)

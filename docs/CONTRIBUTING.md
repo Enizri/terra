@@ -66,7 +66,7 @@ Follow the checklist in [`packages/contracts/README.md`](../packages/contracts/R
 2. Implement the `Task` protocol (`name` + `run`).
 3. Register in `default_registry()` in `tasks/registry.py`.
 4. Go reaches it via `analyzerclient.RunTask` / `StreamTask` / `POST /tasks/{name}` — no Go change for a generic JSON task; streaming tasks need `StreamTask`.
-5. Keep task name stable once shipped. HTTP names today are `architecture`, `qa`, and `agent`.
+5. Keep task name stable once shipped. HTTP names today are `architecture`, `qa`, `agent`, and `editor`.
 
 ### Add a role
 

@@ -12,9 +12,11 @@ import (
 
 type stubPreview struct{}
 
-func (stubPreview) Start(string) (string, error)         { return "", nil }
-func (stubPreview) Lookup(string) (string, string, bool) { return "", "", false }
-func (stubPreview) StopAll()                             {}
+func (stubPreview) Start(string) (string, error)            { return "", nil }
+func (stubPreview) Lookup(string) (string, string, bool)    { return "", "", false }
+func (stubPreview) ApplyPatch(string, string, string) error { return nil }
+func (stubPreview) Restart(string) error                    { return nil }
+func (stubPreview) StopAll()                                {}
 
 func TestBuildPayloadUsesExistingCheckout(t *testing.T) {
 	home := t.TempDir()
