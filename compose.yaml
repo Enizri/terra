@@ -76,6 +76,8 @@ services:
       TERRA_LLM_URL: ${TERRA_LLM_URL:-http://llm:8020/v1}
       TERRA_LLM_API_KEY: ${TERRA_LLM_API_KEY:-}
       TERRA_MODEL: ${TERRA_MODEL:-Qwen/Qwen2.5-0.5B-Instruct-GGUF/qwen2.5-0.5b-instruct-q4_k_m.gguf}
+      TERRA_API_URL: http://api:8080
+      TERRA_TOKEN: ${TERRA_TOKEN:-}
     # Not published to the host — only reachable as http://analyzer:8010 on the Compose network.
     healthcheck:
       test:

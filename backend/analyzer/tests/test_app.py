@@ -132,6 +132,92 @@ def test_tasks_qa_multiselect(monkeypatch):
     assert "How do these relate?" in user
 
 
+def test_tasks_qa_prepends_retrieve_hits_without_snippet(monkeypatch):
+    """No file_snippet → keyword hits go into the same chat() call, not a tool loop."""
+    captured: dict = {}
+
+    def fake_chat(cfg, msgs, use_schema=False):
+        captured["msgs"] = msgs
+        captured["use_schema"] = use_schema
+        return "auth owns sessions"
+
+    import terra_analyzer.tasks.qa as qa_mod
+
+    monkeypatch.setattr(qa_mod, "preflight", lambda cfg: None)
+    monkeypatch.setattr(qa_mod, "chat", fake_chat)
+
+    repo_map = {
+        "project": {"repository_url": "https://github.com/acme/notes"},
+        "components": [
+            {
+                "id": "web",
+                "name": "Web App",
+                "purpose": "Writing notes in the browser.",
+                "tech": ["React"],
+                "files": ["web/src/"],
+            },
+            {
+                "id": "auth",
+                "name": "Authentication",
+                "purpose": "Login, sessions, and SSO identity providers.",
+                "tech": ["JWT"],
+                "files": ["server/auth/"],
+            },
+        ],
+    }
+    response = client.post(
+        "/tasks/qa",
+        json={
+            "question": "How does SSO login work?",
+            "map": repo_map,
+            "model": "",
+        },
+    )
+    assert response.status_code == 200
+    assert captured["use_schema"] is False
+    user = captured["msgs"][1]["content"]
+    assert "Retrieved context:" in user
+    assert "auth" in user
+    assert "server/auth/" in user
+    assert "Architecture map:" in user
+
+
+def test_tasks_qa_skips_retrieve_when_snippet_present(monkeypatch):
+    captured: dict = {}
+
+    def fake_chat(cfg, msgs, use_schema=False):
+        captured["msgs"] = msgs
+        return "here is the snippet"
+
+    import terra_analyzer.tasks.qa as qa_mod
+
+    monkeypatch.setattr(qa_mod, "preflight", lambda cfg: None)
+    monkeypatch.setattr(qa_mod, "chat", fake_chat)
+
+    response = client.post(
+        "/tasks/qa",
+        json={
+            "question": "What does this file do?",
+            "file_snippet": "package auth\nfunc Login() {}",
+            "map": {
+                "components": [
+                    {
+                        "id": "auth",
+                        "name": "Authentication",
+                        "purpose": "Login and SSO.",
+                        "files": ["server/auth/"],
+                    }
+                ]
+            },
+        },
+    )
+    assert response.status_code == 200
+    user = captured["msgs"][1]["content"]
+    assert "Retrieved context:" not in user
+    assert "Source snippet:" in user
+    assert "package auth" in user
+
+
 def test_tasks_unknown_404():
     assert client.post("/tasks/nope", json={}).status_code == 404
 

@@ -164,6 +164,7 @@ Supports `package.json` frontends only; runfile/Go-only repos need `make dev`
 | Variable | Read by | Default | Meaning |
 |---|---|---|---|
 | `TERRA_ANALYZER_URL` | Go | `http://localhost:8010` | Where the Python analyzer listens (`http://analyzer:8010` in Compose) |
+| `TERRA_API_URL` | analyzer | `http://127.0.0.1:8080` | Go API for `read_snippet` (`GET /files`; `http://api:8080` in Compose) |
 | `TERRA_LLM_URL` | analyzer | `http://localhost:8020/v1` | OpenAI-compatible base URL (`…/v1`); Compose hosted or `http://llm:8020/v1` |
 | `TERRA_LLM_API_KEY` | analyzer | _(empty)_ | Optional Bearer token for hosted providers |
 | `TERRA_LLM_TIMEOUT` | analyzer | `600` | Seconds to wait for a chat/completions response (read timeout) |
@@ -173,7 +174,7 @@ Supports `package.json` frontends only; runfile/Go-only repos need `make dev`
 | `TERRA_MODEL` | analyzer + local LLM | `Qwen/Qwen2.5-0.5B-Instruct-GGUF/qwen2.5-0.5b-instruct-q4_k_m.gguf` | GGUF quant as `<hf-repo>/<file>.gguf` |
 | `TERRA_N_CTX` | local LLM | `18432` | Context window; must clear the largest prompt plus 4096 output tokens |
 | `TERRA_N_GPU_LAYERS` | local LLM | `16` on GPU/Metal, `0` on CPU | Layers offloaded to the accelerator (`-1` = all, hottest) |
-| `TERRA_TOKEN` | Go | _(empty)_ | Shared secret; empty leaves API open (local-only) |
+| `TERRA_TOKEN` | Go + analyzer | _(empty)_ | Shared secret; empty leaves API open (local-only). Analyzer sends it on `GET /files` |
 | `TERRA_PREVIEW_MODE` | Go | _(empty)_ = host | `docker` for Compose sibling previews |
 | `TERRA_CHECKOUT_DIR` | Go | user cache | Shared checkout root (Compose: `/data/checkouts`) |
 | `TERRA_PUBLIC_URL` | Go | `http://127.0.0.1:8080` | Origin used in `/__live/...` preview URLs |
