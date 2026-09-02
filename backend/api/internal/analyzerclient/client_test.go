@@ -3,6 +3,7 @@ package analyzerclient
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -162,5 +163,88 @@ func TestAnalyzeSendsRoutingOverrides(t *testing.T) {
 	if body["base_url"] != "https://api.openai.com/v1" || body["model"] != "gpt-4.1-mini" ||
 		body["api_key"] != "sk-test" {
 		t.Errorf("routing fields missing from request: %v", body)
+	}
+}
+
+func fakeTaskServer(t *testing.T, handler http.HandlerFunc) *httptest.Server {
+	t.Helper()
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"status":"ok"}`))
+	})
+	mux.HandleFunc("POST /tasks/{name}", handler)
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+func TestStreamTaskReadsNDJSONStages(t *testing.T) {
+	var gotName string
+	srv := fakeTaskServer(t, func(w http.ResponseWriter, r *http.Request) {
+		gotName = r.PathValue("name")
+		w.Header().Set("Content-Type", "application/x-ndjson")
+		fmt.Fprint(w, `{"stage":"retrieve","label":"lookup_component"}`+"\n")
+		fmt.Fprint(w, `{"stage":"tool","label":"read_snippet"}`+"\n")
+		fmt.Fprint(w, `{"answer":"auth owns SSO"}`+"\n")
+	})
+	var stages []string
+	var labels []string
+	answer, err := StreamTask(context.Background(), srv.URL, "agent", map[string]any{"question": "sso?"}, func(ev TaskEvent) {
+		stages = append(stages, ev.Stage)
+		labels = append(labels, ev.Label)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotName != "agent" {
+		t.Fatalf("task name = %q", gotName)
+	}
+	if answer != "auth owns SSO" {
+		t.Fatalf("answer = %q", answer)
+	}
+	if strings.Join(stages, ",") != "retrieve,tool" {
+		t.Fatalf("stages = %v", stages)
+	}
+	if strings.Join(labels, ",") != "lookup_component,read_snippet" {
+		t.Fatalf("labels = %v", labels)
+	}
+}
+
+func TestStreamTaskMidStreamError(t *testing.T) {
+	srv := fakeTaskServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/x-ndjson")
+		fmt.Fprint(w, `{"stage":"retrieve","label":"lookup_component"}`+"\n")
+		fmt.Fprint(w, `{"error":"turn overflow"}`+"\n")
+	})
+	_, err := StreamTask(context.Background(), srv.URL, "agent", map[string]any{"question": "loop"}, nil)
+	if err == nil || !strings.Contains(err.Error(), "turn overflow") {
+		t.Fatalf("err = %v, want turn overflow", err)
+	}
+}
+
+func TestStreamTaskHTTPError(t *testing.T) {
+	srv := fakeTaskServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(`{"detail":"unknown tool \"run_shell\""}`))
+	})
+	_, err := StreamTask(context.Background(), srv.URL, "agent", map[string]any{"question": "pwn"}, nil)
+	if err == nil || !strings.Contains(err.Error(), "unknown tool") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestStreamTaskHonoursContext(t *testing.T) {
+	srv := fakeTaskServer(t, func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(2 * time.Second)
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	start := time.Now()
+	_, err := StreamTask(ctx, srv.URL, "agent", map[string]any{"question": "x"}, nil)
+	if err == nil {
+		t.Fatal("expected context error")
+	}
+	if elapsed := time.Since(start); elapsed > time.Second {
+		t.Fatalf("cancelled stream took %s to return", elapsed)
 	}
 }

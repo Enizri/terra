@@ -43,6 +43,9 @@ type Server struct {
 	Resolve func(url string) (canonical, name, commit string, err error)
 	Analyze func(ctx context.Context, res *scan.Result, opts analyzerclient.LLMOpts) (*analysis.Map, []string, error)
 	RunTask func(ctx context.Context, name string, payload any) (json.RawMessage, error)
+	// StreamTask reads NDJSON from a streaming analyzer task and forwards
+	// {stage,label} events. The returned string is the final answer.
+	StreamTask func(ctx context.Context, name string, payload any, emit func(job.Event)) (string, error)
 
 	// Host reports what this machine can run locally; nil detects it once.
 	Host func() catalog.Capabilities
@@ -141,6 +144,16 @@ func (s *Server) Handler() http.Handler {
 				return analyzerclient.RunTask(ctx, s.Cfg.AnalyzerURL, name, payload)
 			}
 		}
+		if s.StreamTask == nil {
+			s.StreamTask = func(ctx context.Context, name string, payload any, emit func(job.Event)) (string, error) {
+				return analyzerclient.StreamTask(ctx, s.Cfg.AnalyzerURL, name, payload, func(ev analyzerclient.TaskEvent) {
+					if ev.Stage == "" {
+						return
+					}
+					emit(job.Event{Stage: ev.Stage, Label: ev.Label})
+				})
+			}
+		}
 		if s.Jobs == nil {
 			s.Jobs = job.NewHub()
 		}
@@ -160,6 +173,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /jobs/probe", s.enqueueProbe)
 	mux.HandleFunc("POST /jobs/analyze", s.enqueueAnalyze)
 	mux.HandleFunc("POST /jobs/ask", s.enqueueAsk)
+	mux.HandleFunc("POST /jobs/agent", s.enqueueAgent)
 	mux.HandleFunc("GET /jobs/{id}/events", s.jobEvents)
 	mux.HandleFunc("POST /jobs/{id}/cancel", s.cancelJob)
 	mux.HandleFunc("GET /analyses", s.list)

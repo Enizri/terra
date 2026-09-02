@@ -24,6 +24,7 @@ def test_healthz():
     body = response.json()
     assert body["status"] == "ok"
     assert "architecture" in body["tasks"]
+    assert "agent" in body["tasks"]
     assert "model" in body
     assert "llm_ok" in body
 
@@ -65,7 +66,7 @@ def test_healthz_reports_llm_error(monkeypatch):
 def test_list_tasks():
     response = client.get("/tasks")
     assert response.status_code == 200
-    assert response.json()["tasks"] == ["architecture", "qa"]
+    assert response.json()["tasks"] == ["agent", "architecture", "qa"]
 
 
 def test_analyze_happy_path(monkeypatch, scan, good_draft):
@@ -220,6 +221,159 @@ def test_tasks_qa_skips_retrieve_when_snippet_present(monkeypatch):
 
 def test_tasks_unknown_404():
     assert client.post("/tasks/nope", json={}).status_code == 404
+
+
+def _agent_map() -> dict:
+    return {
+        "project": {"repository_url": "https://github.com/acme/notes"},
+        "components": [
+            {
+                "id": "auth",
+                "name": "Authentication",
+                "purpose": "Login, sessions, and SSO identity providers.",
+                "tech": ["JWT"],
+                "files": ["server/auth.go"],
+            }
+        ],
+    }
+
+
+def _ndjson(response) -> list[dict]:
+    text = response.text.strip()
+    if not text:
+        return []
+    return [json.loads(line) for line in text.split("\n") if line.strip()]
+
+
+def test_tasks_agent_streams_ndjson_stages(monkeypatch):
+    """POST /tasks/agent is NDJSON {stage,label} lines then {answer} (no json_schema)."""
+    from terra_analyzer.inference.client import ToolCall, Turn
+
+    turns = [
+        Turn(
+            content="",
+            tool_calls=[ToolCall(id="c1", name="lookup_component", arguments='{"query":"sso"}')],
+            finish_reason="tool_calls",
+        ),
+        Turn(content="auth owns SSO", tool_calls=[], finish_reason="stop"),
+    ]
+    seen: dict = {}
+
+    def fake_complete(cfg, items, tools=None, tool_choice=None):
+        seen["tools"] = tools
+        seen.setdefault("calls", 0)
+        seen["calls"] += 1
+        return turns.pop(0)
+
+    import terra_analyzer.tasks.agent as agent_mod
+
+    monkeypatch.setattr("terra_analyzer.runtime.loop.complete", fake_complete)
+    monkeypatch.setattr(agent_mod, "preflight", lambda cfg: None)
+
+    response = client.post(
+        "/tasks/agent",
+        json={"question": "How does SSO login work?", "map": _agent_map()},
+    )
+    assert response.status_code == 200
+    assert "ndjson" in response.headers["content-type"]
+    events = _ndjson(response)
+    assert events[0] == {"stage": "retrieve", "label": "lookup_component"}
+    assert events[-1] == {"answer": "auth owns SSO"}
+    assert seen["calls"] == 2
+    names = [t["function"]["name"] for t in seen["tools"]]
+    assert names == ["lookup_component", "retrieve_files", "read_snippet"]
+
+
+def test_tasks_agent_rejects_empty_question():
+    response = client.post("/tasks/agent", json={"question": "  "})
+    assert response.status_code == 400
+
+
+def test_tasks_agent_unknown_tool_is_400(monkeypatch):
+    from terra_analyzer.inference.client import ToolCall, Turn
+
+    def fake_complete(cfg, items, tools=None, tool_choice=None):
+        return Turn(
+            content="",
+            tool_calls=[ToolCall(id="c", name="run_shell", arguments='{"cmd":"ls"}')],
+            finish_reason="tool_calls",
+        )
+
+    import terra_analyzer.tasks.agent as agent_mod
+
+    monkeypatch.setattr("terra_analyzer.runtime.loop.complete", fake_complete)
+    monkeypatch.setattr(agent_mod, "preflight", lambda cfg: None)
+
+    response = client.post("/tasks/agent", json={"question": "pwn?", "map": _agent_map()})
+    assert response.status_code == 400
+    assert "unknown tool" in response.json()["detail"]
+
+
+def test_tasks_agent_dotdot_is_400(monkeypatch):
+    from terra_analyzer.inference.client import ToolCall, Turn
+
+    def fake_complete(cfg, items, tools=None, tool_choice=None):
+        return Turn(
+            content="",
+            tool_calls=[ToolCall(
+                id="c",
+                name="read_snippet",
+                arguments='{"path": "../etc/passwd", "repo_url": "https://github.com/acme/notes"}',
+            )],
+            finish_reason="tool_calls",
+        )
+
+    import terra_analyzer.tasks.agent as agent_mod
+
+    monkeypatch.setattr("terra_analyzer.runtime.loop.complete", fake_complete)
+    monkeypatch.setattr(agent_mod, "preflight", lambda cfg: None)
+
+    response = client.post("/tasks/agent", json={"question": "read secrets", "map": _agent_map()})
+    assert response.status_code == 400
+    assert "escapes" in response.json()["detail"]
+
+
+def test_tasks_agent_turn_cap_overflow(monkeypatch):
+    from terra_analyzer.inference.client import ToolCall, Turn
+
+    def fake_complete(cfg, items, tools=None, tool_choice=None):
+        return Turn(
+            content="",
+            tool_calls=[ToolCall(id="c", name="lookup_component", arguments='{"query":"x"}')],
+            finish_reason="tool_calls",
+        )
+
+    import terra_analyzer.tasks.agent as agent_mod
+
+    monkeypatch.setattr("terra_analyzer.runtime.loop.complete", fake_complete)
+    monkeypatch.setattr(agent_mod, "preflight", lambda cfg: None)
+
+    response = client.post(
+        "/tasks/agent",
+        json={"question": "loop", "map": _agent_map(), "max_turns": 1},
+    )
+    assert response.status_code == 200
+    events = _ndjson(response)
+    assert events[0]["stage"] == "retrieve"
+    assert any("overflow" in str(ev.get("error", "")).lower() for ev in events)
+
+
+def test_tasks_agent_max_turns_zero_is_400(monkeypatch):
+    import terra_analyzer.tasks.agent as agent_mod
+
+    monkeypatch.setattr(agent_mod, "preflight", lambda cfg: None)
+    response = client.post("/tasks/agent", json={"question": "loop", "max_turns": 0})
+    assert response.status_code == 400
+    assert "overflow" in response.json()["detail"]
+    """qa stays a JSON object, not the agent NDJSON stream."""
+    import terra_analyzer.tasks.qa as qa_mod
+
+    monkeypatch.setattr(qa_mod, "preflight", lambda cfg: None)
+    monkeypatch.setattr(qa_mod, "chat", lambda *a, **k: "one shot")
+    response = client.post("/tasks/qa", json={"question": "where?"})
+    assert response.status_code == 200
+    assert response.json() == {"answer": "one shot"}
+    assert "ndjson" not in (response.headers.get("content-type") or "")
 
 
 def test_analyze_llm_error_becomes_502(monkeypatch, scan):

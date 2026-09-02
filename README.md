@@ -24,7 +24,6 @@ What is **not** done, so you don't go looking for it:
 |---|---|
 | **Export JSON** and **Share map** are placeholder chips — visibly present, not wired | `apps/web/src/shared/shell/WorkspaceHeader.tsx` |
 | The workspace session is not persisted. The URL slug is cosmetic, never sent to the server, and in-memory state is lost on reload | `apps/web/src/routes/workspace/cache.ts` |
-| The step list under an Ask answer is a client-side animation, not real tool telemetry | `apps/web/src/features/ask/useAsk.ts` |
 | Live preview supports `package.json` frontends only; other repos need host-exec `make dev` | `backend/api/internal/preview/` |
 | No user accounts. `TERRA_TOKEN` is one shared secret, and empty leaves the API open | [`docs/SECURITY.md`](docs/SECURITY.md) |
 
@@ -157,7 +156,7 @@ Supports `package.json` frontends only; runfile/Go-only repos need `make dev`
 | `make sync-fixtures` | Copy `case-studies/memos.map.json` → `apps/web/src/data/` |
 | `terra scan <url>` | Clone + deterministic scan, JSON to stdout |
 | `terra map <url>` | Scan, ask the analyzer for a map, store in `terra.db` |
-| `terra serve` | HTTP API: `POST /jobs/probe`, `POST /jobs/analyze`, `GET /models`, `GET /host/capabilities`, `GET /analyses`, `POST /preview`, `POST /ask`, `GET /files` |
+| `terra serve` | HTTP API: `POST /jobs/probe`, `POST /jobs/analyze`, `POST /jobs/ask`, `POST /jobs/agent`, `GET /models`, `GET /host/capabilities`, `GET /analyses`, `POST /preview`, `POST /ask`, `GET /files` |
 
 ## Environment variables
 
@@ -228,10 +227,11 @@ than that, analyze rescans and says so.
 | `GET /healthz` | Status, model, whether the LLM `/v1/models` probe succeeded |
 | `POST /analyze` | Architecture map (Go wire contract) |
 | `GET /tasks` | Registered analyzer tasks |
-| `POST /tasks/{name}` | Run a named task (`architecture`, …) |
+| `POST /tasks/{name}` | Run a named task (`architecture`, `qa`, `agent`) |
 
 `POST /analyze` and `POST /tasks/qa` accept optional `base_url` and `api_key`
 alongside `model`, which override `TERRA_LLM_*` for that request only.
+`POST /tasks/agent` streams NDJSON `{stage, label}` lines, then `{answer}`.
 
 Local model sidecar (`make run-llm`, port 8020):
 

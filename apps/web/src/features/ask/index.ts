@@ -1,8 +1,9 @@
-export { ask, type Selection, type ModelChoice } from "./api.ts";
+export { ask, askEvents, type Selection, type ModelChoice } from "./api.ts";
 export {
   buildProcess,
   advanceProcess,
   completeProcess,
+  applyJobEvent,
   updateTerraParts,
   hasMeaningfulSelection,
   type AskMessage,

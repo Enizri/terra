@@ -1,16 +1,19 @@
 """Terra analyzer HTTP service (Go backend client)."""
 
 import contextlib
+import json
 import sys
 from pathlib import Path
 from urllib.parse import urlparse
 
 import httpx
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
 
 from ..contracts import AnalyzeRequest, AnalyzeResponse
 from ..inference.client import LLMError
 from ..inference.config import Config
+from ..runtime import PolicyError
 from ..tasks.registry import TaskRegistry, default_registry
 
 
@@ -87,13 +90,19 @@ def create_app(registry: TaskRegistry | None = None) -> FastAPI:
         return {"tasks": application.state.registry.list()}
 
     @application.post("/tasks/{name}")
-    def run_task(name: str, payload: dict) -> dict:
-        if application.state.registry.get(name) is None:
+    def run_task(name: str, payload: dict):
+        task = application.state.registry.get(name)
+        if task is None:
             raise HTTPException(status_code=404, detail=f'unknown task "{name}"')
+        stream = getattr(task, "run_stream", None)
+        if callable(stream):
+            return _stream_task(stream, payload)
         try:
             return application.state.registry.run(name, payload)
         except LLMError as e:
             raise HTTPException(status_code=502, detail=str(e)) from e
+        except PolicyError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
         except Exception as e:
             raise HTTPException(status_code=400, detail=str(e)) from e
 
@@ -116,6 +125,35 @@ def create_app(registry: TaskRegistry | None = None) -> FastAPI:
         return AnalyzeResponse(draft=out["draft"], warnings=out["warnings"])
 
     return application
+
+
+def _stream_task(stream, payload: dict) -> StreamingResponse:
+    """NDJSON `{stage, label}` lines, then `{answer}`. Peek so validation is 400."""
+    try:
+        iterator = stream(payload)
+        first = next(iterator)
+    except StopIteration:
+        first = None
+        iterator = iter(())
+    except LLMError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+    except PolicyError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    def gen():
+        try:
+            if first is not None:
+                yield json.dumps(first) + "\n"
+            for event in iterator:
+                yield json.dumps(event) + "\n"
+        except LLMError as e:
+            yield json.dumps({"error": str(e)}) + "\n"
+        except PolicyError as e:
+            yield json.dumps({"error": str(e)}) + "\n"
+
+    return StreamingResponse(gen(), media_type="application/x-ndjson")
 
 
 app = create_app()

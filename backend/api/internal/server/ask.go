@@ -86,6 +86,47 @@ func (s *Server) enqueueAsk(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]string{"job_id": j.ID})
 }
 
+// enqueueAgent starts a streaming agent job and returns its id immediately.
+func (s *Server) enqueueAgent(w http.ResponseWriter, r *http.Request) {
+	req, sel, ok := s.decodeAsk(w, r)
+	if !ok {
+		return
+	}
+	payload := s.askPayload(req, sel)
+	key := strings.TrimSpace(req.APIKey)
+	j := s.Jobs.Start(func(ctx context.Context, emit func(job.Event)) {
+		emit(job.Event{Stage: "ask", Label: "Terra is reading the selection"})
+		if err := ctx.Err(); err != nil {
+			emit(job.Event{Stage: "error", Label: "cancelled"})
+			return
+		}
+		if sel.Local {
+			if err := s.ensureModel(ctx, sel.HFID, emit); err != nil {
+				if ctx.Err() != nil {
+					emit(job.Event{Stage: "error", Label: "cancelled"})
+					return
+				}
+				emit(job.Event{Stage: "error", Label: err.Error()})
+				return
+			}
+		}
+		answer, err := s.StreamTask(ctx, "agent", payload, func(ev job.Event) {
+			ev.Label = scrub(ev.Label, key)
+			emit(ev)
+		})
+		if err != nil {
+			emit(job.Event{Stage: "error", Label: scrub(err.Error(), key)})
+			return
+		}
+		if err := ctx.Err(); err != nil {
+			emit(job.Event{Stage: "error", Label: "cancelled"})
+			return
+		}
+		emit(job.Event{Stage: "done", Answer: answer})
+	})
+	writeJSON(w, map[string]string{"job_id": j.ID})
+}
+
 // decodeAsk reads the body and resolves the picker fields through the same
 // validation analyze uses: an unknown model_id or a missing BYOK key is a 400
 // here rather than a failure deep inside the provider.
