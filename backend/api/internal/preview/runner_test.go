@@ -4,6 +4,8 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -106,6 +108,36 @@ func TestHostStopAllKillsStarting(t *testing.T) {
 	// Closing twice must not panic — StopAll nils the listener.
 	if err := ln.Close(); err == nil {
 		t.Fatal("expected listener already closed by StopAll")
+	}
+}
+
+func TestHostRestartStopsExistingBeforeStart(t *testing.T) {
+	base := t.TempDir()
+	dir := filepath.Join(base, "acme-notes")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".terra-commit"), []byte("deadbeef"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r := &hostRunner{
+		byRepo: map[string]*instance{},
+		cfg:    &config.Config{CheckoutDir: base},
+	}
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := "https://github.com/acme/notes"
+	r.byRepo[key] = &instance{proxyLn: ln, proxyURL: "http://old/"}
+	if err := r.Restart(key); err == nil {
+		t.Fatal("Start should fail without a frontend")
+	}
+	if err := ln.Close(); err == nil {
+		t.Fatal("expected listener already closed by Restart")
+	}
+	if _, ok := r.byRepo[key]; ok {
+		t.Fatal("failed Start must not leave a byRepo entry")
 	}
 }
 

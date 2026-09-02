@@ -232,6 +232,30 @@ func (r *dockerRunner) boot(key string, cfg *config.Config) (string, *dockerInst
 	return publicURL, inst, nil
 }
 
+// Restart stops the sibling container for repoURL and boots it again.
+func (r *dockerRunner) Restart(repoURL string) error {
+	key, _, err := scan.NormalizeURL(repoURL)
+	if err != nil {
+		return err
+	}
+	for {
+		r.mu.Lock()
+		if ch, ok := r.boots[key]; ok {
+			r.mu.Unlock()
+			<-ch
+			continue
+		}
+		if inst, ok := r.byRepo[key]; ok {
+			r.stopLocked(inst)
+			delete(r.byRepo, key)
+		}
+		r.mu.Unlock()
+		break
+	}
+	_, err = r.Start(repoURL)
+	return err
+}
+
 func (r *dockerRunner) Lookup(repoURL string) (root, appDir string, ok bool) {
 	key, _, err := scan.NormalizeURL(repoURL)
 	if err != nil {

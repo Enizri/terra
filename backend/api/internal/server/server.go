@@ -180,6 +180,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /analyses/{id}", s.get)
 	mux.HandleFunc("DELETE /analyses/{id}", s.deleteAnalysis)
 	mux.HandleFunc("POST /preview", s.preview)
+	mux.HandleFunc("POST /preview/patch", s.previewPatch)
+	mux.HandleFunc("POST /preview/restart", s.previewRestart)
 	mux.HandleFunc("POST /ask", s.ask)
 	mux.HandleFunc("GET /files", s.files)
 	mux.HandleFunc("GET /traces", s.traces)
@@ -295,6 +297,63 @@ func (s *Server) preview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string]string{"url": url})
+}
+
+func (s *Server) previewPatch(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		RepoURL     string `json:"repo_url"`
+		Path        string `json:"path"`
+		UnifiedDiff string `json:"unified_diff"`
+	}
+	if !decodeBody(w, r, &req, `body must be {"repo_url": "...", "path": "...", "unified_diff": "..."}`) {
+		return
+	}
+	if req.RepoURL == "" || strings.TrimSpace(req.Path) == "" {
+		httpError(w, http.StatusBadRequest, `body must be {"repo_url": "...", "path": "...", "unified_diff": "..."}`)
+		return
+	}
+	if err := s.previewRunner().ApplyPatch(req.RepoURL, req.Path, req.UnifiedDiff); err != nil {
+		previewWriteError(w, err)
+		return
+	}
+	writeJSON(w, map[string]any{"path": req.Path, "ok": true})
+}
+
+func (s *Server) previewRestart(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		RepoURL string `json:"repo_url"`
+	}
+	if !decodeBody(w, r, &req, `body must be {"repo_url": "..."}`) {
+		return
+	}
+	if req.RepoURL == "" {
+		httpError(w, http.StatusBadRequest, `body must be {"repo_url": "..."}`)
+		return
+	}
+	if err := s.previewRunner().Restart(req.RepoURL); err != nil {
+		previewWriteError(w, err)
+		return
+	}
+	writeJSON(w, map[string]any{"ok": true})
+}
+
+func previewWriteError(w http.ResponseWriter, err error) {
+	msg := err.Error()
+	switch {
+	case strings.Contains(msg, "not ready"):
+		httpError(w, http.StatusConflict, msg)
+	case strings.Contains(msg, "too large"):
+		httpError(w, http.StatusRequestEntityTooLarge, msg)
+	case strings.Contains(msg, "escapes"),
+		strings.Contains(msg, "required"),
+		strings.Contains(msg, "does not apply"),
+		strings.Contains(msg, "no hunks"),
+		strings.Contains(msg, "directory"),
+		strings.Contains(msg, "malformed"):
+		httpError(w, http.StatusBadRequest, msg)
+	default:
+		httpError(w, http.StatusBadGateway, msg)
+	}
 }
 
 func writeJSON(w http.ResponseWriter, payload any) {

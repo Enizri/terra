@@ -25,6 +25,7 @@ def test_healthz():
     assert body["status"] == "ok"
     assert "architecture" in body["tasks"]
     assert "agent" in body["tasks"]
+    assert "editor" in body["tasks"]
     assert "model" in body
     assert "llm_ok" in body
 
@@ -66,7 +67,7 @@ def test_healthz_reports_llm_error(monkeypatch):
 def test_list_tasks():
     response = client.get("/tasks")
     assert response.status_code == 200
-    assert response.json()["tasks"] == ["agent", "architecture", "qa"]
+    assert response.json()["tasks"] == ["agent", "architecture", "editor", "qa"]
 
 
 def test_analyze_happy_path(monkeypatch, scan, good_draft):
@@ -307,6 +308,81 @@ def test_tasks_agent_unknown_tool_is_400(monkeypatch):
     response = client.post("/tasks/agent", json={"question": "pwn?", "map": _agent_map()})
     assert response.status_code == 400
     assert "unknown tool" in response.json()["detail"]
+
+
+def test_tasks_agent_rejects_apply_patch(monkeypatch):
+    from terra_analyzer.inference.client import ToolCall, Turn
+
+    def fake_complete(cfg, items, tools=None, tool_choice=None):
+        return Turn(
+            content="",
+            tool_calls=[ToolCall(
+                id="c",
+                name="apply_patch",
+                arguments='{"path": "a.go", "repo_url": "https://github.com/acme/notes", "unified_diff": "@@ -0,0 +1,1 @@\\n+x\\n"}',
+            )],
+            finish_reason="tool_calls",
+        )
+
+    import terra_analyzer.tasks.agent as agent_mod
+
+    monkeypatch.setattr("terra_analyzer.runtime.loop.complete", fake_complete)
+    monkeypatch.setattr(agent_mod, "preflight", lambda cfg: None)
+
+    response = client.post("/tasks/agent", json={"question": "edit it", "map": _agent_map()})
+    assert response.status_code == 400
+    assert "unknown tool" in response.json()["detail"]
+
+
+def test_tasks_editor_streams_patch_then_restart(monkeypatch):
+    from terra_analyzer.inference.client import ToolCall, Turn
+
+    turns = [
+        Turn(
+            content="",
+            tool_calls=[ToolCall(
+                id="c1",
+                name="apply_patch",
+                arguments='{"path":"web/src/App.tsx","repo_url":"https://github.com/acme/notes","unified_diff":"@@ -1,1 +1,1 @@\\n-a\\n+b\\n"}',
+            )],
+            finish_reason="tool_calls",
+        ),
+        Turn(
+            content="",
+            tool_calls=[ToolCall(
+                id="c2",
+                name="preview_restart",
+                arguments='{"repo_url":"https://github.com/acme/notes"}',
+            )],
+            finish_reason="tool_calls",
+        ),
+        Turn(content="patched and restarted", tool_calls=[], finish_reason="stop"),
+    ]
+    seen: dict = {}
+
+    def fake_complete(cfg, items, tools=None, tool_choice=None):
+        seen["tools"] = tools
+        return turns.pop(0)
+
+    import terra_analyzer.tasks.editor as editor_mod
+
+    monkeypatch.setattr("terra_analyzer.runtime.loop.complete", fake_complete)
+    monkeypatch.setattr(editor_mod, "preflight", lambda cfg: None)
+    monkeypatch.setattr(editor_mod, "apply_patch", lambda *a, **k: {"path": "web/src/App.tsx", "ok": True})
+    monkeypatch.setattr(editor_mod, "preview_restart", lambda *a, **k: {"ok": True})
+
+    response = client.post(
+        "/tasks/editor",
+        json={"question": "change the heading", "map": _agent_map()},
+    )
+    assert response.status_code == 200
+    events = _ndjson(response)
+    labels = [ev.get("label") for ev in events if ev.get("stage") == "tool"]
+    assert labels == ["apply_patch", "preview_restart"]
+    assert events[-1] == {"answer": "patched and restarted"}
+    names = [t["function"]["name"] for t in seen["tools"]]
+    assert names[-2:] == ["apply_patch", "preview_restart"]
+    assert "lookup_component" in names
 
 
 def test_tasks_agent_dotdot_is_400(monkeypatch):

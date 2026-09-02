@@ -89,13 +89,13 @@ terra_analyzer/
   roles/              mapper.py, guide.py, editor.py
   tools/              schemas; effects in Go
   retrieve/           map as index (BM25/keyword)
-  tasks/              architecture/, qa/, agent/
+  tasks/              architecture/, qa/, agent/, editor/
   evals/              programmatic checkers
 ../local-llm/
   terra_local_llm/    optional GGUF /v1 server (:8020)
 ```
 
-HTTP task names stay `architecture` and `qa`; `agent` is additive. Completions stays the model wire
+HTTP task names stay `architecture` and `qa`; `agent` and `editor` are additive. Completions stays the model wire
 (llama.cpp / Hugging Face GGUF). Do not add LangGraph, a vector DB, or
 `/v1/responses` on llama.cpp. Register tasks in `tasks/registry.py`
 `default_registry()`.

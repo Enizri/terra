@@ -37,6 +37,20 @@ Caps that do exist: `TERRA_PREVIEW_MAX` (default 2) concurrent previews and
 `TERRA_PREVIEW_TTL` (default 30m) idle shutdown. They limit resource use, not what
 the code inside can do.
 
+### Agent writes stay inside the preview checkout
+
+The editor role may call `apply_patch` / `preview_restart`, which HTTP to
+`POST /preview/patch` and `POST /preview/restart` on the Go API. Those writes are
+confined to the preview checkout (`SafeJoin`, size cap, no symlink escape — the
+same rules as tarball extract / `GET /files`). Python never `os/exec`s the
+checkout. Patches are **not** git-committed.
+
+That does not make the write path safe to point at an untrusted repository. Live
+preview already installs and runs that repository's code as described above;
+agent patches mutate the same tree. Do not point preview — or the editor — at a
+repository you would not `git clone && npm run dev` by hand. The read-only guide
+task (`POST /jobs/agent`) cannot patch.
+
 ### Repository contents reach the model as prompt text
 
 The analyzer sends scanned repository files to an LLM. Treat a resulting map as
