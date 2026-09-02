@@ -90,7 +90,7 @@ terra_analyzer/
   tools/              schemas; effects in Go
   retrieve/           map as index (BM25/keyword)
   tasks/              architecture/, qa/, agent/, editor/
-  evals/              programmatic checkers
+  evals/              programmatic checkers (ask goldens, trajectories, policy)
 ../local-llm/
   terra_local_llm/    optional GGUF /v1 server (:8020)
 ```
@@ -99,6 +99,25 @@ HTTP task names stay `architecture` and `qa`; `agent` and `editor` are additive.
 (llama.cpp / Hugging Face GGUF). Do not add LangGraph, a vector DB, or
 `/v1/responses` on llama.cpp. Register tasks in `tasks/registry.py`
 `default_registry()`.
+
+## Harness evals
+
+`evals/` holds pytest checkers, not an LLM-as-judge. CI runs them through
+`make test-py` (`-m 'not slow'`). `make eval` is the same suite pointed at
+`terra_analyzer/evals/` only.
+
+| Kind | Fixture | What it asserts |
+|---|---|---|
+| Ask retrieve | `case-studies/memos.ask.json` (next to the golden map) | keyword rank hits an expected component and file |
+| Guide / editor trajectory | `evals/fixtures/*.json` (recorded Completions) | tool order and allowlist (guide cannot patch) |
+| Policy | recorded turns in the test | path escape, turn cap (default 6), tool allowlist |
+
+Live llama.cpp stays `@pytest.mark.slow` and is skipped unless
+`TERRA_SLOW=1` / `TERRA_INTEGRATION=1`. There is no LLM-as-judge in CI.
+
+Editor writes are confined to the preview checkout (`SafeJoin`, size cap, no
+symlink escape) — see [`SECURITY.md`](SECURITY.md). Trajectory evals replay
+recorded turns; they do not `POST /preview/patch` against a live checkout.
 
 ## Web — `apps/web/src`
 
@@ -117,6 +136,7 @@ Import direction: `app/routes → features → shared`. Enforced by
 
 - Canonical schemas: [`packages/contracts/`](../packages/contracts/README.md)
 - Golden map: `case-studies/memos.map.json`
+- Ask eval goldens: `case-studies/memos.ask.json` (same directory)
 - Web copy: `apps/web/src/data/memos.map.json` via `make sync-fixtures`
 - Gate: `make check-contracts` (part of `make check`)
 
@@ -126,8 +146,9 @@ Import direction: `app/routes → features → shared`. Enforced by
 |---|---|
 | `make check-contracts` | Versioned fixtures ↔ Go/Python/TS |
 | `make test` | fixtures + Go + Python + web |
+| `make eval` | harness checkers in `evals/` (no live LLM; `-m 'not slow'`) |
 | `make lint` | golangci-lint + oxlint + Python lint |
-| `make check` | contracts + test + lint (CI entry point) |
+| `make check` | contracts + test + lint (CI entry point; Python uses `-m 'not slow'`) |
 
 ## Known warts
 

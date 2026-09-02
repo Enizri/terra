@@ -1,5 +1,5 @@
 .PHONY: run-analyzer run-server run-llm run-web build-web dev dev-api up down up-llm \
-	test test-fixtures sync-fixtures test-go test-py test-web test-integration \
+	test test-fixtures sync-fixtures test-go test-py test-web test-integration eval \
 	lint lint-go lint-web lint-py check check-contracts fmt-go venv venv-local
 
 # One-command local stack (host processes, hot reload):
@@ -17,6 +17,7 @@
 # Verification:
 #   make check            # fixtures + Go/Python/web tests + lint
 #   make test             # fixtures + Go/Python/web tests (no lint)
+#   make eval             # programmatic harness evals (no live LLM)
 #   make test-integration # opt-in live GitHub + live LLM (needs env + services)
 
 VENV := backend/.venv
@@ -99,9 +100,17 @@ fmt-go:
 test-go:
 	cd backend/api && go build ./... && go test ./...
 
+# CI (`make check` → test-py) deselects @pytest.mark.slow so live llama.cpp
+# never runs in GitHub Actions. Harness evals under terra_analyzer/evals/ are
+# included here too (programmatic checkers; no LLM-as-judge).
 test-py:
 	cd backend/analyzer && ../.venv/bin/python -m pytest -q -m 'not slow'
 	cd backend/local-llm && ../.venv/bin/python -m pytest -q
+
+# Ask goldens + recorded trajectories + policy (paths, turn cap, allowlist).
+# Same -m 'not slow' as test-py; live llama.cpp stays opt-in via TERRA_SLOW=1.
+eval:
+	cd backend/analyzer && ../.venv/bin/python -m pytest -q -m 'not slow' terra_analyzer/evals
 
 test-web:
 	cd apps/web && npm install && npm test

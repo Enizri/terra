@@ -20,7 +20,7 @@ Storage details live in [`architecture/data.md`](architecture/data.md).
 | **Role** | System-prompt copy for a kind of work (mapper, guide, editor). Owned by Python `roles/`. |
 | **Tool** | A JSON schema the model may call. Schemas live in Python `tools/`; **effects** run in Go over HTTP. |
 | **Retrieve** | Ranking map components and files as an index (keyword / BM25). Owned by Python `retrieve/`. |
-| **Eval** | Programmatic checkers plus golden files under `case-studies/`. Owned by Python `evals/`. |
+| **Eval** | Programmatic checkers plus golden files under `case-studies/`. Owned by Python `evals/`. CI never uses an LLM-as-judge. |
 | **Probe** | The cheap first half of analyze: fetch + scan + model recommendation, with no LLM map generation. |
 | **Model** | An entry in Terra's static catalog that the workspace may choose for analyze/ask. Reached only through OpenAI-compatible Chat Completions (`inference/` + `local-llm`). |
 

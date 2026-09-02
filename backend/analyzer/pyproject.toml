@@ -21,6 +21,7 @@ build-backend = "setuptools.build_meta"
 include = ["terra_analyzer*"]
 
 [tool.pytest.ini_options]
+testpaths = ["tests", "terra_analyzer/evals"]
 markers = [
-    "slow: hits a real local HF model server (deselect with -m 'not slow')",
+    "slow: hits a real local llama.cpp / HF model server (deselect with -m 'not slow')",
 ]

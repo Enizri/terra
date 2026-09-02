@@ -82,9 +82,12 @@ Follow the checklist in [`packages/contracts/README.md`](../packages/contracts/R
 
 ### Add an eval
 
-1. Add a golden file next to `case-studies/memos.map.json` when the check needs a fixture.
+1. Add a golden file next to `case-studies/memos.map.json` when the check needs a fixture
+   (Ask cases: `memos.ask.json`). Trajectory fixtures stay under `evals/fixtures/`.
 2. Put the pytest checker under `backend/analyzer/terra_analyzer/evals/` (no live LLM in CI).
 3. Programmatic assertions first (paths, turn cap, tool allowlist). No LLM-as-judge in CI.
+4. `make eval` runs the suite. CI already includes it via `make test-py` (`-m 'not slow'`).
+   Mark live llama.cpp tests `@pytest.mark.slow`.
 
 ### Add a web feature module
 
