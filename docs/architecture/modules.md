@@ -15,7 +15,8 @@ backend/api/cmd/terra
       → backend/api/internal/scan, preview, catalog, config, job, …
 
 analyzer
-  terra_analyzer.api → tasks → inference
+  terra_analyzer.api → tasks → roles / runtime / tools / retrieve
+                    → inference
   terra_local_llm    (separate process)
 
 web

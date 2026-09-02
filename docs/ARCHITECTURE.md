@@ -45,6 +45,11 @@ Two invariants hold everywhere:
 | Scan / deps / tarball | `backend/api/internal/scan/` |
 | Analyzer task / schema / validate | `backend/analyzer/terra_analyzer/tasks/<name>/` |
 | Analyzer HTTP | `backend/analyzer/terra_analyzer/api/` |
+| Role prompts | `backend/analyzer/terra_analyzer/roles/` |
+| Tool schemas | `backend/analyzer/terra_analyzer/tools/` (effects in Go) |
+| Retrieve index | `backend/analyzer/terra_analyzer/retrieve/` |
+| Item runtime | `backend/analyzer/terra_analyzer/runtime/` |
+| Harness evals | `backend/analyzer/terra_analyzer/evals/` + `case-studies/` |
 | Wire models | `backend/analyzer/terra_analyzer/contracts/` + root `packages/contracts/` |
 | Local GGUF server | `backend/local-llm/terra_local_llm/` |
 | Workspace UI pane | `apps/web/src/routes/workspace/` |
@@ -79,14 +84,21 @@ terra_analyzer/
   app.py              uvicorn entry (`app`, `create_app`)
   api/                FastAPI routes
   contracts/          Pydantic wire models
-  tasks/              typed tasks (architecture, qa) + registry
-  inference/          OpenAI-compatible client
+  inference/          Completions client; items ↔ messages+tools
+  runtime/            turn cap, dispatch, trace
+  roles/              mapper.py, guide.py, editor.py
+  tools/              schemas; effects in Go
+  retrieve/           map as index (BM25/keyword)
+  tasks/              architecture/, qa/ (+ agent later)
+  evals/              programmatic checkers
 ../local-llm/
   terra_local_llm/    optional GGUF /v1 server (:8020)
 ```
 
-Tasks are deterministic handlers — not autonomous agents. Register new ones in
-`tasks/registry.py` `default_registry()`.
+HTTP task names stay `architecture` and `qa`. Completions stays the model wire
+(llama.cpp / Hugging Face GGUF). Do not add LangGraph, a vector DB, or
+`/v1/responses` on llama.cpp. Register tasks in `tasks/registry.py`
+`default_registry()`.
 
 ## Web — `apps/web/src`
 
