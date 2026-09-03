@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { buildFileTree, countLeaves, type FileNode } from "../fileTree";
-import { ChevronIcon, CloseIcon } from "./icons";
+import { ChevronIcon, CloseIcon, FilesIcon, HistoryIcon } from "./icons";
 import type { HistoryEntry } from "./types";
 
 export type { HistoryEntry } from "./types";
@@ -93,6 +93,8 @@ export function Sidebar({
   onOpen,
   onRemove,
   busy,
+  collapsed = false,
+  onExpand,
 }: {
   map: SidebarMap | null;
   history: HistoryEntry[];
@@ -102,10 +104,39 @@ export function Sidebar({
   /** Drop one stored analysis from the rail and the database. */
   onRemove: (entry: HistoryEntry) => void;
   busy: boolean;
+  /** Narrowed to a glyph strip. The rail stays mounted so its open sections
+   *  and expanded folders survive the collapse. */
+  collapsed?: boolean;
+  onExpand?: () => void;
 }) {
   const tree = useMemo(() => (map ? buildFileTree(map.components) : []), [map]);
   const fileCount = useMemo(() => countLeaves(tree), [tree]);
   const current = map?.project.repository_url ?? null;
+
+  if (collapsed) {
+    return (
+      <aside className="sh-ws__rail is-collapsed">
+        <button
+          type="button"
+          className="sh-ws__rail-glyph"
+          aria-label={`Files${map ? ` (${fileCount})` : ""}`}
+          title={`Files${map ? ` (${fileCount})` : ""}`}
+          onClick={onExpand}
+        >
+          <FilesIcon />
+        </button>
+        <button
+          type="button"
+          className="sh-ws__rail-glyph"
+          aria-label={`History${history.length ? ` (${history.length})` : ""}`}
+          title={`History${history.length ? ` (${history.length})` : ""}`}
+          onClick={onExpand}
+        >
+          <HistoryIcon />
+        </button>
+      </aside>
+    );
+  }
 
   return (
     <aside className="sh-ws__rail">

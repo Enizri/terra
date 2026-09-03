@@ -4,7 +4,6 @@
   .sh-ws {
     --sh-ws-scale: 1;
     zoom: 1;
-    transform: none;
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr) auto;
     width: auto;
@@ -13,18 +12,50 @@
     overflow: visible;
   }
 
+  /* The rail becomes a drawer over the page rather than disappearing. It used
+     to be `display: none` here, which put the file tree and every stored map
+     out of reach on a laptop in a split window. `position: fixed` takes it out
+     of the single column, so the stage and dock keep rows 2 and 3. */
   .sh-ws__rail {
+    position: fixed;
+    z-index: 20;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 260px;
+    background: var(--sh-window);
+    box-shadow: var(--sh-shadow-2);
+  }
+
+  /* Collapsed at this width means gone: a glyph strip pinned over the content
+     would cost the same room as the drawer and do less. */
+  .sh-ws__rail.is-collapsed {
     display: none;
   }
 
   .sh-ws__dock {
     border-left: 0;
     border-top: 1px solid var(--sh-border);
+    /* A cap, not a height — a long answer can still use the room, and the
+       panel shrinks to the composer when the thread is empty. */
+    max-height: min(45dvh, 420px);
   }
 
-  .sh-ws__dock .sh-terra-chat,
-  .sh-ws__dock .sh-terra-chat--open {
-    height: 320px;
+  /* The header intake gives up its slack before the crumb does. */
+  .sh-ws__url--compact {
+    flex: 0 1 220px;
   }
 }
 
+@media (max-width: 720px) {
+  .sh-ws__head {
+    flex-wrap: wrap;
+    gap: var(--sh-space-2);
+  }
+
+  .sh-ws__url--compact {
+    order: 1;
+    flex: 1 1 100%;
+    margin-left: 0;
+  }
+}
