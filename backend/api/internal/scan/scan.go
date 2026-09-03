@@ -135,7 +135,16 @@ func scanTarball(r io.Reader, res *Result) error {
 		case tar.TypeDir:
 			col.dir(rel)
 		case tar.TypeReg:
-			col.file(rel, hdr.Size, func() ([]byte, error) { return io.ReadAll(tr) })
+			col.file(rel, hdr.Size, func() ([]byte, error) {
+				data, err := io.ReadAll(io.LimitReader(tr, maxManifestBytes+1))
+				if err != nil {
+					return nil, err
+				}
+				if int64(len(data)) > maxManifestBytes {
+					return nil, nil
+				}
+				return data, nil
+			})
 		}
 	}
 	col.finish()

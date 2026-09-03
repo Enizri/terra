@@ -2,7 +2,7 @@ import { useState, type ClipboardEvent, type DragEvent, type FormEvent } from "r
 import type { TerraMap } from "../../../features/architecture-map";
 import type { LiveSelection } from "../../../features/preview";
 import type { useAnalyze } from "../useAnalyze";
-import { extractGitHubURL, githubURLFromDataTransfer } from "../githubUrl";
+import { githubURLFromDataTransfer, parseGitHubURL, discardedRefNote } from "../githubUrl";
 import { ArrowIcon } from "../../../shared/shell/icons";
 import { StatusLine } from "../../../shared/shell/StatusLine";
 import { WsDropCard } from "../../../shared/shell/DropCard";
@@ -29,11 +29,13 @@ export function DropStage({
   const [over, setOver] = useState(false);
   const [url, setUrl] = useState("");
   const [intakeError, setIntakeError] = useState<string | null>(null);
+  const [intakeNote, setIntakeNote] = useState<string | null>(null);
   const { start, proceed, cancel, status, error, running, elapsed, partial, recommendation } =
     analyze;
 
-  const begin = (repo: string) => {
+  const begin = (repo: string, note?: string | null) => {
     setIntakeError(null);
+    setIntakeNote(note ?? null);
     setUrl(repo);
     start(repo);
   };
@@ -42,29 +44,29 @@ export function DropStage({
     e.preventDefault();
     const repo = url.trim();
     if (!repo || running) return;
-    const normalized = extractGitHubURL(repo) ?? repo;
-    begin(normalized);
+    const parsed = parseGitHubURL(repo);
+    begin(parsed?.url ?? repo, parsed ? discardedRefNote(parsed) : null);
   };
 
   const onDrop = (e: DragEvent) => {
     e.preventDefault();
     setOver(false);
     if (running) return;
-    const repo = githubURLFromDataTransfer(e.dataTransfer);
-    if (!repo) {
+    const parsed = githubURLFromDataTransfer(e.dataTransfer);
+    if (!parsed) {
       setIntakeError("Drop a GitHub repository URL (github.com/owner/repo)");
       return;
     }
-    begin(repo);
+    begin(parsed.url, discardedRefNote(parsed));
   };
 
   const onPaste = (e: ClipboardEvent) => {
     if (running || map) return;
     const text = e.clipboardData.getData("text/plain");
-    const repo = extractGitHubURL(text);
-    if (!repo) return;
+    const parsed = parseGitHubURL(text);
+    if (!parsed) return;
     e.preventDefault();
-    begin(repo);
+    begin(parsed.url, discardedRefNote(parsed));
   };
 
   return (
@@ -113,7 +115,11 @@ export function DropStage({
         />
       )}
 
-      {(intakeError || error) && <p className="sh-ws__error">{intakeError ?? error}</p>}
+      {(intakeNote || intakeError || error) && (
+        <p className={intakeError || error ? "sh-ws__error" : "sh-ws__note"}>
+          {intakeError ?? error ?? intakeNote}
+        </p>
+      )}
 
       <form className="sh-ws__url" onSubmit={submit}>
         <input
@@ -122,6 +128,7 @@ export function DropStage({
           onChange={(e) => {
             setUrl(e.target.value);
             setIntakeError(null);
+            setIntakeNote(null);
           }}
           placeholder="github.com/terra/terra"
           aria-label="GitHub repository URL"

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { extractGitHubURL } from "./githubUrl.ts";
+import { extractGitHubURL, parseGitHubURL, discardedRefNote } from "./githubUrl.ts";
 
 test("https github URLs normalize to canonical form", () => {
   assert.equal(
@@ -46,4 +46,35 @@ test("first github URL wins when text has extras", () => {
     extractGitHubURL("check https://github.com/acme/notes please"),
     "https://github.com/acme/notes",
   );
+});
+
+test("a /tree/<branch> URL keeps the repo and names the discarded branch", () => {
+  const parsed = parseGitHubURL("https://github.com/acme/notes/tree/feature-x");
+  assert.deepEqual(parsed, {
+    url: "https://github.com/acme/notes",
+    discardedBranch: "feature-x",
+  });
+  assert.equal(
+    discardedRefNote(parsed!),
+    "Terra maps the default branch — the URL pointed at feature-x.",
+  );
+});
+
+test("a subdirectory under tree is named in the note", () => {
+  const parsed = parseGitHubURL("https://github.com/acme/notes/tree/main/web");
+  assert.equal(parsed?.url, "https://github.com/acme/notes");
+  assert.equal(parsed?.discardedBranch, "main");
+  assert.equal(parsed?.discardedPath, "web");
+  assert.match(discardedRefNote(parsed!) ?? "", /main and web/);
+});
+
+test("a blob path is treated as a discarded branch plus path", () => {
+  const parsed = parseGitHubURL("https://github.com/acme/notes/blob/main/README.md");
+  assert.equal(parsed?.discardedBranch, "main");
+  assert.equal(parsed?.discardedPath, "README.md");
+});
+
+test("a bare owner/repo has no discarded note", () => {
+  const parsed = parseGitHubURL("https://github.com/acme/notes");
+  assert.equal(discardedRefNote(parsed!), null);
 });
