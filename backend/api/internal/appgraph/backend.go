@@ -33,18 +33,38 @@ func fromGo(root, dir string) []App {
 		return nil
 	}
 	def := defaultGoPkg(pkgs)
+	kind := KindAPI
+	if goLooksLikeCLI(dir, def) {
+		kind = KindCLI
+	}
 	var apps []App
 	for _, pkg := range pkgs {
 		app := App{
-			Dir: rel(root, dir), Kind: KindAPI, Framework: "go",
-			Install: "go mod download", Run: "go run " + pkg, Previewable: pkg == def,
+			Dir: rel(root, dir), Kind: kind, Framework: "go",
+			Install: "go mod download", Run: "go run " + pkg, Previewable: pkg == def && kind == KindAPI,
 		}
-		if !app.Previewable {
+		switch {
+		case kind == KindCLI:
+			app.Previewable = false
+			app.Reason = "This is a Go CLI. It has no web UI to iframe — Terra will show a terminal in a later change."
+		case !app.Previewable:
 			app.Reason = fmt.Sprintf("Secondary entry point: Terra boots %s for this module.", def)
 		}
 		apps = append(apps, app)
 	}
 	return apps
+}
+
+func goLooksLikeCLI(dir, defPkg string) bool {
+	switch defPkg {
+	case "./cmd/api", "./cmd/server", "./cmd/web":
+		return false
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "go.mod"))
+	if err != nil {
+		return false
+	}
+	return strings.Contains(string(data), "github.com/spf13/cobra")
 }
 
 func defaultGoPkg(pkgs []string) string {
@@ -84,6 +104,10 @@ func fromPython(root, dir string) []App {
 	case deps["flask"] && exists(dir, "app.py"):
 		base.Run = "flask --app app run --port {port}"
 		return []App{withFramework(base, KindAPI, "flask")}
+	case deps["click"] || deps["typer"]:
+		base.Kind, base.Framework, base.Previewable = KindCLI, "python", false
+		base.Reason = "This is a Python CLI. It has no web UI to iframe — Terra will show a terminal in a later change."
+		return []App{base}
 	}
 	return nil
 }
@@ -96,7 +120,7 @@ func pythonDeps(dir string) map[string]bool {
 			continue
 		}
 		low := strings.ToLower(string(data))
-		for _, dep := range []string{"fastapi", "uvicorn", "flask", "django"} {
+		for _, dep := range []string{"fastapi", "uvicorn", "flask", "django", "click", "typer"} {
 			if strings.Contains(low, dep) {
 				deps[dep] = true
 			}
