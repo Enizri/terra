@@ -2,7 +2,8 @@
 
 .sh-ws__dock {
   display: flex;
-  padding: 20px;
+  flex-direction: column;
+  padding: var(--sh-space-5);
   border-left: 1px solid var(--sh-border);
   min-height: 0;
   background: var(--sh-bg);
@@ -15,11 +16,18 @@
   gap: 6px;
 }
 
-/* Fill the column instead of the floating 360x440 the theater uses. */
+/* Fill the column instead of the floating 360x440 the theater uses. Released
+   as a flex item rather than pinned to `height: 100%`: a percentage height
+   needs every ancestor to carry a definite one, which stops being true the
+   moment the shell switches to `height: auto` at the narrow breakpoint. The
+   widget is already a flex column inside (head / body / prompt), so it only
+   needs its fixed size undone. */
 .sh-ws__dock .sh-terra-chat,
 .sh-ws__dock .sh-terra-chat--open {
-  width: 100%;
-  height: 100%;
+  flex: 1 1 auto;
+  width: auto;
+  height: auto;
+  min-height: 0;
 }
 
 /* Light chat skin — scoped so the landing theater dock stays dark. */
@@ -28,11 +36,8 @@
   color: #111;
   font-size: 14px;
   line-height: 1.5;
-  border-radius: 14px;
-  box-shadow:
-    0 1px 0 rgba(0, 0, 0, 0.04),
-    0 12px 32px rgba(0, 0, 0, 0.06),
-    0 0 0 1px rgba(0, 0, 0, 0.08);
+  border-radius: var(--sh-radius-lg);
+  box-shadow: var(--sh-shadow-1);
 }
 
 .sh-ws__dock .sh-terra-chat__head {
@@ -271,12 +276,10 @@
   max-height: min(320px, 45vh);
   overflow: auto;
   padding: 6px;
-  border-radius: 14px;
+  border-radius: var(--sh-radius-lg);
   border: 1px solid rgba(0, 0, 0, 0.1);
   background: #fff;
-  box-shadow:
-    0 12px 40px rgba(0, 0, 0, 0.12),
-    0 0 0 1px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--sh-shadow-2);
 }
 
 .sh-model-toggle__menu .sh-gate__list {

@@ -1,11 +1,11 @@
-import { useState, type ClipboardEvent, type DragEvent, type FormEvent } from "react";
+import { useState, type ClipboardEvent, type DragEvent } from "react";
 import type { TerraMap } from "../../../features/architecture-map";
 import type { LiveSelection } from "../../../features/preview";
 import type { useAnalyze } from "../useAnalyze";
 import { extractGitHubURL, githubURLFromDataTransfer } from "../githubUrl";
-import { ArrowIcon } from "../../../shared/shell/icons";
 import { StatusLine } from "../../../shared/shell/StatusLine";
 import { WsDropCard } from "../../../shared/shell/DropCard";
+import { RepoForm } from "../../../shared/shell/RepoForm";
 import { MapStage } from "./MapStage";
 import { ModelGate } from "./ModelGate";
 import type { ModelChoice } from "../../../features/analysis";
@@ -27,23 +27,16 @@ export function DropStage({
   onModel: (choice: ModelChoice) => void;
 }) {
   const [over, setOver] = useState(false);
-  const [url, setUrl] = useState("");
+  /** What a drop put in the field, so the intake shows what it is about to map. */
+  const [dropped, setDropped] = useState("");
   const [intakeError, setIntakeError] = useState<string | null>(null);
   const { start, proceed, cancel, status, error, running, elapsed, partial, recommendation } =
     analyze;
 
   const begin = (repo: string) => {
     setIntakeError(null);
-    setUrl(repo);
+    setDropped(repo);
     start(repo);
-  };
-
-  const submit = (e: FormEvent) => {
-    e.preventDefault();
-    const repo = url.trim();
-    if (!repo || running) return;
-    const normalized = extractGitHubURL(repo) ?? repo;
-    begin(normalized);
   };
 
   const onDrop = (e: DragEvent) => {
@@ -67,8 +60,10 @@ export function DropStage({
     begin(repo);
   };
 
+  const mapped = !!map && !recommendation;
+
   return (
-    <main className={`sh-ws__stage${map && !recommendation ? " is-map" : ""}`}>
+    <main className={`sh-ws__stage${mapped ? " is-map" : ""}`}>
       {recommendation ? (
         <ModelGate
           recommendation={recommendation}
@@ -99,39 +94,31 @@ export function DropStage({
           <button type="button" className="sh-ws__stop" onClick={cancel}>
             Stop
           </button>
+          {error && <p className="sh-ws__error">{error}</p>}
         </div>
       ) : (
-        <WsDropCard
-          over={over}
-          onDragOver={(e) => {
-            e.preventDefault();
-            setOver(true);
-          }}
-          onDragLeave={() => setOver(false)}
-          onDrop={onDrop}
-          onPaste={onPaste}
-        />
+        /* Drop target and field are one panel: the two halves of a single
+           instruction, not a card with a stray form under it. */
+        <div className="sh-ws__intake">
+          <WsDropCard
+            over={over}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setOver(true);
+            }}
+            onDragLeave={() => setOver(false)}
+            onDrop={onDrop}
+            onPaste={onPaste}
+          />
+          <RepoForm
+            busy={running}
+            seed={dropped}
+            onSubmit={(raw) => begin(extractGitHubURL(raw) ?? raw)}
+            label="GitHub repository URL"
+          />
+          {(intakeError || error) && <p className="sh-ws__error">{intakeError ?? error}</p>}
+        </div>
       )}
-
-      {(intakeError || error) && <p className="sh-ws__error">{intakeError ?? error}</p>}
-
-      <form className="sh-ws__url" onSubmit={submit}>
-        <input
-          className="sh-ws__input"
-          value={url}
-          onChange={(e) => {
-            setUrl(e.target.value);
-            setIntakeError(null);
-          }}
-          placeholder="github.com/terra/terra"
-          aria-label="GitHub repository URL"
-          spellCheck={false}
-          disabled={running}
-        />
-        <button className="sh-btn" type="submit" disabled={running}>
-          {running ? "Mapping…" : "Map it"} <ArrowIcon />
-        </button>
-      </form>
     </main>
   );
 }
