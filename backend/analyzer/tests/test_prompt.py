@@ -34,6 +34,16 @@ def test_build_prompt_caps_deps(scan):
     assert "(+10 more)" in prompt
 
 
+def test_build_prompt_caps_manifest_count(scan):
+    scan.dependencies = [
+        Manifest(manifest=f"pkg{i}/package.json", ecosystem="npm", names=["react"])
+        for i in range(25)
+    ]
+    prompt = build_prompt(scan)
+    assert "pkg19/package.json" in prompt and "pkg20/package.json" not in prompt
+    assert "(+5 more manifests omitted)" in prompt
+
+
 def test_file_section_groups_root_files_bare():
     section = file_section(["main.go", "go.mod", "web/app.tsx"])
     assert section.startswith("main.go, go.mod\n") or "main.go, go.mod\n" in section

@@ -52,7 +52,7 @@
           },
           "type": {
             "type": "string",
-            "enum": ["frontend", "backend", "database", "infrastructure"]
+            "enum": ["frontend", "backend", "database", "infrastructure", "mobile", "desktop"]
           },
           "tech": {
             "type": "array",

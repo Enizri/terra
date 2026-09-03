@@ -8,6 +8,7 @@ from ...contracts import ScanResult
 MAX_PROMPT_PATHS = 1200
 MAX_FILES_CHARS = 16000
 MAX_DEPS_PER_MANIFEST = 30
+MAX_MANIFESTS = 20
 
 
 def build_prompt(res: ScanResult) -> str:
@@ -35,7 +36,8 @@ def build_prompt(res: ScanResult) -> str:
 
     if res.dependencies:
         parts.append("\nDEPENDENCIES\n")
-        for manifest in res.dependencies:
+        shown = res.dependencies[:MAX_MANIFESTS]
+        for manifest in shown:
             names, extra = manifest.names, ""
             if len(names) > MAX_DEPS_PER_MANIFEST:
                 extra = f" (+{len(names) - MAX_DEPS_PER_MANIFEST} more)"
@@ -43,6 +45,9 @@ def build_prompt(res: ScanResult) -> str:
             parts.append(
                 f"{manifest.manifest} [{manifest.ecosystem}]: {', '.join(names)}{extra}\n"
             )
+        omitted = len(res.dependencies) - len(shown)
+        if omitted > 0:
+            parts.append(f"(+{omitted} more manifests omitted)\n")
 
     parts.append("\nFILES (real paths, grouped by directory — quote these exactly)\n")
     parts.append(file_section(res.files))
