@@ -52,8 +52,19 @@ func MountPathProxy(publicBase, id, targetBaseURL, repoKey string, authFix func(
 	if _, err := url.ParseRequestURI(strings.TrimRight(targetBaseURL, "/") + "/"); err != nil {
 		return "", fmt.Errorf("invalid preview target: %w", err)
 	}
+	return mountPathProxy(publicBase, id, targetBaseURL, repoKey, authFix, false)
+}
+
+func mountPathProxy(publicBase, id, targetBaseURL, repoKey string, authFix func(*http.Request), stripPrefix bool) (publicURL string, err error) {
+	id = strings.Trim(id, "/")
+	if id == "" || strings.Contains(id, "/") {
+		return "", fmt.Errorf("invalid live proxy id %q", id)
+	}
+	if _, err := url.ParseRequestURI(strings.TrimRight(targetBaseURL, "/") + "/"); err != nil {
+		return "", fmt.Errorf("invalid preview target: %w", err)
+	}
 	prefix := "/__live/" + id
-	handler, err := newInjectProxy(repoKey, targetBaseURL, authFix, prefix)
+	handler, err := newInjectProxy(repoKey, targetBaseURL, authFix, prefix, stripPrefix)
 	if err != nil {
 		return "", err
 	}

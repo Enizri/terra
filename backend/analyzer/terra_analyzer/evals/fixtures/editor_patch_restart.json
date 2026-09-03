@@ -1,0 +1,31 @@
+{
+  "turns": [
+    {
+      "content": "",
+      "finish_reason": "tool_calls",
+      "tool_calls": [
+        {
+          "id": "c1",
+          "name": "apply_patch",
+          "arguments": "{\"path\": \"web/src/App.tsx\", \"repo_url\": \"https://github.com/acme/notes\", \"unified_diff\": \"@@ -1,1 +1,1 @@\\n-export const n = 1\\n+export const n = 2\\n\"}"
+        }
+      ]
+    },
+    {
+      "content": "",
+      "finish_reason": "tool_calls",
+      "tool_calls": [
+        {
+          "id": "c2",
+          "name": "preview_restart",
+          "arguments": "{\"repo_url\": \"https://github.com/acme/notes\"}"
+        }
+      ]
+    },
+    {
+      "content": "Updated the heading in web/src/App.tsx and restarted the preview. Nothing was committed.",
+      "finish_reason": "stop",
+      "tool_calls": []
+    }
+  ]
+}

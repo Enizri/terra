@@ -57,10 +57,10 @@ func requiresToken(r *http.Request) bool {
 	switch r.Method {
 	case http.MethodPost:
 		switch p {
-		case "/analyze", "/preview", "/ask", "/traces/ingest":
+		case "/analyze", "/ask", "/traces/ingest":
 			return true
 		}
-		if strings.HasPrefix(p, "/jobs/") {
+		if strings.HasPrefix(p, "/jobs/") || strings.HasPrefix(p, "/preview") {
 			return true
 		}
 	case http.MethodDelete:

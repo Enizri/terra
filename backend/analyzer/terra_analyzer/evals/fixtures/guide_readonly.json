@@ -1,0 +1,20 @@
+{
+  "turns": [
+    {
+      "content": "",
+      "finish_reason": "tool_calls",
+      "tool_calls": [
+        {
+          "id": "c1",
+          "name": "lookup_component",
+          "arguments": "{\"query\": \"How does SSO login work?\"}"
+        }
+      ]
+    },
+    {
+      "content": "SSO lives in the auth component (server/auth.go). Login verifies the session cookie and redirects to the identity provider.",
+      "finish_reason": "stop",
+      "tool_calls": []
+    }
+  ]
+}

@@ -3,10 +3,41 @@
 .sh-ws__rail {
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  padding: 20px 14px;
+  gap: var(--sh-space-4);
+  padding: var(--sh-space-5) var(--sh-space-3);
   border-right: 1px solid var(--sh-border);
-  overflow-y: auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Collapsed: a glyph strip that expands the rail back. */
+.sh-ws__rail.is-collapsed {
+  align-items: center;
+  gap: var(--sh-space-2);
+  padding: var(--sh-space-5) var(--sh-space-2);
+}
+
+.sh-ws__rail-glyph {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--sh-radius-sm);
+  background: none;
+  color: var(--sh-muted);
+  cursor: pointer;
+}
+
+.sh-ws__rail-glyph svg {
+  width: 17px;
+  height: 17px;
+}
+
+.sh-ws__rail-glyph:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--sh-ink);
 }
 
 /* An open section may hold a long tree; a closed one is just its header. */
@@ -16,6 +47,16 @@
   min-height: 0;
 }
 
+/* Open sections size to their content and give room back by shrinking, never
+   by growing: grow would stretch a three-file tree down the rail and strand
+   History at the bottom behind a band of nothing. Shrink is what matters —
+   with `min-height: 0` below, two open sections split the rail in proportion
+   to how much each actually holds, and each body scrolls inside its share, so
+   both headers stay on screen however deep the tree gets.
+
+   The rule this replaces capped each body at `46vh`. That is a fraction of the
+   window, not of the rail: two open sections could still add up to more rail
+   than there was, which pushed History off the bottom. */
 .sh-ws__rail-section.is-open {
   flex: 0 1 auto;
 }
@@ -23,10 +64,12 @@
 .sh-ws__rail-toggle {
   display: flex;
   align-items: center;
-  gap: 8px;
+  /* The section shrinks by squeezing its body, never its own header. */
+  flex-shrink: 0;
+  gap: var(--sh-space-2);
   width: 100%;
   margin: 0 0 8px;
-  padding: 4px 6px;
+  padding: var(--sh-space-1) 6px;
   border: 0;
   border-radius: 6px;
   background: none;
@@ -67,7 +110,6 @@
 /* Scrolls itself so a deep tree can't push History off the rail. */
 .sh-ws__rail-body {
   min-height: 0;
-  max-height: 46vh;
   overflow-y: auto;
   overscroll-behavior: contain;
 }

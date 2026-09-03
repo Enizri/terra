@@ -1,0 +1,9 @@
+[package]
+name = "app"
+
+[dependencies]
+serde = "1"
+tauri = { version = "2" }
+
+[dev-dependencies]
+tokio = "1"

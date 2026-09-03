@@ -37,6 +37,26 @@ Caps that do exist: `TERRA_PREVIEW_MAX` (default 2) concurrent previews and
 `TERRA_PREVIEW_TTL` (default 30m) idle shutdown. They limit resource use, not what
 the code inside can do.
 
+### Agent writes stay inside the preview checkout
+
+The editor role may call `apply_patch` / `preview_restart`, which HTTP to
+`POST /preview/patch` and `POST /preview/restart` on the Go API. Those writes are
+confined to the preview checkout (`SafeJoin`, size cap, no symlink escape — the
+same rules as tarball extract / `GET /files`). Python never `os/exec`s the
+checkout. Patches are **not** git-committed.
+
+That does not make the write path safe to point at an untrusted repository. Live
+preview already installs and runs that repository's code as described above;
+agent patches mutate the same tree. Do not point preview — or the editor — at a
+repository you would not `git clone && npm run dev` by hand. The read-only guide
+task (`POST /jobs/agent`) cannot patch.
+
+Harness evals (`make eval`, and CI via `make test-py`) replay recorded Completions
+turns. They assert path escape, the turn cap, and tool allowlists; they do not
+call `POST /preview/patch` against a live checkout. Live llama.cpp is
+`@pytest.mark.slow` and is not run in CI (`-m 'not slow'`). There is no
+LLM-as-judge in CI.
+
 ### Repository contents reach the model as prompt text
 
 The analyzer sends scanned repository files to an LLM. Treat a resulting map as

@@ -25,6 +25,11 @@ GitHub default is **`main`**. Branch from **`staging`**. Open PRs into **`stagin
 | SQLite / migrations | `backend/api/internal/store/` |
 | Scan / tarball | `backend/api/internal/scan/` |
 | Analyzer task | `backend/analyzer/terra_analyzer/tasks/<name>/` |
+| Role prompt | `backend/analyzer/terra_analyzer/roles/` |
+| Tool schema | `backend/analyzer/terra_analyzer/tools/` (effects in Go) |
+| Retrieve | `backend/analyzer/terra_analyzer/retrieve/` |
+| Item runtime | `backend/analyzer/terra_analyzer/runtime/` |
+| Harness eval | `backend/analyzer/terra_analyzer/evals/` + `case-studies/` |
 | Local GGUF server | `backend/local-llm/terra_local_llm/` |
 | Workspace UI | `apps/web/src/routes/workspace/` |
 | Map diagram | `apps/web/src/features/architecture-map/` |
@@ -39,3 +44,4 @@ Web imports: `routes → features → shared`. Golden map:
 - Commit `.env`, keys, GGUF weights, or `.claude/` / `.cursor/` local state.
 - Mount `HeroDemo` on the landing until `apps/web/public/videos/landing/workspace-demo.mp4` exists.
 - Rewrite git history or open feature PRs against `main`.
+- Put LangGraph, a vector DB, or `/v1/responses` on llama.cpp.

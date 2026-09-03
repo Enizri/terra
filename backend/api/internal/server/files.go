@@ -1,15 +1,14 @@
 package server
 
 import (
-	"fmt"
 	"net/http"
 	"os"
 	"path"
-	"path/filepath"
 	"slices"
 	"strings"
 	"time"
 
+	"github.com/Enizri/terra/backend/api/internal/preview"
 	"github.com/Enizri/terra/backend/api/internal/scan"
 	"github.com/Enizri/terra/backend/api/internal/trace"
 )
@@ -26,7 +25,7 @@ func (s *Server) files(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]any{"starting": true})
 		return
 	}
-	full, rel, err := safeJoin(appDir, r.URL.Query().Get("path"))
+	full, rel, err := preview.SafeJoin(appDir, r.URL.Query().Get("path"))
 	if err != nil {
 		httpError(w, http.StatusBadRequest, err.Error())
 		return
@@ -125,19 +124,8 @@ func (s *Server) ingest(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// safeJoin resolves rel under base and rejects path escape (including symlinks).
+// safeJoin is the GET /files wrapper around preview.SafeJoin so existing
+// tests keep covering the same trust boundary ApplyPatch uses.
 func safeJoin(base, rel string) (full, clean string, err error) {
-	clean = path.Clean("/" + strings.TrimPrefix(rel, "/"))[1:]
-	realBase, err := filepath.EvalSymlinks(base)
-	if err != nil {
-		return "", "", fmt.Errorf("preview checkout unavailable")
-	}
-	full = filepath.Join(realBase, filepath.FromSlash(clean))
-	if realFull, err := filepath.EvalSymlinks(full); err == nil {
-		relPath, err := filepath.Rel(realBase, realFull)
-		if err != nil || relPath == ".." || strings.HasPrefix(relPath, ".."+string(filepath.Separator)) {
-			return "", "", fmt.Errorf("path escapes the repository")
-		}
-	}
-	return full, clean, nil
+	return preview.SafeJoin(base, rel)
 }

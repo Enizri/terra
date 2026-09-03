@@ -34,11 +34,11 @@
     --sh-flight-tile: 164px;
   }
 
-  /* The drawer runs at the reference `lg:text-3xl` / `lg:text-md`; the
-     `--sh-read` inflation the rest of the page uses would blow it past the
-     card beside it. */
+  /* The drawer runs a notch under the reference's `lg:text-3xl` / `lg:text-md`;
+     the `--sh-read` inflation the rest of the page uses would blow it past the
+     card beside it, and the card is the subject of this section. */
   .sh-root--landing .sh-power-list__btn {
-    font-size: 30px;
+    font-size: 27px;
   }
 }
 

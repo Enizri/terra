@@ -95,3 +95,48 @@ func TestMountPathProxyRoutesAndInjects(t *testing.T) {
 		t.Fatalf("after unmount status = %d, want 404", resp.StatusCode)
 	}
 }
+
+func TestMountPathProxyStripsPrefix(t *testing.T) {
+	id := "test-strip-hub"
+	prefix := "/__live/" + id
+	t.Cleanup(func() { UnmountPathProxy(id) })
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" && r.URL.Path != "/health" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		io.WriteString(w, "<html><head></head><body>"+r.URL.Path+"</body></html>")
+	}))
+	t.Cleanup(upstream.Close)
+
+	if _, err := mountPathProxy("http://127.0.0.1:8080", id, upstream.URL, "https://github.com/acme/notes", nil, true); err != nil {
+		t.Fatal(err)
+	}
+
+	mux := http.NewServeMux()
+	mux.Handle("/__live/", LiveHandler())
+	ts := httptest.NewServer(mux)
+	t.Cleanup(ts.Close)
+
+	resp, err := http.Get(ts.URL + prefix + "/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != 200 || !strings.Contains(string(body), "<body>/</body>") {
+		t.Fatalf("stripped / got %d %s", resp.StatusCode, body)
+	}
+
+	resp, err = http.Get(ts.URL + prefix + "/health")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	body, _ = io.ReadAll(resp.Body)
+	if resp.StatusCode != 200 || !strings.Contains(string(body), "<body>/health</body>") {
+		t.Fatalf("stripped /health got %d %s", resp.StatusCode, body)
+	}
+}

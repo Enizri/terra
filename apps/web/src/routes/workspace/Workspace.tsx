@@ -8,6 +8,7 @@ import { analyses, analysis, deleteAnalysis } from "../../features/analysis";
 import { wsCache } from "./cache";
 import { useAnalyze } from "./useAnalyze";
 import { nextSelection } from "./selection";
+import { extractGitHubURL } from "./githubUrl";
 import { toHistory, type HistoryEntry } from "./history";
 import { WorkspaceHeader } from "../../shared/shell/WorkspaceHeader";
 import { Sidebar } from "../../shared/shell/Sidebar";
@@ -28,6 +29,19 @@ export default function Workspace() {
   /** Stored map from the rail — no pipeline re-run. */
   const [storedMap, setStoredMap] = useState<TerraMap | null>(wsCache.storedMap);
   const [sessionModel, setSessionModel] = useState(wsCache.selectedModel);
+  const [railOpen, setRailOpen] = useState(wsCache.railOpen);
+  const [dockOpen, setDockOpen] = useState(wsCache.dockOpen);
+
+  const toggleRail = () =>
+    setRailOpen((v) => {
+      wsCache.railOpen = !v;
+      return !v;
+    });
+  const toggleDock = () =>
+    setDockOpen((v) => {
+      wsCache.dockOpen = !v;
+      return !v;
+    });
   /** Keep deleted ids out of the rail until the server catches up / refetch lands. */
   const deletedIds = useRef(new Set<number>());
   const autoOpened = useRef(false);
@@ -147,8 +161,22 @@ export default function Workspace() {
   );
 
   return (
-    <div className="sh-root sh-ws">
-      <WorkspaceHeader slug={slug} title={map?.project.name} busy={analyze.running} />
+    <div
+      className={`sh-root sh-ws${railOpen ? "" : " is-rail-collapsed"}${
+        dockOpen ? "" : " is-dock-hidden"
+      }`}
+    >
+      <WorkspaceHeader
+        slug={slug}
+        title={map?.project.name}
+        busy={analyze.running}
+        mapped={!!map && !analyze.recommendation}
+        railOpen={railOpen}
+        dockOpen={dockOpen}
+        onToggleRail={toggleRail}
+        onToggleDock={toggleDock}
+        onRepo={(raw) => analyze.start(extractGitHubURL(raw) ?? raw)}
+      />
       <Sidebar
         map={map}
         history={history}
@@ -156,6 +184,8 @@ export default function Workspace() {
         onOpen={open}
         onRemove={remove}
         busy={analyze.running}
+        collapsed={!railOpen}
+        onExpand={toggleRail}
       />
       <DropStage
         analyze={analyze}

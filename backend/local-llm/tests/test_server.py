@@ -408,3 +408,109 @@ def test_grammar_compiles_for_the_architecture_schema():
 
 def test_grammar_returns_none_for_uncompilable_schema():
     assert _grammar_for("not json at all") is None
+
+
+# --- Chat Completions tools (fake Llama, no weights) ---------------------
+
+LOOKUP_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "lookup_component",
+        "description": "Find a map component",
+        "parameters": {"type": "object", "properties": {"q": {"type": "string"}}},
+    },
+}
+
+TOOL_CALL = {
+    "id": "call_1",
+    "type": "function",
+    "function": {"name": "lookup_component", "arguments": '{"q":"web"}'},
+}
+
+
+def _install_llama(reply: dict) -> dict:
+    seen: dict = {}
+
+    class FakeLlama:
+        def create_chat_completion(self, **kwargs):
+            seen.clear()
+            seen.update(kwargs)
+            return reply
+
+    local.state.loaded = True
+    local.state.model_id = SMALL
+    local.state.model = FakeLlama()
+    return seen
+
+
+def test_chat_request_accepts_tools_and_tool_messages():
+    raw = {
+        "messages": [
+            {"role": "assistant", "content": None, "tool_calls": [TOOL_CALL]},
+            {"role": "tool", "tool_call_id": "call_1", "content": "the web app"},
+        ],
+        "tools": [LOOKUP_TOOL],
+        "tool_choice": "auto",
+    }
+    req = ChatCompletionRequest.model_validate(raw)
+    assert req.messages[0].content is None
+    assert req.messages[0].tool_calls[0]["function"]["name"] == "lookup_component"
+    assert req.messages[1].tool_call_id == "call_1"
+    assert req.tools == [LOOKUP_TOOL]
+    msgs = _messages_for_generate(req)
+    assert msgs[0]["tool_calls"] == [TOOL_CALL]
+    assert msgs[1] == {"role": "tool", "tool_call_id": "call_1", "content": "the web app"}
+
+
+def test_generate_chat_forwards_tools_to_llama():
+    seen = _install_llama({
+        "choices": [{
+            "message": {"role": "assistant", "content": None, "tool_calls": [TOOL_CALL]},
+            "finish_reason": "tool_calls",
+        }],
+    })
+    req = ChatCompletionRequest(
+        messages=[ChatMessage(role="user", content="where is web?")],
+        tools=[LOOKUP_TOOL],
+    )
+    content, finish, tool_calls = local.generate_chat(req)
+    assert content == ""
+    assert finish == "tool_calls"
+    assert tool_calls == [TOOL_CALL]
+    assert seen["tools"] == [LOOKUP_TOOL]
+    assert seen["tool_choice"] == "auto"
+    assert seen["messages"][0]["content"] == "where is web?"
+
+
+def test_generate_chat_without_tools_omits_them():
+    seen = _install_llama({
+        "choices": [{
+            "message": {"role": "assistant", "content": "hello"},
+            "finish_reason": "stop",
+        }],
+    })
+    req = ChatCompletionRequest(messages=[ChatMessage(role="user", content="hi")])
+    content, finish, tool_calls = local.generate_chat(req)
+    assert content == "hello"
+    assert finish == "stop"
+    assert tool_calls is None
+    assert "tools" not in seen
+
+
+def test_chat_completions_includes_tool_calls_in_response():
+    _install_llama({
+        "choices": [{
+            "message": {"role": "assistant", "content": None, "tool_calls": [TOOL_CALL]},
+            "finish_reason": "tool_calls",
+        }],
+    })
+    req = ChatCompletionRequest(
+        messages=[ChatMessage(role="user", content="where is web?")],
+        tools=[LOOKUP_TOOL],
+        tool_choice="auto",
+    )
+    out = local.chat_completions(req)
+    choice = out["choices"][0]
+    assert choice["finish_reason"] == "tool_calls"
+    assert choice["message"]["tool_calls"] == [TOOL_CALL]
+    assert choice["message"]["content"] is None

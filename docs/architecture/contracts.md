@@ -13,3 +13,4 @@ TypeScript feature map types) mirror these schemas by hand.
 `make check-contracts` fails on drift.
 
 Task names `architecture` and `qa` are part of the public surface.
+`agent` (read-only guide) and `editor` (checkout patch + preview restart) are additive.

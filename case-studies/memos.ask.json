@@ -1,0 +1,53 @@
+{
+  "$schema_note": "Ask evals for github.com/usememos/memos. Each question must retrieve an expected component and file from memos.map.json via keyword rank — no LLM.",
+  "cases": [
+    {
+      "id": "login-sso",
+      "question": "How does login work, and what SSO options exist?",
+      "expected_component_ids": ["auth"],
+      "expected_files": ["server/auth/"]
+    },
+    {
+      "id": "memo-editor",
+      "question": "Where is the Markdown memo editor with CodeMirror implemented?",
+      "expected_component_ids": ["web.editor"],
+      "expected_files": ["web/src/components/MemoEditor/"]
+    },
+    {
+      "id": "database-drivers",
+      "question": "Where would I add a new database besides SQLite, MySQL, or PostgreSQL?",
+      "expected_component_ids": ["data.drivers", "data"],
+      "expected_files": ["store/db/sqlite/", "store/db/mysql/", "store/db/postgres/", "store/driver.go", "store/"]
+    },
+    {
+      "id": "attachments-s3",
+      "question": "How are uploaded images stored in S3 with presigned URLs?",
+      "expected_component_ids": ["attachments"],
+      "expected_files": ["internal/storage/s3/", "server/router/api/v1/attachment_service.go"]
+    },
+    {
+      "id": "ai-speech",
+      "question": "Where is speech-to-text for audio memos and the LLM helpers?",
+      "expected_component_ids": ["ai"],
+      "expected_files": ["internal/ai/", "server/router/api/v1/ai_service.go"]
+    },
+    {
+      "id": "api-contracts",
+      "question": "Where are the Protocol Buffers API contracts that keep Go and TypeScript in sync?",
+      "expected_component_ids": ["api.contracts", "api"],
+      "expected_files": ["proto/api/v1/", "proto/gen/"]
+    },
+    {
+      "id": "schema-migrations",
+      "question": "Where is the versioned SQL that upgrades the database schema per driver?",
+      "expected_component_ids": ["data.migrations", "data"],
+      "expected_files": ["store/migration/", "store/migrator.go"]
+    },
+    {
+      "id": "integrations-notify",
+      "question": "What happens when a memo is created — who gets notified over webhooks, RSS, or MCP?",
+      "expected_component_ids": ["integrations"],
+      "expected_files": ["internal/webhook/", "server/router/mcp/", "server/router/rss/"]
+    }
+  ]
+}

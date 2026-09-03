@@ -43,6 +43,9 @@ type Server struct {
 	Resolve func(url string) (canonical, name, commit string, err error)
 	Analyze func(ctx context.Context, res *scan.Result, opts analyzerclient.LLMOpts) (*analysis.Map, []string, error)
 	RunTask func(ctx context.Context, name string, payload any) (json.RawMessage, error)
+	// StreamTask reads NDJSON from a streaming analyzer task and forwards
+	// {stage,label} events. The returned string is the final answer.
+	StreamTask func(ctx context.Context, name string, payload any, emit func(job.Event)) (string, error)
 
 	// Host reports what this machine can run locally; nil detects it once.
 	Host func() catalog.Capabilities
@@ -141,6 +144,16 @@ func (s *Server) Handler() http.Handler {
 				return analyzerclient.RunTask(ctx, s.Cfg.AnalyzerURL, name, payload)
 			}
 		}
+		if s.StreamTask == nil {
+			s.StreamTask = func(ctx context.Context, name string, payload any, emit func(job.Event)) (string, error) {
+				return analyzerclient.StreamTask(ctx, s.Cfg.AnalyzerURL, name, payload, func(ev analyzerclient.TaskEvent) {
+					if ev.Stage == "" {
+						return
+					}
+					emit(job.Event{Stage: ev.Stage, Label: ev.Label})
+				})
+			}
+		}
 		if s.Jobs == nil {
 			s.Jobs = job.NewHub()
 		}
@@ -160,12 +173,20 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /jobs/probe", s.enqueueProbe)
 	mux.HandleFunc("POST /jobs/analyze", s.enqueueAnalyze)
 	mux.HandleFunc("POST /jobs/ask", s.enqueueAsk)
+	mux.HandleFunc("POST /jobs/agent", s.enqueueAgent)
+	mux.HandleFunc("POST /jobs/preview", s.enqueuePreview)
+	mux.HandleFunc("POST /jobs/preview/test", s.enqueuePreviewTest)
+	mux.HandleFunc("POST /jobs/preview/cli", s.enqueuePreviewCLI)
 	mux.HandleFunc("GET /jobs/{id}/events", s.jobEvents)
 	mux.HandleFunc("POST /jobs/{id}/cancel", s.cancelJob)
 	mux.HandleFunc("GET /analyses", s.list)
 	mux.HandleFunc("GET /analyses/{id}", s.get)
 	mux.HandleFunc("DELETE /analyses/{id}", s.deleteAnalysis)
 	mux.HandleFunc("POST /preview", s.preview)
+	mux.HandleFunc("POST /preview/patch", s.previewPatch)
+	mux.HandleFunc("POST /preview/restart", s.previewRestart)
+	mux.HandleFunc("GET /preview/routes", s.previewRoutes)
+	mux.HandleFunc("POST /preview/probe", s.previewProbe)
 	mux.HandleFunc("POST /ask", s.ask)
 	mux.HandleFunc("GET /files", s.files)
 	mux.HandleFunc("GET /traces", s.traces)
@@ -275,12 +296,69 @@ func (s *Server) preview(w http.ResponseWriter, r *http.Request) {
 		httpError(w, http.StatusBadRequest, `body must be {"repo_url": "github.com/user/project"}`)
 		return
 	}
-	url, err := s.previewRunner().Start(req.RepoURL)
+	res, err := s.previewRunner().Boot(req.RepoURL, nil)
 	if err != nil {
 		httpError(w, http.StatusBadGateway, err.Error())
 		return
 	}
-	writeJSON(w, map[string]string{"url": url})
+	writeJSON(w, res)
+}
+
+func (s *Server) previewPatch(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		RepoURL     string `json:"repo_url"`
+		Path        string `json:"path"`
+		UnifiedDiff string `json:"unified_diff"`
+	}
+	if !decodeBody(w, r, &req, `body must be {"repo_url": "...", "path": "...", "unified_diff": "..."}`) {
+		return
+	}
+	if req.RepoURL == "" || strings.TrimSpace(req.Path) == "" {
+		httpError(w, http.StatusBadRequest, `body must be {"repo_url": "...", "path": "...", "unified_diff": "..."}`)
+		return
+	}
+	if err := s.previewRunner().ApplyPatch(req.RepoURL, req.Path, req.UnifiedDiff); err != nil {
+		previewWriteError(w, err)
+		return
+	}
+	writeJSON(w, map[string]any{"path": req.Path, "ok": true})
+}
+
+func (s *Server) previewRestart(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		RepoURL string `json:"repo_url"`
+	}
+	if !decodeBody(w, r, &req, `body must be {"repo_url": "..."}`) {
+		return
+	}
+	if req.RepoURL == "" {
+		httpError(w, http.StatusBadRequest, `body must be {"repo_url": "..."}`)
+		return
+	}
+	if err := s.previewRunner().Restart(req.RepoURL); err != nil {
+		previewWriteError(w, err)
+		return
+	}
+	writeJSON(w, map[string]any{"ok": true})
+}
+
+func previewWriteError(w http.ResponseWriter, err error) {
+	msg := err.Error()
+	switch {
+	case strings.Contains(msg, "not ready"):
+		httpError(w, http.StatusConflict, msg)
+	case strings.Contains(msg, "too large"):
+		httpError(w, http.StatusRequestEntityTooLarge, msg)
+	case strings.Contains(msg, "escapes"),
+		strings.Contains(msg, "required"),
+		strings.Contains(msg, "does not apply"),
+		strings.Contains(msg, "no hunks"),
+		strings.Contains(msg, "directory"),
+		strings.Contains(msg, "malformed"):
+		httpError(w, http.StatusBadRequest, msg)
+	default:
+		httpError(w, http.StatusBadGateway, msg)
+	}
 }
 
 func writeJSON(w http.ResponseWriter, payload any) {

@@ -190,12 +190,36 @@
 }
 
 .terra-faq__list {
+  /* Left inset gives the active-row star somewhere to sit. */
+  padding-left: 34px;
+  overflow: visible;
   border-bottom: 1px solid var(--sh-border);
 }
 
+@media (min-width: 1024px) {
+  .terra-faq__list {
+    padding-left: 40px;
+  }
+}
+
 .terra-faq__item {
+  position: relative;
   padding-block: 4px;
   border-top: 1px solid var(--sh-border);
+}
+
+.terra-faq__mark {
+  position: absolute;
+  left: -30px;
+  top: 26px;
+  width: 18px;
+  height: 18px;
+  opacity: 0;
+  transition: opacity 0.4s ease-in-out;
+}
+
+.terra-faq__item.is-open .terra-faq__mark {
+  opacity: 1;
 }
 
 .terra-faq__q {
@@ -225,6 +249,13 @@
   flex: 1;
   font-size: 1.15rem;
   line-height: 1.25;
+  color: var(--sh-muted);
+  transition: color 0.075s ease;
+}
+
+.terra-faq__q:hover .terra-faq__label,
+.terra-faq__item.is-open .terra-faq__label {
+  color: var(--sh-ink);
 }
 
 @media (min-width: 640px) {
@@ -233,12 +264,56 @@
   }
 }
 
+.terra-faq__reveal {
+  display: grid;
+  grid-template-rows: 0fr;
+  overflow: hidden;
+  transition: grid-template-rows 0.6s ease-in-out;
+}
+
+.terra-faq__item.is-open .terra-faq__reveal {
+  grid-template-rows: 1fr;
+}
+
+/* `min-height: 0` is what lets the 0fr row actually collapse. */
+.terra-faq__reveal-inner {
+  min-height: 0;
+}
+
 .terra-faq__a {
   padding: 0 0 20px 44px;
   margin: 0;
   font-size: 14px;
   line-height: 1.6;
   color: var(--sh-muted);
+  transform-origin: top left;
+  transform: translateY(-4px) scale(0.9);
+  opacity: 0;
+  filter: blur(2px);
+  transition:
+    transform 0.45s ease-out,
+    opacity 0.45s ease-out,
+    filter 0.45s ease-out;
+}
+
+.terra-faq__item.is-open .terra-faq__a {
+  transform: none;
+  opacity: 1;
+  filter: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .terra-faq__reveal,
+  .terra-faq__a,
+  .terra-faq__mark,
+  .terra-faq__label {
+    transition: none;
+  }
+
+  .terra-faq__a {
+    transform: none;
+    filter: none;
+  }
 }
 
 /* ---------- finale (World Labs-style closing card) ---------- */

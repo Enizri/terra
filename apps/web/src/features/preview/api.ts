@@ -1,16 +1,124 @@
 /** Preview feature — live preview proxy + trace stream. */
-import { authHeaders, json, noteUnauthorized, post } from "../../shared/http.ts";
+import { authHeaders, json, jobEvents, noteUnauthorized, post } from "../../shared/http.ts";
 import { getToken } from "../../shared/token.ts";
 import { tracesURL } from "./tracesUrl.ts";
 
 export { tracesURL };
 
-/** Boot or reuse the repo's preview proxy. */
+export type PreviewApp = {
+  id: string;
+  name: string;
+  kind: string;
+  framework: string;
+  url?: string;
+  status: string;
+  reason?: string;
+};
+
+export type PreviewResult = {
+  url: string;
+  primary_id: string;
+  apps: PreviewApp[];
+};
+
+export type PreviewEvent = {
+  stage: string;
+  label?: string;
+  preview?: PreviewResult;
+  answer?: string;
+};
+
+/** Boot or reuse the repo's preview proxy (legacy one-shot). */
 export async function preview(repoUrl: string, signal?: AbortSignal): Promise<string> {
   const res = await post("/preview", { repo_url: repoUrl }, signal);
-  const data = await json<{ url?: string }>(res, "preview");
+  const data = await json<PreviewResult>(res, "preview");
   if (!data.url) throw new Error("preview failed");
   return data.url;
+}
+
+/** Stream preview boot: checkout → detect → install → boot → ready. */
+export async function* previewEvents(
+  repoUrl: string,
+  signal?: AbortSignal,
+): AsyncGenerator<PreviewEvent> {
+  const created = await post("/jobs/preview", { repo_url: repoUrl }, signal);
+  const { job_id } = await json<{ job_id: string }>(created, "preview");
+  yield* jobEvents<PreviewEvent>(job_id, signal);
+}
+
+const README_CANDIDATES = ["README.md", "readme.md", "README"];
+
+/** Read a file from the mounted preview checkout. Null while it is still starting. */
+export async function repoFile(
+  repoUrl: string,
+  path: string,
+  signal?: AbortSignal,
+): Promise<string | null> {
+  const q = new URLSearchParams({ repo_url: repoUrl, path });
+  const res = await fetch(`/files?${q}`, { headers: authHeaders(), signal });
+  noteUnauthorized(res);
+  const data = (await res.json().catch(() => null)) as {
+    content?: string;
+    starting?: boolean;
+    error?: string;
+  } | null;
+  if (data?.starting) return null;
+  if (!res.ok) return null;
+  return data?.content ?? null;
+}
+
+/** First README that exists in the checkout, or null. */
+export async function repoReadme(repoUrl: string, signal?: AbortSignal): Promise<string | null> {
+  for (const name of README_CANDIDATES) {
+    const text = await repoFile(repoUrl, name, signal);
+    if (text != null) return text;
+  }
+  return null;
+}
+
+/** Stream `npm test` / `go test` from the mounted checkout. */
+export async function* previewCLIEvents(
+  repoUrl: string,
+  args: string,
+  signal?: AbortSignal,
+): AsyncGenerator<PreviewEvent> {
+  const created = await post("/jobs/preview/cli", { repo_url: repoUrl, args }, signal);
+  const { job_id } = await json<{ job_id: string }>(created, "cli");
+  yield* jobEvents<PreviewEvent>(job_id, signal);
+}
+
+export type ProbeHit = {
+  method: string;
+  path: string;
+  status: number;
+  body: string;
+};
+
+export async function previewRoutes(repoUrl: string, signal?: AbortSignal): Promise<string[]> {
+  const q = new URLSearchParams({ repo_url: repoUrl });
+  const res = await fetch(`/preview/routes?${q}`, { headers: authHeaders(), signal });
+  const data = await json<{ routes: string[] }>(res, "routes");
+  return data.routes ?? [];
+}
+
+export async function previewProbe(
+  repoUrl: string,
+  url: string,
+  method: string,
+  path: string,
+  signal?: AbortSignal,
+): Promise<ProbeHit> {
+  const res = await post("/preview/probe", { repo_url: repoUrl, url, method, path }, signal);
+  return json<ProbeHit>(res, "probe");
+}
+
+export async function* previewTestEvents(
+  repoUrl: string,
+  signal?: AbortSignal,
+): AsyncGenerator<PreviewEvent> {
+  const created = await post("/jobs/preview/test", { repo_url: repoUrl }, signal);
+  const { job_id } = await json<{ job_id: string }>(created, "tests");
+  yield* jobEvents<PreviewEvent>(job_id, signal);
 }
 
 /** Preview proxy span — see backend/api/internal/trace. */

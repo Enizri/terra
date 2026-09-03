@@ -6,6 +6,8 @@ import type { Component, TerraMap } from "./types";
 /** Column: frontend | work | storage. */
 const COL: Record<Component["type"], 0 | 1 | 2> = {
   frontend: 0,
+  mobile: 0,
+  desktop: 0,
   backend: 1,
   infrastructure: 1,
   database: 2,
@@ -13,6 +15,8 @@ const COL: Record<Component["type"], 0 | 1 | 2> = {
 
 const KIND: Record<Component["type"], DiagramKind> = {
   frontend: "frontend",
+  mobile: "frontend",
+  desktop: "frontend",
   backend: "backend",
   infrastructure: "service",
   database: "data",

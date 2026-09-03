@@ -4,17 +4,9 @@ import json
 
 from ...inference.client import chat, preflight
 from ...inference.config import Config
+from ...retrieve import format_hits, retrieve
+from ...roles.guide import SYSTEM_PROMPT
 from .models import QAInput, QAOutput
-
-QA_SYSTEM = (
-    """
-    You are Terra, a codebase guide.
-    - Answer the user's question about the selected component , 
-        or about the project as a whole when no component is selected , using the provided source snippet and architecture map. 
-    - Be concrete and brief.
-    - Do not propose or write code edits.
-    """
-)
 
 __all__ = ["QAInput", "QAOutput", "QATask"]
 
@@ -39,6 +31,12 @@ class QATask:
             )
         if inp.file_snippet:
             parts.append("Source snippet:\n```\n" + str(inp.file_snippet) + "\n```")
+        elif inp.map is not None:
+            # One Completions call: rank the map into the prompt instead of a tool loop.
+            hits = retrieve(inp.question, inp.map, inp.selection, inp.selections)
+            block = format_hits(hits)
+            if block:
+                parts.append("Retrieved context:\n" + block)
         if inp.map is not None:
             parts.append("Architecture map:\n" + json.dumps(inp.map))
 
@@ -51,7 +49,7 @@ class QATask:
         )
         preflight(cfg)
         msgs = [
-            {"role": "system", "content": QA_SYSTEM},
+            {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": "\n\n".join(parts)},
         ]
         return QAOutput(answer=chat(cfg, msgs, use_schema=False))

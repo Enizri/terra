@@ -65,8 +65,29 @@ Follow the checklist in [`packages/contracts/README.md`](../packages/contracts/R
 1. Create `backend/analyzer/terra_analyzer/tasks/<name>/` with typed input/output models.
 2. Implement the `Task` protocol (`name` + `run`).
 3. Register in `default_registry()` in `tasks/registry.py`.
-4. Go reaches it via `analyzerclient.RunTask` / `POST /tasks/{name}` — no Go change for a generic task.
-5. Keep task name stable once shipped.
+4. Go reaches it via `analyzerclient.RunTask` / `StreamTask` / `POST /tasks/{name}` — no Go change for a generic JSON task; streaming tasks need `StreamTask`.
+5. Keep task name stable once shipped. HTTP names today are `architecture`, `qa`, `agent`, and `editor`.
+
+### Add a role
+
+1. Put system-prompt copy in `backend/analyzer/terra_analyzer/roles/<name>.py`.
+2. Import it from the task that runs that role. Tasks keep the HTTP name; roles keep the prompt.
+3. Do not inline a new system prompt inside `tasks/`.
+
+### Add a tool
+
+1. Put the JSON schema in `backend/analyzer/terra_analyzer/tools/`.
+2. Put side effects in Go (HTTP). Python never `os/exec`s the preview checkout.
+3. Allowlist the tool on the role that may call it.
+
+### Add an eval
+
+1. Add a golden file next to `case-studies/memos.map.json` when the check needs a fixture
+   (Ask cases: `memos.ask.json`). Trajectory fixtures stay under `evals/fixtures/`.
+2. Put the pytest checker under `backend/analyzer/terra_analyzer/evals/` (no live LLM in CI).
+3. Programmatic assertions first (paths, turn cap, tool allowlist). No LLM-as-judge in CI.
+4. `make eval` runs the suite. CI already includes it via `make test-py` (`-m 'not slow'`).
+   Mark live llama.cpp tests `@pytest.mark.slow`.
 
 ### Add a web feature module
 

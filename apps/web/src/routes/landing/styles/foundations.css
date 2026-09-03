@@ -32,28 +32,6 @@
   box-shadow: 0 8px 30px rgba(28, 29, 24, 0.12);
 }
 
-/* Docked over the window section: the pill gives up its centring margin and
-   glides to the left rail, shedding the wordmark, links and CTA down to just
-   the burger. Pressing it expands it again in place; scrolling clear of the
-   section restores it.
-
-   The move and the resize are one motion `layout` animation. Nothing here may
-   carry a CSS transition of its own: a box that changes outside motion's
-   before/after snapshots fights the projection, and the pill wobbles. */
-
-.sh-nav--docked .sh-nav__pill {
-  margin-left: 0;
-  margin-right: auto;
-}
-
-/* Docked pill is the burger alone — every other slot has collapsed to zero
-   width, so the gaps between them would otherwise hold it open off-centre. */
-
-.sh-nav__pill--compact {
-  gap: 0;
-  padding: calc(4px * var(--sh-read, 1));
-}
-
 .sh-nav__logo {
   display: flex;
   align-items: center;
@@ -83,61 +61,6 @@
 
 .sh-nav__word {
   white-space: nowrap;
-}
-
-/* Burger: three bars that fold into a cross when the docked pill is opened.
-   Sized off the logo row so the pill keeps its height through the swap. */
-
-.sh-nav__burger {
-  --burger-bar: 2px;
-  --burger-gap: calc(5px * var(--sh-read, 1));
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--burger-gap);
-  width: calc(34px * var(--sh-read, 1));
-  height: calc(34px * var(--sh-read, 1));
-  padding: 0;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  cursor: pointer;
-  transition: background-color 120ms ease;
-}
-
-.sh-nav__burger:hover {
-  background: rgba(0, 0, 0, 0.05);
-}
-
-.sh-nav__burger span {
-  display: block;
-  width: calc(17px * var(--sh-read, 1));
-  height: var(--burger-bar);
-  border-radius: 999px;
-  background: #141510;
-  transition:
-    transform 300ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    opacity 160ms ease;
-}
-
-.sh-nav__burger.is-open span:first-child {
-  transform: translateY(calc(var(--burger-gap) + var(--burger-bar))) rotate(45deg);
-}
-
-.sh-nav__burger.is-open span:nth-child(2) {
-  opacity: 0;
-}
-
-.sh-nav__burger.is-open span:last-child {
-  transform: translateY(calc(-1 * (var(--burger-gap) + var(--burger-bar)))) rotate(-45deg);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .sh-nav__burger,
-  .sh-nav__burger span {
-    transition: none;
-  }
 }
 
 /* Eight-point star cut out of the brand gradient; spins 60deg on hover with a
@@ -175,11 +98,9 @@
 }
 
 /* The pill is `width: fit-content` and cannot shrink — at ~436px of content it
-   outruns a phone viewport. Drop the section links so logo + CTA still fit.
-   The docked pill has no wordmark and starts flush left, so there it keeps
-   them: opening the burger onto a lone CTA would be a menu of nothing. */
+   outruns a phone viewport. Drop the section links so logo + CTA still fit. */
 @media (max-width: 479px) {
-  .sh-nav:not(.sh-nav--docked) .sh-nav__links {
+  .sh-nav__links {
     display: none;
   }
 }

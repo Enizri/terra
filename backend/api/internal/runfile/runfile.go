@@ -235,7 +235,12 @@ func fileExists(root, name string) bool {
 
 /* ---------- SHA-keyed cache ---------- */
 
-func cachePath(sha string) (string, error) {
+// CacheVersion namespaces every commit-keyed inference cache on disk. Bump it
+// whenever inference rules change: a wrong answer cached under a bare SHA
+// otherwise sticks to that commit permanently.
+const CacheVersion = "v2"
+
+func cachePath(kind, sha string) (string, error) {
 	if sha == "" {
 		return "", fmt.Errorf("empty commit SHA")
 	}
@@ -243,21 +248,44 @@ func cachePath(sha string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(cache, "terra", "runfiles", sha+".json"), nil
+	return filepath.Join(cache, "terra", kind, CacheVersion, sha+".json"), nil
+}
+
+// LoadJSON reads a cached inference of the given kind into out, reporting
+// whether one was there. Other packages keyed by commit share this cache.
+func LoadJSON(kind, sha string, out any) bool {
+	path, err := cachePath(kind, sha)
+	if err != nil {
+		return false
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	return json.Unmarshal(data, out) == nil
+}
+
+// SaveJSON caches an inference under its commit SHA. A cache miss is always
+// recoverable, so write failures are silent.
+func SaveJSON(kind, sha string, v any) {
+	path, err := cachePath(kind, sha)
+	if err != nil {
+		return
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return
+	}
+	data, err := json.Marshal(v)
+	if err != nil {
+		return
+	}
+	os.WriteFile(path, data, 0o644)
 }
 
 // Load returns the cached Runfile for a commit, or nil.
 func Load(sha string) *Runfile {
-	path, err := cachePath(sha)
-	if err != nil {
-		return nil
-	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil
-	}
 	var rf Runfile
-	if json.Unmarshal(data, &rf) != nil {
+	if !LoadJSON("runfiles", sha, &rf) {
 		return nil
 	}
 	return &rf
@@ -265,15 +293,7 @@ func Load(sha string) *Runfile {
 
 // Save caches a Runfile under its commit SHA.
 func Save(sha string, rf *Runfile) {
-	path, err := cachePath(sha)
-	if err != nil {
-		return
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return
-	}
-	data, _ := json.Marshal(rf)
-	os.WriteFile(path, data, 0o644)
+	SaveJSON("runfiles", sha, rf)
 }
 
 // For returns a cached or freshly inferred Runfile. Empty sha skips cache.

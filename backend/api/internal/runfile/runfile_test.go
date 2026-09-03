@@ -145,3 +145,36 @@ func TestCacheRoundTripBySHA(t *testing.T) {
 		t.Errorf("For = %+v, %v; want the cached runfile", got, err)
 	}
 }
+
+// The cache key carries a version and a kind: a wrong answer cached by an
+// older Terra must not stick to that commit, and two kinds of inference for
+// the same commit must not overwrite each other.
+func TestCacheKeyIsVersionedAndNamespaced(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	cache, err := os.UserCacheDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	sha := "cafebabe"
+
+	legacy := filepath.Join(cache, "terra", "runfiles", sha+".json")
+	if err := os.MkdirAll(filepath.Dir(legacy), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(legacy, []byte(`{"source":"dockerfile","run":"wrong"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := Load(sha); got != nil {
+		t.Fatalf("Load read an unversioned entry: %+v", got)
+	}
+
+	SaveJSON("appgraph", sha, []string{"other kind of inference"})
+	if got := Load(sha); got != nil {
+		t.Fatalf("Load read another kind's entry: %+v", got)
+	}
+	Save(sha, &Runfile{Source: "go.mod", Run: "go run ."})
+	var apps []string
+	if !LoadJSON("appgraph", sha, &apps) || len(apps) != 1 {
+		t.Fatalf("appgraph entry = %v, want it untouched by Save", apps)
+	}
+}

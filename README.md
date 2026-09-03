@@ -24,12 +24,13 @@ What is **not** done, so you don't go looking for it:
 |---|---|
 | **Export JSON** and **Share map** are placeholder chips — visibly present, not wired | `apps/web/src/shared/shell/WorkspaceHeader.tsx` |
 | The workspace session is not persisted. The URL slug is cosmetic, never sent to the server, and in-memory state is lost on reload | `apps/web/src/routes/workspace/cache.ts` |
-| The step list under an Ask answer is a client-side animation, not real tool telemetry | `apps/web/src/features/ask/useAsk.ts` |
-| Live preview supports `package.json` frontends only; other repos need host-exec `make dev` | `backend/api/internal/preview/` |
+| Live preview boots every app in the checkout (web + API, plus mobile/desktop when previewable). Docker mode still needs the Node image for JS apps; Go/Python run on the host. | `backend/api/internal/preview/` |
 | No user accounts. `TERRA_TOKEN` is one shared secret, and empty leaves the API open | [`docs/SECURITY.md`](docs/SECURITY.md) |
 
 Live preview runs the analyzed repository's own code — in host-exec mode, directly on
-your machine. Read [`docs/SECURITY.md`](docs/SECURITY.md) before pointing it at a repository you
+your machine. The editor write path (`POST /preview/patch`) is confined to that
+checkout and does not git commit, but it still mutates untrusted-repo files. Read
+[`docs/SECURITY.md`](docs/SECURITY.md) before pointing preview at a repository you
 don't trust.
 
 ## Architecture
@@ -138,10 +139,17 @@ token. `make dev` (loopback) stays open.
 **Live preview (Phase 1b):** Compose sets `TERRA_PREVIEW_MODE=docker`, mounts the
 host Docker socket, and shares checkouts via the named `terra-data` volume
 (`TERRA_CHECKOUT_VOLUME`) so Docker Desktop can mount them into siblings.
-`POST /preview` starts a Node sibling and returns `/__live/{id}/` (same origin).
-Caps: `TERRA_PREVIEW_MAX` (default 2), idle TTL `TERRA_PREVIEW_TTL` (default 30m).
-Supports `package.json` frontends only; runfile/Go-only repos need `make dev`
-(host-exec).
+`POST /preview` starts every previewable app in the checkout and returns
+`{url, primary_id, apps}`. `POST /jobs/preview` streams the same boot as NDJSON
+(`checkout → detect → install → boot → ready`) so the workspace can show
+progress and cancel. Node apps run in a
+sibling container and return `/__live/{id}/` (same origin) when the framework
+takes a base path on the command line (Vite, Angular, CRA); the rest are served
+at their own loopback origin instead, since their absolute asset paths cannot be
+moved under a prefix. Go and Python apps boot on the host — the default Node
+image has none of those toolchains.
+Caps: `TERRA_PREVIEW_MAX` (default 2, counting **apps** not repos), idle TTL
+`TERRA_PREVIEW_TTL` (default 30m). Both apply in host-exec and Docker.
 
 ## Commands
 
@@ -152,18 +160,20 @@ Supports `package.json` frontends only; runfile/Go-only repos need `make dev`
 | `make up` | Docker Compose: build/start api + analyzer (detached) |
 | `make up-llm` | Same as `make up` with local HF `llm` profile |
 | `make down` | Docker Compose: stop and remove containers |
-| `make check` | Fixtures + Go/Python/web tests + lint (CI entry point) |
+| `make check` | Fixtures + Go/Python/web tests + lint (CI entry point; Python `-m 'not slow'`) |
 | `make test` | Fixtures + Go/Python/web tests |
+| `make eval` | Harness evals in `terra_analyzer/evals/` (no live LLM) |
 | `make sync-fixtures` | Copy `case-studies/memos.map.json` → `apps/web/src/data/` |
 | `terra scan <url>` | Clone + deterministic scan, JSON to stdout |
 | `terra map <url>` | Scan, ask the analyzer for a map, store in `terra.db` |
-| `terra serve` | HTTP API: `POST /jobs/probe`, `POST /jobs/analyze`, `GET /models`, `GET /host/capabilities`, `GET /analyses`, `POST /preview`, `POST /ask`, `GET /files` |
+| `terra serve` | HTTP API: `POST /jobs/probe`, `POST /jobs/analyze`, `POST /jobs/ask`, `POST /jobs/agent`, `POST /jobs/preview`, `GET /models`, `GET /host/capabilities`, `GET /analyses`, `POST /preview`, `POST /preview/patch`, `POST /preview/restart`, `POST /ask`, `GET /files` |
 
 ## Environment variables
 
 | Variable | Read by | Default | Meaning |
 |---|---|---|---|
 | `TERRA_ANALYZER_URL` | Go | `http://localhost:8010` | Where the Python analyzer listens (`http://analyzer:8010` in Compose) |
+| `TERRA_API_URL` | analyzer | `http://127.0.0.1:8080` | Go API for `read_snippet` (`GET /files`) and editor writes (`POST /preview/patch`, `POST /preview/restart`; `http://api:8080` in Compose) |
 | `TERRA_LLM_URL` | analyzer | `http://localhost:8020/v1` | OpenAI-compatible base URL (`…/v1`); Compose hosted or `http://llm:8020/v1` |
 | `TERRA_LLM_API_KEY` | analyzer | _(empty)_ | Optional Bearer token for hosted providers |
 | `TERRA_LLM_TIMEOUT` | analyzer | `600` | Seconds to wait for a chat/completions response (read timeout) |
@@ -173,12 +183,12 @@ Supports `package.json` frontends only; runfile/Go-only repos need `make dev`
 | `TERRA_MODEL` | analyzer + local LLM | `Qwen/Qwen2.5-0.5B-Instruct-GGUF/qwen2.5-0.5b-instruct-q4_k_m.gguf` | GGUF quant as `<hf-repo>/<file>.gguf` |
 | `TERRA_N_CTX` | local LLM | `18432` | Context window; must clear the largest prompt plus 4096 output tokens |
 | `TERRA_N_GPU_LAYERS` | local LLM | `16` on GPU/Metal, `0` on CPU | Layers offloaded to the accelerator (`-1` = all, hottest) |
-| `TERRA_TOKEN` | Go | _(empty)_ | Shared secret; empty leaves API open (local-only) |
+| `TERRA_TOKEN` | Go + analyzer | _(empty)_ | Shared secret; empty leaves API open (local-only). Analyzer sends it on `GET /files` and preview write routes |
 | `TERRA_PREVIEW_MODE` | Go | _(empty)_ = host | `docker` for Compose sibling previews |
 | `TERRA_CHECKOUT_DIR` | Go | user cache | Shared checkout root (Compose: `/data/checkouts`) |
 | `TERRA_PUBLIC_URL` | Go | `http://127.0.0.1:8080` | Origin used in `/__live/...` preview URLs |
-| `TERRA_PREVIEW_MAX` | Go | `2` | Max concurrent Docker previews |
-| `TERRA_PREVIEW_TTL` | Go | `30m` | Idle TTL before a Docker preview is stopped |
+| `TERRA_PREVIEW_MAX` | Go | `2` | Max concurrent preview **apps** (host and Docker) |
+| `TERRA_PREVIEW_TTL` | Go | `30m` | Idle TTL before a preview is stopped (host and Docker) |
 | `TERRA_DEVICE` | local LLM + Go | `auto` (`mps` / `cuda` / `cpu`) | Device for `make run-llm` / Compose `llm`; also reported by `GET /host/capabilities` |
 | `TERRA_LOCAL_LLM_URL` | Go | `http://localhost:8020` | Sidecar the workspace picker loads local models into (`http://llm:8020` in Compose) |
 | `GITHUB_TOKEN` | Go scan | _(empty)_ | GitHub PAT for analyze/fetch; without it ~60 REST req/hour/IP, with it ~5,000/hour |
@@ -227,10 +237,11 @@ than that, analyze rescans and says so.
 | `GET /healthz` | Status, model, whether the LLM `/v1/models` probe succeeded |
 | `POST /analyze` | Architecture map (Go wire contract) |
 | `GET /tasks` | Registered analyzer tasks |
-| `POST /tasks/{name}` | Run a named task (`architecture`, …) |
+| `POST /tasks/{name}` | Run a named task (`architecture`, `qa`, `agent`) |
 
 `POST /analyze` and `POST /tasks/qa` accept optional `base_url` and `api_key`
 alongside `model`, which override `TERRA_LLM_*` for that request only.
+`POST /tasks/agent` streams NDJSON `{stage, label}` lines, then `{answer}`.
 
 Local model sidecar (`make run-llm`, port 8020):
 
@@ -244,6 +255,7 @@ Local model sidecar (`make run-llm`, port 8020):
 ```sh
 make check              # fixtures + Go + Python + web + lint (CI entry point)
 make test               # fixtures + Go + Python + web (no lint)
+make eval               # harness evals (ask goldens, trajectories, policy; no live LLM)
 make test-integration   # opt-in live suites (needs TERRA_INTEGRATION=1)
 make sync-fixtures      # copy case-studies/memos.map.json → apps/web/src/data/
 ```
@@ -252,11 +264,12 @@ make sync-fixtures      # copy case-studies/memos.map.json → apps/web/src/data
 |---|---|---|
 | Go unit/integration | `backend/api/internal/*/*_test.go` (colocated) | `make test-go` |
 | Python | `backend/analyzer/tests/` | `make test-py` (excludes `@pytest.mark.slow`) |
+| Harness evals | `backend/analyzer/terra_analyzer/evals/` + `case-studies/memos.ask.json` | `make eval` (same `-m 'not slow'`) |
 | Web logic | `apps/web/src/**/*.test.ts` | `make test-web` (`node --test`) |
 | Web components | `apps/web/src/**/*.test.tsx` | part of `make test-web` (vitest) |
 | Fixture sync | `case-studies/` ↔ `apps/web/src/data/` | `make test-fixtures` |
 | Live GitHub | `backend/api/internal/scan/live_test.go` | `TERRA_INTEGRATION=1 make test-integration` |
-| Live LLM | `backend/analyzer/tests/test_slow_llm.py` | same (`TERRA_SLOW=1` still works alone) |
+| Live LLM | `backend/analyzer/tests/test_slow_llm.py` + `evals/test_live_llama.py` | same (`TERRA_SLOW=1` still works alone) |
 
 The wire contract between Go and Python is the draft JSON in
 `backend/analyzer/terra_analyzer/contracts/models.py` mirrored by `backend/api/internal/analysis/types.go`;

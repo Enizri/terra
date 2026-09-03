@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -223,11 +224,18 @@ func TestCheckoutExtractsTarballSafely(t *testing.T) {
 		t.Error("a tarball checkout must not contain .git")
 	}
 
-	// Second call reuses without hitting the network: point at dead servers.
-	apiBase, codeloadBase = "http://127.0.0.1:1", "http://127.0.0.1:1"
+	// Same HEAD reuses the tree: tarball is not fetched again.
+	codeloadHits := 0
+	codeload := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		codeloadHits++
+		http.Error(w, "tarball must not be re-fetched", http.StatusInternalServerError)
+	}))
+	oldCodeload := codeloadBase
+	codeloadBase = codeload.URL
+	t.Cleanup(func() { codeloadBase = oldCodeload; codeload.Close() })
 	dir2, err := Checkout("", "github.com/o/r")
-	if err != nil || dir2 != dir {
-		t.Errorf("reuse: dir=%q err=%v, want cached %q", dir2, err, dir)
+	if err != nil || dir2 != dir || codeloadHits != 0 {
+		t.Errorf("reuse: dir=%q err=%v hits=%d, want cached %q", dir2, err, codeloadHits, dir)
 	}
 }
 
@@ -267,5 +275,141 @@ func TestRepoMetaRateLimitError(t *testing.T) {
 
 	if _, _, err := RepoMeta("github.com/acme/notes"); !IsRateLimited(err) {
 		t.Errorf("err = %v, want RateLimitError", err)
+	}
+}
+
+func TestCheckoutRefreshesWhenCommitChanges(t *testing.T) {
+	current := testSHA
+	tgzFor := func(sha string) []byte {
+		return makeTarball(t, "r-"+sha[:7], map[string]string{"main.go": "package main\n// " + sha + "\n"})
+	}
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(current))
+	}))
+	downloads := 0
+	codeload := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/o/r/tar.gz/"+current {
+			http.NotFound(w, r)
+			return
+		}
+		downloads++
+		w.Write(tgzFor(current))
+	}))
+	oldAPI, oldCodeload := apiBase, codeloadBase
+	apiBase, codeloadBase = api.URL, codeload.URL
+	t.Cleanup(func() {
+		apiBase, codeloadBase = oldAPI, oldCodeload
+		api.Close()
+		codeload.Close()
+	})
+
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	dir, err := Checkout("", "github.com/o/r")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if downloads != 1 {
+		t.Fatalf("first checkout downloads = %d, want 1", downloads)
+	}
+
+	current = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	dir2, err := Checkout("", "github.com/o/r")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dir2 != dir {
+		t.Errorf("dir = %q, want same path %q", dir2, dir)
+	}
+	if downloads != 2 {
+		t.Errorf("after HEAD moved, downloads = %d, want 2", downloads)
+	}
+	if got := CheckoutCommit(dir2); got != current {
+		t.Errorf("marker = %q, want %q", got, current)
+	}
+	data, err := os.ReadFile(filepath.Join(dir2, "main.go"))
+	if err != nil || !strings.Contains(string(data), current) {
+		t.Errorf("main.go = %q, %v; want the new commit", data, err)
+	}
+}
+
+func TestExtractTarballRejectsOversize(t *testing.T) {
+	oldBytes, oldFiles := maxExtractBytes, maxExtractFiles
+	maxExtractBytes, maxExtractFiles = 8, 100
+	t.Cleanup(func() { maxExtractBytes, maxExtractFiles = oldBytes, oldFiles })
+
+	tgz := makeTarball(t, "r-abc", map[string]string{"big.txt": "0123456789abcdef"})
+	err := extractTarball(bytes.NewReader(tgz), t.TempDir())
+	if err == nil || !strings.Contains(err.Error(), "exceeds") {
+		t.Fatalf("err = %v, want oversize rejection", err)
+	}
+}
+
+func TestExtractTarballRejectsTooManyFiles(t *testing.T) {
+	oldBytes, oldFiles := maxExtractBytes, maxExtractFiles
+	maxExtractBytes, maxExtractFiles = 1<<20, 2
+	t.Cleanup(func() { maxExtractBytes, maxExtractFiles = oldBytes, oldFiles })
+
+	tgz := makeTarball(t, "r-abc", map[string]string{
+		"a.go": "package a\n",
+		"b.go": "package b\n",
+		"c.go": "package c\n",
+	})
+	err := extractTarball(bytes.NewReader(tgz), t.TempDir())
+	if err == nil || !strings.Contains(err.Error(), "too many files") {
+		t.Fatalf("err = %v, want file-count rejection", err)
+	}
+}
+
+func TestFetchTarballAllowsSlowBody(t *testing.T) {
+	tgz := makeTarball(t, "r-"+testSHA[:7], map[string]string{"main.go": "package main\n"})
+	codeload := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
+		time.Sleep(200 * time.Millisecond)
+		w.Write(tgz)
+	}))
+	oldClient, oldCodeload := httpClient, codeloadBase
+	httpClient = newGitHubClient()
+	codeloadBase = codeload.URL
+	t.Cleanup(func() {
+		httpClient, codeloadBase = oldClient, oldCodeload
+		codeload.Close()
+	})
+
+	body, err := fetchTarball("o", "r", testSHA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer body.Close()
+	got, err := io.ReadAll(body)
+	if err != nil || len(got) == 0 {
+		t.Fatalf("body = %d bytes, err=%v", len(got), err)
+	}
+}
+
+func TestGitHubClientTimesOutSlowHeaders(t *testing.T) {
+	oldHeader, oldClient := responseHeaderTimeout, httpClient
+	responseHeaderTimeout = 50 * time.Millisecond
+	httpClient = newGitHubClient()
+	t.Cleanup(func() {
+		responseHeaderTimeout = oldHeader
+		httpClient = oldClient
+	})
+
+	codeload := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(300 * time.Millisecond)
+		w.WriteHeader(http.StatusOK)
+	}))
+	oldCodeload := codeloadBase
+	codeloadBase = codeload.URL
+	t.Cleanup(func() { codeloadBase = oldCodeload; codeload.Close() })
+
+	_, err := fetchTarball("o", "r", testSHA)
+	if err == nil {
+		t.Fatal("want a response-header timeout, got nil")
 	}
 }

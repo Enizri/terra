@@ -1,7 +1,7 @@
 export const IMG = "/terra/images";
 
 /** Repo whose real frontend the theater previews live (via terra serve). */
-export const REPO_URL = "github.com/terra/terra";
+export const REPO_URL = "github.com/usememos/memos";
 /** Diagram node that gets the live preview instead of a replica. */
 export const LIVE_NODE_ID = "web";
 
@@ -319,19 +319,19 @@ export const faq = {
   items: [
     {
       q: "What is Terra?",
-      a: "A map of your repo that you can talk to. Terra reads the code, draws the architecture, runs the app in the cloud, and applies the changes you ask for.",
+      a: "A map of your repo that you can talk to. Drop it on the playground — Terra clones it, sets it up, and runs it. Frontends you change live; desktop, mobile, and heavier edits are next. Need keys? Terra asks in the UI and stores them on your machine.",
     },
     {
       q: "Does my code leave my machine?",
-      a: "Terra clones the repo into an isolated cloud workspace. Nothing is written back until you approve a diff.",
+      a: "Not on the free path — the model runs locally. Stronger hosted models are opt-in. Nothing is written back until you approve a diff.",
     },
     {
       q: "What does it cost?",
-      a: "Mapping a public repo is free. Cloud runs and private repos use workspace credits.",
+      a: "Free on your machine. Credits are for higher usage and stronger models.",
     },
     {
       q: "Which languages does it read?",
-      a: "The analyzer is language-aware rather than language-specific — Go and TypeScript are the best-covered today.",
+      a: "Whatever is in the repo. It classifies the files — Go, Python, TypeScript, Rust, Java, and the rest of a normal stack — then maps from those facts, not from a language-specific parser.",
     },
     {
       q: "Can it change things without me?",
@@ -339,7 +339,7 @@ export const faq = {
     },
     {
       q: "Is this a replacement for my IDE?",
-      a: "No. It's the layer above it — the part where you decide what to change and see what it did.",
+      a: "No. It's the layer above it — and a faster way to clone someone else's repo and actually understand it.",
     },
   ],
 };

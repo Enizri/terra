@@ -23,6 +23,8 @@ export type AnalyzeEvent = {
     | "analyze"
     | "store"
     | "ask"
+    | "retrieve"
+    | "tool"
     | "done"
     | "error";
   label?: string;

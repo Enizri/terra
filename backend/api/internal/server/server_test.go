@@ -18,6 +18,7 @@ import (
 	"github.com/Enizri/terra/backend/api/internal/analyzerclient"
 	"github.com/Enizri/terra/backend/api/internal/catalog"
 	"github.com/Enizri/terra/backend/api/internal/config"
+	"github.com/Enizri/terra/backend/api/internal/preview"
 	"github.com/Enizri/terra/backend/api/internal/scan"
 	"github.com/Enizri/terra/backend/api/internal/trace"
 )
@@ -744,11 +745,59 @@ func TestDeleteAnalysis(t *testing.T) {
 type stubPreview struct {
 	startErr error
 	url      string
+	result   preview.Result
 }
 
-func (s stubPreview) Start(string) (string, error)       { return s.url, s.startErr }
-func (stubPreview) Lookup(string) (string, string, bool) { return "", "", false }
-func (stubPreview) StopAll()                             {}
+func (s stubPreview) Start(string) (string, error) { return s.url, s.startErr }
+func (s stubPreview) Boot(_ string, emit preview.Emitter) (preview.Result, error) {
+	if emit != nil {
+		emit("checkout", "Fetching the repository")
+		emit("detect", "Finding apps")
+		emit("ready", "Preview is up")
+	}
+	if s.result.URL != "" || len(s.result.Apps) > 0 {
+		return s.result, s.startErr
+	}
+	return preview.Result{URL: s.url}, s.startErr
+}
+func (stubPreview) Lookup(string) (string, string, bool)    { return "", "", false }
+func (stubPreview) ApplyPatch(string, string, string) error { return nil }
+func (stubPreview) Restart(string) error                    { return nil }
+func (stubPreview) StopAll()                                {}
+
+func TestPreviewReturnsApps(t *testing.T) {
+	s, ts := testServer(t)
+	s.Preview = stubPreview{
+		url: "http://preview.test/",
+		result: preview.Result{
+			URL:       "http://preview.test/",
+			PrimaryID: "web",
+			Apps: []preview.AppInfo{
+				{ID: "web", Name: "web", Kind: "web", Framework: "vite", URL: "http://preview.test/", Status: "ready"},
+				{ID: "mobile", Name: "ios", Kind: "mobile", Framework: "react-native", Status: "skipped", Reason: "needs a simulator"},
+			},
+		},
+	}
+	resp, err := http.Post(ts.URL+"/preview", "application/json",
+		strings.NewReader(`{"repo_url":"https://github.com/acme/notes"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+	var out preview.Result
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatal(err)
+	}
+	if out.URL != "http://preview.test/" || out.PrimaryID != "web" || len(out.Apps) != 2 {
+		t.Fatalf("got %+v", out)
+	}
+	if out.Apps[1].Status != "skipped" || out.Apps[1].Reason == "" {
+		t.Fatalf("skipped app = %+v", out.Apps[1])
+	}
+}
 
 func TestPreviewUsesServerRunner(t *testing.T) {
 	s, ts := testServer(t)
@@ -766,6 +815,32 @@ func TestPreviewUsesServerRunner(t *testing.T) {
 	body, _ := io.ReadAll(resp.Body)
 	if !strings.Contains(string(body), "not implemented") {
 		t.Fatalf("body = %s", body)
+	}
+}
+
+func TestPreviewJobStreamsStages(t *testing.T) {
+	s, ts := testServer(t)
+	s.Preview = stubPreview{
+		result: preview.Result{
+			URL:       "http://preview.test/",
+			PrimaryID: "web",
+			Apps:      []preview.AppInfo{{ID: "web", Status: "ready", URL: "http://preview.test/"}},
+		},
+	}
+	events := runJob(t, ts, "/jobs/preview", `{"repo_url":"https://github.com/acme/notes"}`)
+	var stages []string
+	for _, ev := range events {
+		stages = append(stages, ev.Stage)
+	}
+	joined := strings.Join(stages, ",")
+	for _, want := range []string{"checkout", "detect", "ready", "done"} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("stages %v missing %s", stages, want)
+		}
+	}
+	last := events[len(events)-1]
+	if last.Stage != "done" || last.Answer != "http://preview.test/" {
+		t.Fatalf("done = %+v", last)
 	}
 }
 
@@ -1171,7 +1246,7 @@ func TestBodyTooLarge(t *testing.T) {
 	_, ts := testServer(t)
 	huge := `{"repo_url":"https://github.com/acme/notes","pad":"` +
 		strings.Repeat("x", 2<<20) + `"}`
-	for _, path := range []string{"/analyze", "/jobs/analyze", "/preview", "/jobs/ask", "/traces/ingest"} {
+	for _, path := range []string{"/analyze", "/jobs/analyze", "/preview", "/preview/patch", "/preview/restart", "/preview/probe", "/jobs/ask", "/jobs/agent", "/jobs/preview", "/jobs/preview/test", "/jobs/preview/cli", "/traces/ingest"} {
 		resp, err := http.Post(ts.URL+path, "application/json", strings.NewReader(huge))
 		if err != nil {
 			t.Fatal(err)

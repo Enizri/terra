@@ -22,7 +22,7 @@ export interface Component {
   name: string;
   purpose: string;
   importance: "critical" | "high" | "medium" | "low";
-  type: "frontend" | "backend" | "database" | "infrastructure";
+  type: "frontend" | "backend" | "database" | "infrastructure" | "mobile" | "desktop";
   tech?: string[];
   files: string[];
   file_count?: number;

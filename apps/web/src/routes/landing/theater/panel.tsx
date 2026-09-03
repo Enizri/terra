@@ -292,7 +292,7 @@ export function TheaterPanel({
       <div className="sh-theater__stage" ref={stageRef}>
         {live ? (
           <div className="sh-replica sh-replica--live" data-node={node.id}>
-            <LiveFrame picking frameRef={frameRef} repoUrl={REPO_URL} />
+            <LiveFrame frameRef={frameRef} repoUrl={REPO_URL} />
           </div>
         ) : (
           <div

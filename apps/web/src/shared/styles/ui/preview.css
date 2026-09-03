@@ -1,3 +1,86 @@
+.sh-live-shell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.sh-live-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--sh-border, rgba(0, 0, 0, 0.12));
+  background: color-mix(in srgb, var(--sh-window, #fff) 92%, #000 8%);
+  flex-shrink: 0;
+}
+
+.sh-live-apps {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.sh-live-app {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  max-width: 16rem;
+}
+
+.sh-live-app b {
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.sh-live-app em {
+  font-size: 0.68rem;
+  font-style: normal;
+  opacity: 0.65;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.sh-live-app.is-on {
+  border-color: var(--sh-border, rgba(0, 0, 0, 0.2));
+  background: #fff;
+}
+
+.sh-live-app.is-off {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.sh-live-mode {
+  flex-shrink: 0;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--sh-border, rgba(0, 0, 0, 0.16));
+  background: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sh-live-mode.is-interact {
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+
 .sh-live {
   flex: 1;
   width: 100%;
@@ -22,4 +105,97 @@
   white-space: pre-wrap;
   text-align: left;
   font-size: 0.8rem;
+}
+
+.sh-live-pack {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  overflow: auto;
+}
+
+.sh-live-pack__why {
+  margin: 0;
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+
+.sh-live-pack__readme,
+.sh-live-pack__log {
+  margin: 0;
+  padding: 12px;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid var(--sh-border, rgba(0, 0, 0, 0.12));
+  font-size: 0.78rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow: auto;
+  max-height: 50%;
+}
+
+.sh-live-pack__tests {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.sh-live-pack__log--tall {
+  max-height: none;
+  flex: 1;
+}
+
+.sh-live-cli {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.sh-live-cli__in {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--sh-border, rgba(0, 0, 0, 0.16));
+  border-radius: 8px;
+  font: inherit;
+  font-size: 0.85rem;
+}
+
+.sh-live-api {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: auto;
+}
+
+.sh-live-api__hit {
+  border: 1px solid var(--sh-border, rgba(0, 0, 0, 0.12));
+  border-radius: 8px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.sh-live-api__hit header {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  font-size: 0.8rem;
+}
+
+.sh-live-api__hit pre {
+  margin: 0;
+  padding: 8px 10px;
+  border-top: 1px solid var(--sh-border, rgba(0, 0, 0, 0.08));
+  font-size: 0.75rem;
+  white-space: pre-wrap;
+  max-height: 10rem;
+  overflow: auto;
 }
