@@ -151,15 +151,14 @@ func (r *hostRunner) boot(key string) (string, *instance, error) {
 		stop(apiCmd)
 		return "", nil, err
 	}
-	// npm needs `--` to forward port flags; pnpm/yarn do not.
-	args := []string{"run", script}
-	if pm == "npm" {
-		args = append(args, "--")
-	}
-	args = append(args, "--port", strconv.Itoa(devPort), "--strictPort")
-	cmd := exec.Command(pm, args...)
+	// Host mode gives the app its own loopback proxy origin, so no base path
+	// is needed and localhost-only binding is fine.
+	spec := specFor(frameworkFor(root, appDir))
+	opts := launch{Port: devPort}
+	cmd := exec.Command(pm, scriptArgs(pm, script, spec.args(opts))...)
 	cmd.Dir = appDir
-	cmd.Env = append(childEnv(), "PORT="+strconv.Itoa(devPort), "BROWSER=none")
+	cmd.Env = append(childEnv(), spec.environ(opts)...)
+	cmd.Env = append(cmd.Env, "BROWSER=none")
 	cmd.Env = append(cmd.Env, apiEnv...)
 	cmd.Env = append(cmd.Env, traceEnv(r.cfg, key)...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
