@@ -154,6 +154,39 @@ func TestDetectShapes(t *testing.T) {
 				{dir: "apps/mobile", kind: KindMobile, framework: "expo", previewable: true},
 			},
 		},
+		{
+			name: "npm library",
+			files: map[string]string{
+				"package.json": `{"name":"lib","main":"./index.js","exports":{".":"./index.js"},"scripts":{"test":"jest"}}`,
+			},
+			want: []want{{dir: ".", kind: KindLibrary, framework: "node", previewable: false, reason: "library"}},
+		},
+		{
+			name: "allure e2e is not a web app",
+			files: map[string]string{
+				"package.json":     `{"name":"reporter","main":"./index.js","exports":{".":"./index.js"}}`,
+				"e2e/package.json": `{"scripts":{"start":"ALLURE_NO_ANALYTICS=1 allure serve allure-results","test":"jest"}}`,
+			},
+			want: []want{
+				{dir: ".", kind: KindLibrary, framework: "node", previewable: false, reason: "library"},
+				{dir: "e2e", kind: KindLibrary, framework: "node", previewable: false, reason: "Allure"},
+			},
+		},
+		{
+			name: "npm cli",
+			files: map[string]string{
+				"package.json": `{"bin":{"map":"./bin/map.js"},"scripts":{"test":"jest"}}`,
+			},
+			want: []want{{dir: ".", kind: KindCLI, framework: "node", previewable: false, reason: "command-line"}},
+		},
+		{
+			name: "go cobra cli",
+			files: map[string]string{
+				"go.mod":          "module x\nrequire github.com/spf13/cobra v1.8.0\n",
+				"cmd/map/main.go": "package main\n",
+			},
+			want: []want{{dir: ".", kind: KindCLI, framework: "go", previewable: false, reason: "CLI"}},
+		},
 	}
 
 	for _, tc := range cases {
@@ -288,6 +321,26 @@ func TestPythonAPIs(t *testing.T) {
 	}
 	if apps[0].Framework != "django" || apps[0].Kind != KindAPI || apps[0].Run == "" {
 		t.Fatalf("got %+v, want a django api", apps[0])
+	}
+}
+
+func TestPythonClickIsACLI(t *testing.T) {
+	root := repo(t, map[string]string{"requirements.txt": "click==8.1.0\n"})
+	apps, err := Detect(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if apps[0].Kind != KindCLI || apps[0].Previewable || !strings.Contains(apps[0].Reason, "CLI") {
+		t.Fatalf("got %+v, want a python CLI that is not previewable", apps[0])
+	}
+}
+
+func TestWorkspaceRootIsNotAnApp(t *testing.T) {
+	root := repo(t, map[string]string{
+		"package.json": `{"private":true,"workspaces":["e2e"]}`,
+	})
+	if _, err := Detect(root); err == nil {
+		t.Fatal("a workspaces-only root is not an app")
 	}
 }
 

@@ -8,7 +8,10 @@ import (
 
 // kindRank decides which app a preview opens first: a web UI is what a
 // visitor expects to see, an API is what it talks to.
-var kindRank = map[Kind]int{KindWeb: 0, KindAPI: 1, KindDesktop: 2, KindMobile: 3}
+var kindRank = map[Kind]int{
+	KindWeb: 0, KindAPI: 1, KindDesktop: 2, KindMobile: 3,
+	KindCLI: 4, KindLibrary: 5,
+}
 
 // rank sorts apps primary-first: previewable ones, then by kind, then named
 // frameworks over a bare script, then the shallower directory — so a

@@ -1,5 +1,5 @@
 // Package appgraph discovers every runnable app in a checkout: web, api,
-// mobile and desktop. It only looks — nothing here boots a process.
+// mobile, desktop, cli and library. It only looks — nothing here boots a process.
 package appgraph
 
 import (
@@ -22,6 +22,8 @@ const (
 	KindAPI     Kind = "api"
 	KindMobile  Kind = "mobile"
 	KindDesktop Kind = "desktop"
+	KindCLI     Kind = "cli"
+	KindLibrary Kind = "library"
 )
 
 // maxDepth is how deep below the repo root a manifest may sit and still be

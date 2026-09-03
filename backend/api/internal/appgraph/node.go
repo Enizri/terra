@@ -11,6 +11,11 @@ type pkgJSON struct {
 	Scripts         map[string]string `json:"scripts"`
 	Dependencies    map[string]string `json:"dependencies"`
 	DevDependencies map[string]string `json:"devDependencies"`
+	Bin             json.RawMessage   `json:"bin"`
+	Main            string            `json:"main"`
+	Typings         string            `json:"typings"`
+	Types           string            `json:"types"`
+	Exports         json.RawMessage   `json:"exports"`
 }
 
 func (p pkgJSON) has(dep string) bool {
@@ -25,6 +30,19 @@ func (p pkgJSON) script() string {
 		}
 	}
 	return ""
+}
+
+func (p pkgJSON) hasBin() bool {
+	s := strings.TrimSpace(string(p.Bin))
+	return s != "" && s != "null" && s != "{}" && s != "[]"
+}
+
+func (p pkgJSON) published() bool {
+	if p.Main != "" || p.Typings != "" || p.Types != "" {
+		return true
+	}
+	s := strings.TrimSpace(string(p.Exports))
+	return s != "" && s != "null" && s != "{}" && s != "[]"
 }
 
 // webFrameworks maps a dependency to the framework name, most specific first:
@@ -54,8 +72,9 @@ var defaultPorts = map[string]int{
 	"django": 8000, "fastapi": 8000, "flask": 5000,
 }
 
-// fromNode reads dir/package.json and classifies it as web, api, mobile or
-// desktop. A workspace root with no runnable script yields nothing.
+// fromNode reads dir/package.json and classifies it as web, api, mobile,
+// desktop, cli or library. A workspace root with no script, bin or publish
+// fields yields nothing.
 func fromNode(root, dir string) []App {
 	data, err := os.ReadFile(filepath.Join(dir, "package.json"))
 	if err != nil {
@@ -84,23 +103,80 @@ func fromNode(root, dir string) []App {
 	}
 
 	script := pkg.script()
-	if script == "" {
-		return nil
+	cmd := ""
+	if script != "" {
+		cmd = pkg.Scripts[script]
 	}
-	base.Run = pm + " run " + script
-	for _, fw := range webFrameworks {
-		if pkg.has(fw.dep) {
-			return []App{withFramework(base, KindWeb, fw.framework)}
+
+	if script != "" && !notADevServer(cmd) {
+		base.Run = pm + " run " + script
+		for _, fw := range webFrameworks {
+			if pkg.has(fw.dep) {
+				return []App{withFramework(base, KindWeb, fw.framework)}
+			}
+		}
+		for _, fw := range apiFrameworks {
+			if pkg.has(fw.dep) {
+				return []App{withFramework(base, KindAPI, fw.framework)}
+			}
 		}
 	}
-	for _, fw := range apiFrameworks {
-		if pkg.has(fw.dep) {
-			return []App{withFramework(base, KindAPI, fw.framework)}
+
+	if pkg.hasBin() {
+		return []App{cliApp(base)}
+	}
+	if script != "" && notADevServer(cmd) {
+		return []App{libraryApp(base, libraryReason(cmd))}
+	}
+	if script != "" {
+		// A runnable script with no framework evidence still boots something;
+		// the launcher treats "node" as flag-free (node server.js).
+		base.Run = pm + " run " + script
+		return []App{withFramework(base, KindWeb, "node")}
+	}
+	if pkg.published() {
+		return []App{libraryApp(base, "This is a library, not a web app. Live preview will show the README and tests; there is no page to iframe.")}
+	}
+	return nil
+}
+
+func cliApp(base App) App {
+	base.Kind, base.Framework, base.Previewable = KindCLI, "node", false
+	base.Reason = "This is a command-line tool. It has no web UI to iframe — Terra will show a terminal in a later change."
+	return base
+}
+
+func libraryApp(base App, reason string) App {
+	base.Kind, base.Framework, base.Previewable = KindLibrary, "node", false
+	base.Run = ""
+	base.Reason = reason
+	return base
+}
+
+func libraryReason(cmd string) string {
+	if strings.Contains(strings.ToLower(cmd), "allure") {
+		return "This start script only serves Allure test reports, not a product UI."
+	}
+	return "This start script runs tests or a build, not a web server. Live preview will show the README and tests."
+}
+
+// notADevServer is true when the script is a test, linter, compiler or report
+// server — something Terra must not iframe as a product.
+func notADevServer(cmd string) bool {
+	s := strings.TrimSpace(cmd)
+	if s == "" || s == ":" {
+		return true
+	}
+	low := strings.ToLower(s)
+	for _, needle := range []string{
+		"allure", "jest", "mocha", "vitest", "eslint", "prettier",
+		"husky", "commitlint", "tsc", "lint-staged",
+	} {
+		if strings.Contains(low, needle) {
+			return true
 		}
 	}
-	// A runnable script with no framework evidence still boots something; the
-	// launcher treats "node" as flag-free.
-	return []App{withFramework(base, KindWeb, "node")}
+	return false
 }
 
 func withFramework(app App, kind Kind, framework string) App {
