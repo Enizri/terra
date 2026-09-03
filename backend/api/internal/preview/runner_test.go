@@ -174,6 +174,11 @@ func TestDockerRunnerMissingBinary(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, ".terra-commit"), []byte("deadbeef"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	// A .git marker skips HEAD resolve — this test is about the missing docker
+	// binary, not GitHub, and acme/notes is not a real repository.
+	if err := os.Mkdir(filepath.Join(dir, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"scripts":{"dev":"vite"},"devDependencies":{"vite":"^5"}}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
