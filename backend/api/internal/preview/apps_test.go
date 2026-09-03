@@ -91,6 +91,25 @@ func TestDockerableIsNodeNotGo(t *testing.T) {
 	}
 }
 
+func TestSnapshotListsSkippedApps(t *testing.T) {
+	inst := &instance{
+		proxyURL:  "http://live/web/",
+		primaryID: "web",
+		graph: []appgraph.App{
+			{ID: "web", Dir: "web", Kind: appgraph.KindWeb, Framework: "vite", Previewable: true},
+			{ID: "mobile", Dir: "ios", Kind: appgraph.KindMobile, Framework: "react-native", Previewable: false, Reason: "needs a simulator"},
+		},
+		apps: []*appProcess{{id: "web", publicURL: "http://live/web/", primary: true}},
+	}
+	got := snapshot(inst)
+	if got.URL != "http://live/web/" || got.PrimaryID != "web" || len(got.Apps) != 2 {
+		t.Fatalf("%+v", got)
+	}
+	if got.Apps[0].Status != "ready" || got.Apps[1].Status != "skipped" || got.Apps[1].Reason == "" {
+		t.Fatalf("apps = %+v", got.Apps)
+	}
+}
+
 func ids(apps []appgraph.App) []string {
 	out := make([]string, len(apps))
 	for i, app := range apps {

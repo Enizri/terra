@@ -33,6 +33,7 @@ type Event struct {
 	ProbeID        string                    `json:"probe_id,omitempty"`
 	Repo           *recommend.RepoInfo       `json:"repo,omitempty"`
 	Recommendation *recommend.Recommendation `json:"recommendation,omitempty"`
+	Preview        any                       `json:"preview,omitempty"`
 }
 
 // RunFunc runs job work. emit is concurrency-safe; ctx cancels on Cancel or finish.

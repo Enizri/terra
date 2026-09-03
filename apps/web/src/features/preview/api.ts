@@ -1,16 +1,49 @@
 /** Preview feature — live preview proxy + trace stream. */
-import { authHeaders, json, noteUnauthorized, post } from "../../shared/http.ts";
+import { authHeaders, json, jobEvents, noteUnauthorized, post } from "../../shared/http.ts";
 import { getToken } from "../../shared/token.ts";
 import { tracesURL } from "./tracesUrl.ts";
 
 export { tracesURL };
 
-/** Boot or reuse the repo's preview proxy. */
+export type PreviewApp = {
+  id: string;
+  name: string;
+  kind: string;
+  framework: string;
+  url?: string;
+  status: string;
+  reason?: string;
+};
+
+export type PreviewResult = {
+  url: string;
+  primary_id: string;
+  apps: PreviewApp[];
+};
+
+export type PreviewEvent = {
+  stage: string;
+  label?: string;
+  preview?: PreviewResult;
+  answer?: string;
+};
+
+/** Boot or reuse the repo's preview proxy (legacy one-shot). */
 export async function preview(repoUrl: string, signal?: AbortSignal): Promise<string> {
   const res = await post("/preview", { repo_url: repoUrl }, signal);
-  const data = await json<{ url?: string }>(res, "preview");
+  const data = await json<PreviewResult>(res, "preview");
   if (!data.url) throw new Error("preview failed");
   return data.url;
+}
+
+/** Stream preview boot: checkout → detect → install → boot → ready. */
+export async function* previewEvents(
+  repoUrl: string,
+  signal?: AbortSignal,
+): AsyncGenerator<PreviewEvent> {
+  const created = await post("/jobs/preview", { repo_url: repoUrl }, signal);
+  const { job_id } = await json<{ job_id: string }>(created, "preview");
+  yield* jobEvents<PreviewEvent>(job_id, signal);
 }
 
 /** Preview proxy span — see backend/api/internal/trace. */

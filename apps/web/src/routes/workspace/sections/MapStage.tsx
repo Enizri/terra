@@ -172,7 +172,7 @@ export function MapStage({
           <div className="sh-ws__preview">
             {/* Boots a real dev server for the mapped repo — only some projects
                 have one, so this stays behind the button and says so on failure. */}
-            <LiveFrame picking frameRef={frameRef} repoUrl={map.project.repository_url} />
+            <LiveFrame frameRef={frameRef} repoUrl={map.project.repository_url} />
           </div>
         )}
         {primary && (

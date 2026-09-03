@@ -33,6 +33,7 @@ func TestPublicRoutesRegistered(t *testing.T) {
 		{"POST", "/jobs/analyze"},
 		{"POST", "/jobs/ask"},
 		{"POST", "/jobs/agent"},
+		{"POST", "/jobs/preview"},
 		{"POST", "/preview"},
 		{"POST", "/preview/patch"},
 		{"POST", "/preview/restart"},

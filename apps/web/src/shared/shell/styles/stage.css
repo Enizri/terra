@@ -332,6 +332,7 @@
   border: 1px solid var(--sh-border);
 }
 
+.sh-ws__preview .sh-live-shell,
 .sh-ws__preview .sh-live {
   flex: 1;
   border: 0;

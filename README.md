@@ -139,7 +139,10 @@ token. `make dev` (loopback) stays open.
 **Live preview (Phase 1b):** Compose sets `TERRA_PREVIEW_MODE=docker`, mounts the
 host Docker socket, and shares checkouts via the named `terra-data` volume
 (`TERRA_CHECKOUT_VOLUME`) so Docker Desktop can mount them into siblings.
-`POST /preview` starts every previewable app in the checkout. Node apps run in a
+`POST /preview` starts every previewable app in the checkout and returns
+`{url, primary_id, apps}`. `POST /jobs/preview` streams the same boot as NDJSON
+(`checkout → detect → install → boot → ready`) so the workspace can show
+progress and cancel. Node apps run in a
 sibling container and return `/__live/{id}/` (same origin) when the framework
 takes a base path on the command line (Vite, Angular, CRA); the rest are served
 at their own loopback origin instead, since their absolute asset paths cannot be
@@ -163,7 +166,7 @@ Caps: `TERRA_PREVIEW_MAX` (default 2, counting **apps** not repos), idle TTL
 | `make sync-fixtures` | Copy `case-studies/memos.map.json` → `apps/web/src/data/` |
 | `terra scan <url>` | Clone + deterministic scan, JSON to stdout |
 | `terra map <url>` | Scan, ask the analyzer for a map, store in `terra.db` |
-| `terra serve` | HTTP API: `POST /jobs/probe`, `POST /jobs/analyze`, `POST /jobs/ask`, `POST /jobs/agent`, `GET /models`, `GET /host/capabilities`, `GET /analyses`, `POST /preview`, `POST /preview/patch`, `POST /preview/restart`, `POST /ask`, `GET /files` |
+| `terra serve` | HTTP API: `POST /jobs/probe`, `POST /jobs/analyze`, `POST /jobs/ask`, `POST /jobs/agent`, `POST /jobs/preview`, `GET /models`, `GET /host/capabilities`, `GET /analyses`, `POST /preview`, `POST /preview/patch`, `POST /preview/restart`, `POST /ask`, `GET /files` |
 
 ## Environment variables
 

@@ -1,7 +1,7 @@
 export const IMG = "/terra/images";
 
 /** Repo whose real frontend the theater previews live (via terra serve). */
-export const REPO_URL = "github.com/terra/terra";
+export const REPO_URL = "github.com/usememos/memos";
 /** Diagram node that gets the live preview instead of a replica. */
 export const LIVE_NODE_ID = "web";
 
