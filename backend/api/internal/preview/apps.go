@@ -97,12 +97,15 @@ func snapshot(inst *instance) Result {
 				info.URL = p.publicURL
 				info.Status = "ready"
 				info.Reason = ""
-			} else if g.Kind == appgraph.KindLibrary || g.Kind == appgraph.KindCLI {
-				info.Status = "ready"
-			} else if !g.Previewable {
-				info.Status = "skipped"
 			} else {
-				info.Status = "error"
+				switch {
+				case g.Kind == appgraph.KindLibrary || g.Kind == appgraph.KindCLI:
+					info.Status = "ready"
+				case !g.Previewable:
+					info.Status = "skipped"
+				default:
+					info.Status = "error"
+				}
 			}
 			apps = append(apps, info)
 		}
@@ -341,19 +344,6 @@ func packageStage(root string, apps []appgraph.App) *instance {
 		}
 	}
 	return &instance{root: root, graph: apps, primaryID: id, staged: true}
-}
-
-func noPreviewable(root string, apps []appgraph.App) error {
-	var reasons []string
-	for _, app := range apps {
-		if app.Reason != "" {
-			reasons = append(reasons, app.Reason)
-		}
-	}
-	if len(reasons) == 0 {
-		return fmt.Errorf("no previewable app found in %s", root)
-	}
-	return fmt.Errorf("no previewable app found in %s: %s", root, strings.Join(reasons, " "))
 }
 
 func installApp(root string, app appgraph.App) error {
