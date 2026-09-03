@@ -97,10 +97,15 @@ func snapshot(inst *instance) Result {
 				info.URL = p.publicURL
 				info.Status = "ready"
 				info.Reason = ""
-			} else if !g.Previewable {
-				info.Status = "skipped"
 			} else {
-				info.Status = "error"
+				switch {
+				case g.Kind == appgraph.KindLibrary || g.Kind == appgraph.KindCLI:
+					info.Status = "ready"
+				case !g.Previewable:
+					info.Status = "skipped"
+				default:
+					info.Status = "error"
+				}
 			}
 			apps = append(apps, info)
 		}
@@ -123,6 +128,8 @@ type instance struct {
 	primaryID string
 	proxyURL  string
 	timer     *time.Timer
+	// staged is a non-HTTP live view (library README). No child process.
+	staged bool
 }
 
 // bootWait is an in-flight Start. apps is 0 until detect finishes, then the
@@ -149,6 +156,9 @@ func (inst *instance) primaryApp() *appProcess {
 }
 
 func (inst *instance) appDir() string {
+	if inst != nil && inst.staged {
+		return inst.root
+	}
 	if p := inst.primaryApp(); p != nil && p.dir != "" {
 		return p.dir
 	}
@@ -159,6 +169,9 @@ func (inst *instance) appDir() string {
 }
 
 func (inst *instance) healthy() bool {
+	if inst != nil && inst.staged {
+		return true
+	}
 	p := inst.primaryApp()
 	if p == nil {
 		return false
@@ -310,17 +323,27 @@ func previewLimit(cfg *config.Config) int {
 	return cfg.PreviewMax
 }
 
-func noPreviewable(root string, apps []appgraph.App) error {
-	var reasons []string
-	for _, app := range apps {
-		if app.Reason != "" {
-			reasons = append(reasons, app.Reason)
+// packageStage is the live view when nothing HTTP-bootable exists: the
+// checkout stays mounted so GET /files can show README and the tree.
+func packageStage(root string, apps []appgraph.App) *instance {
+	if len(apps) == 0 {
+		apps = []appgraph.App{{
+			ID: "repo", Dir: ".", Kind: appgraph.KindLibrary,
+			Reason: "Terra found no app to boot. Showing the repository instead.",
+		}}
+	}
+	id := apps[0].ID
+	if p, ok := appgraph.Primary(apps); ok {
+		id = p.ID
+	} else {
+		for _, a := range apps {
+			if a.Kind == appgraph.KindLibrary || a.Kind == appgraph.KindCLI {
+				id = a.ID
+				break
+			}
 		}
 	}
-	if len(reasons) == 0 {
-		return fmt.Errorf("no previewable app found in %s", root)
-	}
-	return fmt.Errorf("no previewable app found in %s: %s", root, strings.Join(reasons, " "))
+	return &instance{root: root, graph: apps, primaryID: id, staged: true}
 }
 
 func installApp(root string, app appgraph.App) error {

@@ -175,6 +175,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /jobs/ask", s.enqueueAsk)
 	mux.HandleFunc("POST /jobs/agent", s.enqueueAgent)
 	mux.HandleFunc("POST /jobs/preview", s.enqueuePreview)
+	mux.HandleFunc("POST /jobs/preview/test", s.enqueuePreviewTest)
 	mux.HandleFunc("GET /jobs/{id}/events", s.jobEvents)
 	mux.HandleFunc("POST /jobs/{id}/cancel", s.cancelJob)
 	mux.HandleFunc("GET /analyses", s.list)

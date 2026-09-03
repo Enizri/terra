@@ -46,6 +46,46 @@ export async function* previewEvents(
   yield* jobEvents<PreviewEvent>(job_id, signal);
 }
 
+const README_CANDIDATES = ["README.md", "readme.md", "README"];
+
+/** Read a file from the mounted preview checkout. Null while it is still starting. */
+export async function repoFile(
+  repoUrl: string,
+  path: string,
+  signal?: AbortSignal,
+): Promise<string | null> {
+  const q = new URLSearchParams({ repo_url: repoUrl, path });
+  const res = await fetch(`/files?${q}`, { headers: authHeaders(), signal });
+  noteUnauthorized(res);
+  const data = (await res.json().catch(() => null)) as {
+    content?: string;
+    starting?: boolean;
+    error?: string;
+  } | null;
+  if (data?.starting) return null;
+  if (!res.ok) return null;
+  return data?.content ?? null;
+}
+
+/** First README that exists in the checkout, or null. */
+export async function repoReadme(repoUrl: string, signal?: AbortSignal): Promise<string | null> {
+  for (const name of README_CANDIDATES) {
+    const text = await repoFile(repoUrl, name, signal);
+    if (text != null) return text;
+  }
+  return null;
+}
+
+/** Stream `npm test` / `go test` from the mounted checkout. */
+export async function* previewTestEvents(
+  repoUrl: string,
+  signal?: AbortSignal,
+): AsyncGenerator<PreviewEvent> {
+  const created = await post("/jobs/preview/test", { repo_url: repoUrl }, signal);
+  const { job_id } = await json<{ job_id: string }>(created, "tests");
+  yield* jobEvents<PreviewEvent>(job_id, signal);
+}
+
 /** Preview proxy span — see backend/api/internal/trace. */
 export type TraceSpan = {
   repo: string;

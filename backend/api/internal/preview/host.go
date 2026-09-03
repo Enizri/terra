@@ -156,11 +156,19 @@ func (r *hostRunner) boot(key string, emit Emitter) (*instance, error) {
 	ping(emit, "detect", "Finding apps")
 	apps, err := appgraph.For(root, scan.CheckoutCommit(root))
 	if err != nil {
-		return r.startViaRunfile(key, root, err, emit)
+		inst, rfErr := r.startViaRunfile(key, root, err, emit)
+		if rfErr != nil {
+			ping(emit, "ready", "Showing the repository")
+			return packageStage(root, nil), nil
+		}
+		return inst, nil
 	}
 	order := bootOrder(apps)
 	if len(order) == 0 {
-		return nil, noPreviewable(root, apps)
+		ping(emit, "ready", "Showing the repository")
+		inst := packageStage(root, apps)
+		r.trackStarting(key, inst)
+		return inst, nil
 	}
 	if err := r.reserveApps(key, len(order)); err != nil {
 		return nil, err
