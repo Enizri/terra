@@ -14,7 +14,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 )
 
@@ -119,33 +118,6 @@ func detectGoBackend(root string) (pkg string, ok bool) {
 		return "", false
 	}
 	return "./cmd/" + filepath.Base(filepath.Dir(mains[0])), true
-}
-
-// startBackend runs the repo's own Go server and returns the port it bound.
-// It gets PORT and nothing else: --port and --data are usememos/memos' own
-// spelling, and every other Go repo exits on them. A server that ignores PORT
-// is found by the address it prints instead (see waitReady).
-func startBackend(root, pkg string) (int, *exec.Cmd, error) {
-	port, err := freePort()
-	if err != nil {
-		return 0, nil, err
-	}
-	cmd := exec.Command("go", "run", pkg)
-	cmd.Dir = root
-	cmd.Env = append(childEnv(), specFor("go").environ(launch{Port: port})...)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	logs := &boundedBuf{}
-	cmd.Stdout = logs
-	cmd.Stderr = logs
-	if err := cmd.Start(); err != nil {
-		return 0, nil, fmt.Errorf("start backend (go run %s): %w", pkg, err)
-	}
-	bound, err := waitReady(port, logs, watch(cmd), 5*time.Minute)
-	if err != nil {
-		stop(cmd)
-		return 0, nil, fmt.Errorf("backend never came up: %v\n--- output ---\n%s", err, logs.String())
-	}
-	return bound, cmd, nil
 }
 
 /* ---------- dev server readiness ---------- */

@@ -2,7 +2,6 @@ package preview
 
 import (
 	"fmt"
-	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -13,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Enizri/terra/backend/api/internal/appgraph"
 	"github.com/Enizri/terra/backend/api/internal/config"
 	"github.com/Enizri/terra/backend/api/internal/scan"
 )
@@ -20,7 +20,7 @@ import (
 const dockerPreviewPort = 5173
 
 // dockerDefault is the process-wide Docker sibling preview runner.
-var dockerDefault = &dockerRunner{byRepo: map[string]*dockerInstance{}}
+var dockerDefault = &dockerRunner{byRepo: map[string]*instance{}}
 
 // Docker returns the process-local Docker sibling preview runner, configured with c.
 func Docker(c *config.Config) Runner {
@@ -30,26 +30,14 @@ func Docker(c *config.Config) Runner {
 	return dockerDefault
 }
 
-type dockerInstance struct {
-	root          string
-	appDir        string
-	containerName string
-	publicURL     string
-	target        string
-	readyURL      string
-	liveID        string
-	proxyLn       net.Listener // set when the app is served at its own origin
-	timer         *time.Timer
-}
-
 type dockerRunner struct {
 	mu     sync.Mutex
 	cfg    *config.Config
-	byRepo map[string]*dockerInstance
-	boots  map[string]chan struct{} // in-flight boots; closed when done
+	byRepo map[string]*instance
+	boots  map[string]*bootWait
 	// starting tracks containers owned by an in-flight boot so StopAll can
 	// remove them before they land in byRepo.
-	starting map[string]*dockerInstance
+	starting map[string]*instance
 }
 
 func (r *dockerRunner) Start(repoURL string) (string, error) {
@@ -59,24 +47,24 @@ func (r *dockerRunner) Start(repoURL string) (string, error) {
 	}
 	for {
 		r.mu.Lock()
-		ttl := r.cfg.PreviewTTL
-		limit := r.cfg.PreviewMax
+		ttl := time.Duration(0)
+		limit := previewLimit(r.cfg)
 		cfg := r.cfg
+		if cfg != nil {
+			ttl = cfg.PreviewTTL
+		}
 
 		if inst, ok := r.byRepo[key]; ok {
-			check := inst.readyURL
-			if check == "" {
-				check = inst.target
-			}
-			publicURL := inst.publicURL
-			name := inst.containerName
+			publicURL := inst.proxyURL
 			r.mu.Unlock()
-			if aliveURL(check) {
+			if inst.healthy() {
 				r.mu.Lock()
 				if cur, ok := r.byRepo[key]; ok && cur == inst {
 					r.resetTTLLocked(key, inst, ttl)
 					r.mu.Unlock()
-					fmt.Fprintf(os.Stderr, "preview: reusing %s, ttl reset to %s\n", name, ttl)
+					if p := inst.primaryApp(); p != nil {
+						fmt.Fprintf(os.Stderr, "preview: reusing %s, ttl reset to %s\n", p.containerName, ttl)
+					}
 					return publicURL, nil
 				}
 				r.mu.Unlock()
@@ -91,31 +79,30 @@ func (r *dockerRunner) Start(repoURL string) (string, error) {
 
 		if ch, ok := r.boots[key]; ok {
 			r.mu.Unlock()
-			<-ch
+			<-ch.done
 			continue
 		}
 
-		inflight := len(r.byRepo) + len(r.boots)
-		if limit >= 0 && inflight >= limit {
-			fmt.Fprintf(os.Stderr, "preview: rejected %s, capacity full (%d/%d)\n", key, len(r.byRepo), limit)
+		used := usedApps(r.byRepo, r.boots)
+		if limit >= 0 && used >= limit {
+			fmt.Fprintf(os.Stderr, "preview: rejected %s, capacity full (%d/%d apps)\n", key, used, limit)
 			r.mu.Unlock()
-			return "", fmt.Errorf("preview capacity full (%d concurrent); stop another preview or raise TERRA_PREVIEW_MAX", limit)
+			return "", fmt.Errorf("preview capacity full (%d apps / %d); stop another preview or raise TERRA_PREVIEW_MAX", used, limit)
 		}
 		if r.boots == nil {
-			r.boots = map[string]chan struct{}{}
+			r.boots = map[string]*bootWait{}
 		}
-		ch := make(chan struct{})
-		r.boots[key] = ch
+		wait := &bootWait{done: make(chan struct{})}
+		r.boots[key] = wait
 		r.mu.Unlock()
 
-		url, err := r.runBoot(key, cfg, ttl, limit, ch)
+		url, err := r.runBoot(key, cfg, ttl, limit, wait)
 		return url, err
 	}
 }
 
-// runBoot runs the heavy docker work outside the mutex and always clears boots.
-func (r *dockerRunner) runBoot(key string, cfg *config.Config, ttl time.Duration, limit int, ch chan struct{}) (url string, err error) {
-	var inst *dockerInstance
+func (r *dockerRunner) runBoot(key string, cfg *config.Config, ttl time.Duration, limit int, wait *bootWait) (url string, err error) {
+	var inst *instance
 	defer func() {
 		if rec := recover(); rec != nil {
 			err = fmt.Errorf("docker preview boot panicked: %v", rec)
@@ -125,8 +112,12 @@ func (r *dockerRunner) runBoot(key string, cfg *config.Config, ttl time.Duration
 		if err == nil && inst != nil {
 			r.resetTTLLocked(key, inst, ttl)
 			r.byRepo[key] = inst
-			fmt.Fprintf(os.Stderr, "preview: started %s at %s (ttl %s, %d/%d slots)\n",
-				inst.containerName, inst.publicURL, ttl, len(r.byRepo), limit)
+			name := key
+			if p := inst.primaryApp(); p != nil && p.containerName != "" {
+				name = p.containerName
+			}
+			fmt.Fprintf(os.Stderr, "preview: started %s at %s (ttl %s, %d/%d apps)\n",
+				name, inst.proxyURL, ttl, usedApps(r.byRepo, r.boots), limit)
 		} else {
 			if inst != nil {
 				r.stopLocked(inst)
@@ -136,61 +127,151 @@ func (r *dockerRunner) runBoot(key string, cfg *config.Config, ttl time.Duration
 		}
 		delete(r.starting, key)
 		delete(r.boots, key)
-		close(ch)
+		close(wait.done)
 		r.mu.Unlock()
 	}()
 	url, inst, err = r.boot(key, cfg)
 	return url, err
 }
 
-func (r *dockerRunner) trackStarting(key string, inst *dockerInstance) {
+func (r *dockerRunner) trackStarting(key string, inst *instance) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.starting == nil {
-		r.starting = map[string]*dockerInstance{}
+		r.starting = map[string]*instance{}
 	}
 	r.starting[key] = inst
 }
 
-// boot does checkout + docker run + ready-wait. It must not hold r.mu.
-func (r *dockerRunner) boot(key string, cfg *config.Config) (string, *dockerInstance, error) {
-	dockerBin := cfg.DockerBin
-	if _, err := exec.LookPath(dockerBin); err != nil {
-		return "", nil, fmt.Errorf("docker preview: %q not found on PATH (set TERRA_DOCKER): %w", dockerBin, err)
+func (r *dockerRunner) reserveApps(key string, n int) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if b, ok := r.boots[key]; ok {
+		b.apps = n
 	}
+	limit := previewLimit(r.cfg)
+	used := usedApps(r.byRepo, r.boots)
+	if limit >= 0 && used > limit {
+		return fmt.Errorf("preview capacity full (%d apps / %d); stop another preview or raise TERRA_PREVIEW_MAX", used, limit)
+	}
+	return nil
+}
 
+func (r *dockerRunner) boot(key string, cfg *config.Config) (string, *instance, error) {
 	root, err := scan.Checkout(cfg.CheckoutDir, key)
 	if err != nil {
 		return "", nil, err
 	}
-	appDir, script, pm, err := detect(root)
+	apps, err := appgraph.For(root, scan.CheckoutCommit(root))
 	if err != nil {
-		return "", nil, fmt.Errorf("docker preview supports package.json frontends only (use TERRA_PREVIEW_MODE=host for runfile/Go): %v", err)
+		inst, err := bootRunfile(cfg, key, root, err)
+		if err != nil {
+			return "", nil, err
+		}
+		r.trackStarting(key, inst)
+		if err := r.reserveApps(key, 1); err != nil {
+			inst.stop(r.dockerBin())
+			return "", nil, err
+		}
+		return inst.proxyURL, inst, nil
 	}
-
-	liveID := safeContainerKey(key)
-	name := "terra-preview-" + liveID
-	_ = exec.Command(dockerBin, "rm", "-f", name).Run()
-
-	// Write hook into the checkout so sibling containers see it via the shared
-	// volume/bind (API image paths are not host-visible to Docker Desktop).
-	hookPath := filepath.Join(root, ".terra-hook.js")
-	if err := os.WriteFile(hookPath, hookJS, 0o644); err != nil {
+	order := bootOrder(apps)
+	if len(order) == 0 {
+		return "", nil, noPreviewable(root, apps)
+	}
+	if err := r.reserveApps(key, len(order)); err != nil {
 		return "", nil, err
 	}
 
-	image := cfg.PreviewImage
-	network := cfg.PreviewNetwork
+	needsDocker := false
+	for _, app := range order {
+		if dockerable(app) {
+			needsDocker = true
+			break
+		}
+	}
+	dockerBin := ""
+	if needsDocker {
+		dockerBin = cfg.DockerBin
+		if _, err := exec.LookPath(dockerBin); err != nil {
+			return "", nil, fmt.Errorf("docker preview: %q not found on PATH (set TERRA_DOCKER): %w", dockerBin, err)
+		}
+		hookPath := filepath.Join(root, ".terra-hook.js")
+		if err := os.WriteFile(hookPath, hookJS, 0o644); err != nil {
+			return "", nil, err
+		}
+	}
 
-	// Only a framework that takes its base path on the command line can be
-	// mounted under /__live/{id}/; the others are served at their own origin,
-	// or every absolute asset path they emit 404s.
-	spec := specFor(frameworkFor(root, appDir))
+	primary, _ := appgraph.Primary(apps)
+	inst := &instance{root: root}
+	r.trackStarting(key, inst)
+
+	var extraEnv []string
+	var apiProc *appProcess
+	for _, app := range order {
+		var proc *appProcess
+		if dockerable(app) {
+			proc, err = r.startDockerApp(cfg, dockerBin, key, root, app, primary.ID, extraEnv)
+		} else {
+			port, perr := freePort()
+			if perr != nil {
+				inst.stop(dockerBin)
+				return "", nil, perr
+			}
+			spec := specFor(app.Framework)
+			liveID := appLiveID(key, app.ID, app.ID == primary.ID)
+			opts := launch{Port: port}
+			if spec.SupportsBasePath {
+				opts.BasePath = "/__live/" + liveID + "/"
+			}
+			proc, err = startHostApp(cfg, key, root, app, opts, extraEnv)
+			if err == nil {
+				proc.liveID = liveID
+				proc.primary = app.ID == primary.ID
+				bound, werr := waitReady(port, proc.logs, watch(proc.cmd), readyBudget(app), skipPorts(inst.apps)...)
+				if werr != nil {
+					proc.stop(dockerBin)
+					err = fmt.Errorf("%s never came up: %v\n--- output ---\n%s", app.ID, werr, proc.logs.String())
+				} else {
+					proc.port = bound
+					proc.target = "http://localhost:" + strconv.Itoa(bound)
+					proc.readyURL = proc.target + "/"
+					err = publishApp(cfg, key, proc, spec, true, seedDemoAuth(key, proc.target))
+				}
+			}
+		}
+		if err != nil {
+			inst.stop(dockerBin)
+			return "", nil, err
+		}
+		inst.apps = append(inst.apps, proc)
+		if app.Kind == appgraph.KindAPI && apiProc == nil {
+			apiProc = proc
+			extraEnv = apiProxyEnv(proc.dockerAPIOrigin(cfg))
+		}
+	}
+	p := inst.primaryApp()
+	if p == nil {
+		inst.stop(dockerBin)
+		return "", nil, fmt.Errorf("preview boot produced no apps")
+	}
+	inst.proxyURL = p.publicURL
+	return inst.proxyURL, inst, nil
+}
+
+func (r *dockerRunner) startDockerApp(cfg *config.Config, dockerBin, key, root string, app appgraph.App, primaryID string, extraEnv []string) (*appProcess, error) {
+	liveID := appLiveID(key, app.ID, app.ID == primaryID)
+	name := "terra-preview-" + liveID
+	_ = exec.Command(dockerBin, "rm", "-f", name).Run()
+
+	spec := specFor(app.Framework)
 	basePath := ""
 	if spec.SupportsBasePath {
 		basePath = "/__live/" + liveID + "/"
 	}
 	opts := launch{Port: dockerPreviewPort, BasePath: basePath, AllHosts: true}
+	hookPath := filepath.Join(root, ".terra-hook.js")
+	appDir := appWorkDir(root, app)
 
 	args := []string{"run", "-d", "--name", name}
 	args = append(args, dockerMountArgs(cfg, root)...)
@@ -199,27 +280,29 @@ func (r *dockerRunner) boot(key string, cfg *config.Config) (string, *dockerInst
 		"-e", "BROWSER=none",
 		"-e", "NODE_OPTIONS=--require "+hookPath,
 	)
-	for _, kv := range append(spec.environ(opts), dockerTraceVars(cfg, key)...) {
+	for _, kv := range append(spec.environ(opts), extraEnv...) {
 		args = append(args, "-e", kv)
 	}
+	for _, kv := range dockerTraceVars(cfg, key) {
+		args = append(args, "-e", kv)
+	}
+	network := cfg.PreviewNetwork
 	if network != "" {
 		args = append(args, "--network", network)
 	} else {
 		args = append(args, "-p", "127.0.0.1::"+strconv.Itoa(dockerPreviewPort))
 	}
-	args = append(args, image, "bash", "-lc", dockerDevCommand(pm, script, spec, opts))
+	args = append(args, cfg.PreviewImage, "bash", "-lc", dockerAppCommand(app, spec, opts))
 
 	out, err := exec.Command(dockerBin, args...).CombinedOutput()
 	if err != nil {
-		return "", nil, fmt.Errorf("docker run preview: %v: %s", err, tail(out))
+		return nil, fmt.Errorf("docker run preview (%s): %v: %s", app.ID, err, tail(out))
 	}
-	partial := &dockerInstance{containerName: name, liveID: liveID}
-	r.trackStarting(key, partial)
 
 	target, err := r.resolveTarget(dockerBin, name, network)
 	if err != nil {
 		_ = exec.Command(dockerBin, "rm", "-f", name).Run()
-		return "", nil, err
+		return nil, err
 	}
 	readyURL := strings.TrimRight(target, "/") + "/"
 	if basePath != "" {
@@ -228,34 +311,48 @@ func (r *dockerRunner) boot(key string, cfg *config.Config) (string, *dockerInst
 	if err := waitURLReady(readyURL, 3*time.Minute); err != nil {
 		logs, _ := exec.Command(dockerBin, "logs", "--tail", "80", name).CombinedOutput()
 		_ = exec.Command(dockerBin, "rm", "-f", name).Run()
-		return "", nil, fmt.Errorf("preview container never became ready: %v\n--- docker logs ---\n%s", err, tail(logs))
+		return nil, fmt.Errorf("preview container never became ready (%s): %v\n--- docker logs ---\n%s", app.ID, err, tail(logs))
 	}
 
+	proc := &appProcess{
+		id: app.ID, dir: appDir, kind: app.Kind, framework: app.Framework,
+		containerName: name, port: dockerPreviewPort, target: target,
+		readyURL: readyURL, liveID: liveID, primary: app.ID == primaryID,
+	}
 	authFix := seedDemoAuth(key, target)
-	var publicURL string
-	var proxyLn net.Listener
-	if basePath != "" {
-		publicURL, err = MountPathProxy(cfg.PublicBase(), liveID, target, key, authFix)
-	} else {
-		// Same loopback origin proxy host mode returns: select.js injection and
-		// the demo-auth hook still apply, but the URL is only reachable from
-		// the machine running the API.
-		publicURL, proxyLn, err = serveProxy(key, target, authFix)
-	}
-	if err != nil {
+	if err := publishApp(cfg, key, proc, spec, spec.SupportsBasePath, authFix); err != nil {
 		_ = exec.Command(dockerBin, "rm", "-f", name).Run()
-		return "", nil, err
+		return nil, err
 	}
-
-	inst := &dockerInstance{
-		root: root, appDir: appDir, containerName: name,
-		publicURL: publicURL, target: target, readyURL: readyURL,
-		liveID: liveID, proxyLn: proxyLn,
-	}
-	return publicURL, inst, nil
+	return proc, nil
 }
 
-// Restart stops the sibling container for repoURL and boots it again.
+func dockerAppCommand(app appgraph.App, spec launchSpec, opts launch) string {
+	if pm, script, ok := nodeRun(app.Run); ok {
+		return dockerDevCommand(pm, script, spec, opts)
+	}
+	prefix := ""
+	if strings.HasPrefix(app.Install, "pnpm ") || strings.HasPrefix(app.Install, "yarn ") {
+		prefix = "corepack enable && "
+	}
+	install := app.Install
+	if install == "" {
+		install = "true"
+	}
+	run := strings.ReplaceAll(app.Run, "{port}", strconv.Itoa(opts.Port))
+	if flags := spec.args(opts); len(flags) > 0 && !strings.Contains(app.Run, "{port}") {
+		run += " " + strings.Join(flags, " ")
+	}
+	return prefix + install + " && " + run
+}
+
+func (r *dockerRunner) dockerBin() string {
+	if r.cfg == nil || r.cfg.DockerBin == "" {
+		return "docker"
+	}
+	return r.cfg.DockerBin
+}
+
 func (r *dockerRunner) Restart(repoURL string) error {
 	key, _, err := scan.NormalizeURL(repoURL)
 	if err != nil {
@@ -265,7 +362,7 @@ func (r *dockerRunner) Restart(repoURL string) error {
 		r.mu.Lock()
 		if ch, ok := r.boots[key]; ok {
 			r.mu.Unlock()
-			<-ch
+			<-ch.done
 			continue
 		}
 		if inst, ok := r.byRepo[key]; ok {
@@ -290,7 +387,7 @@ func (r *dockerRunner) Lookup(repoURL string) (root, appDir string, ok bool) {
 	if !ok {
 		return "", "", false
 	}
-	return inst.root, inst.appDir, true
+	return inst.root, inst.appDir(), true
 }
 
 func (r *dockerRunner) StopAll() {
@@ -306,23 +403,16 @@ func (r *dockerRunner) StopAll() {
 	}
 }
 
-func (r *dockerRunner) stopLocked(inst *dockerInstance) {
-	if inst.timer != nil {
-		inst.timer.Stop()
-		inst.timer = nil
+func (r *dockerRunner) stopLocked(inst *instance) {
+	bin := r.dockerBin()
+	inst.stop(bin)
+	if inst != nil && len(inst.apps) > 0 {
+		fmt.Fprintf(os.Stderr, "preview: stopped %s\n", inst.apps[0].containerName)
 	}
-	UnmountPathProxy(inst.liveID)
-	if inst.proxyLn != nil {
-		inst.proxyLn.Close()
-		inst.proxyLn = nil
-	}
-	bin := r.cfg.DockerBin
-	_ = exec.Command(bin, "rm", "-f", inst.containerName).Run()
-	fmt.Fprintf(os.Stderr, "preview: stopped %s\n", inst.containerName)
 }
 
-func (r *dockerRunner) resetTTLLocked(key string, inst *dockerInstance, ttl time.Duration) {
-	if ttl <= 0 {
+func (r *dockerRunner) resetTTLLocked(key string, inst *instance, ttl time.Duration) {
+	if ttl <= 0 || inst == nil {
 		return
 	}
 	if inst.timer != nil {
@@ -336,7 +426,7 @@ func (r *dockerRunner) resetTTLLocked(key string, inst *dockerInstance, ttl time
 		if !ok || cur != inst {
 			return
 		}
-		fmt.Fprintf(os.Stderr, "preview: idle %s expired, stopping %s (%s)\n", ttl, inst.containerName, key)
+		fmt.Fprintf(os.Stderr, "preview: idle %s expired, stopping %s\n", ttl, key)
 		r.stopLocked(inst)
 		delete(r.byRepo, key)
 	})

@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Enizri/terra/backend/api/internal/config"
 	"github.com/Enizri/terra/backend/api/internal/runfile"
 	"github.com/Enizri/terra/backend/api/internal/scan"
 )
@@ -18,16 +19,29 @@ import (
 // a plain Go or Python service gets proxied (with select.js injected) just
 // like a dev server would. Runs outside r.mu (see hostRunner.boot).
 func (r *hostRunner) startViaRunfile(key, root string, detectErr error) (string, *instance, error) {
+	inst, err := bootRunfile(r.cfg, key, root, detectErr)
+	if err != nil {
+		return "", nil, err
+	}
+	r.trackStarting(key, inst)
+	if err := r.reserveApps(key, 1); err != nil {
+		inst.stop("")
+		return "", nil, err
+	}
+	return inst.proxyURL, inst, nil
+}
+
+func bootRunfile(cfg *config.Config, key, root string, detectErr error) (*instance, error) {
 	rf, err := runfile.For(root, scan.CheckoutCommit(root))
 	if err != nil {
-		return "", nil, fmt.Errorf("%v; and no runfile evidence either", detectErr)
+		return nil, fmt.Errorf("%v; and no runfile evidence either", detectErr)
 	}
 	if !rf.HostRunnable() {
-		return "", nil, fmt.Errorf("%v; runfile (%s) is not host-runnable without a sandbox", detectErr, rf.Source)
+		return nil, fmt.Errorf("%v; runfile (%s) is not host-runnable without a sandbox", detectErr, rf.Source)
 	}
 	port, err := freePort()
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
 	shell, env := runfileCommand(rf, root, port)
 
@@ -36,7 +50,7 @@ func (r *hostRunner) startViaRunfile(key, root string, detectErr error) (string,
 		cmd.Dir = workDir(root, rf)
 		cmd.Env = append(childEnv(), ienv...)
 		if out, err := cmd.CombinedOutput(); err != nil {
-			return "", nil, fmt.Errorf("runfile install (%s): %v: %s", install, err, tail(out))
+			return nil, fmt.Errorf("runfile install (%s): %v: %s", install, err, tail(out))
 		}
 	}
 
@@ -45,33 +59,36 @@ func (r *hostRunner) startViaRunfile(key, root string, detectErr error) (string,
 	cmd.Env = append(childEnv(), env...)
 	// Only Node runs get the trace hook; NODE_OPTIONS means nothing to a Go
 	// binary or a uvicorn process.
-	if rf.Source == "package.json" {
-		cmd.Env = append(cmd.Env, traceEnv(r.cfg, key)...)
+	if rf.Source == "package.json" && cfg != nil {
+		cmd.Env = append(cmd.Env, traceEnv(cfg, key)...)
 	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	logs := &boundedBuf{}
 	cmd.Stdout = logs
 	cmd.Stderr = logs
 	if err := cmd.Start(); err != nil {
-		return "", nil, fmt.Errorf("runfile run (%s): %w", shell, err)
+		return nil, fmt.Errorf("runfile run (%s): %w", shell, err)
 	}
-	inst := &instance{root: root, appDir: root, cmd: cmd, devPort: port}
-	r.trackStarting(key, inst)
+	liveID := appLiveID(key, "app", true)
+	proc := &appProcess{
+		id: "app", dir: workDir(root, rf), cmd: cmd, logs: logs,
+		port: port, liveID: liveID, primary: true,
+	}
+	inst := &instance{root: root, apps: []*appProcess{proc}}
 	// Go services may compile first; same budget as startBackend.
 	bound, err := waitReady(port, logs, watch(cmd), 5*time.Minute)
 	if err != nil {
-		stop(cmd)
-		return "", nil, fmt.Errorf("runfile service never came up: %v\n--- output ---\n%s", err, logs.String())
+		proc.stop("")
+		return nil, fmt.Errorf("runfile service never came up: %v\n--- output ---\n%s", err, logs.String())
 	}
-	proxyURL, proxyLn, err := serveProxy(key, "http://localhost:"+strconv.Itoa(bound), nil)
-	if err != nil {
-		stop(cmd)
-		return "", nil, err
+	proc.port = bound
+	proc.target = "http://localhost:" + strconv.Itoa(bound)
+	if err := publishApp(cfg, key, proc, specFor(""), true, nil); err != nil {
+		proc.stop("")
+		return nil, err
 	}
-	inst.devPort = bound
-	inst.proxyURL = proxyURL
-	inst.proxyLn = proxyLn
-	return proxyURL, inst, nil
+	inst.proxyURL = proc.publicURL
+	return inst, nil
 }
 
 // runfileCommand turns a Runfile's run template into a shell command and env

@@ -24,8 +24,8 @@ type Config struct {
 	PublicURL   string // TERRA_PUBLIC_URL, no trailing slash; empty follows Addr (see PublicBase)
 
 	PreviewMode    string        // TERRA_PREVIEW_MODE, lowercased ("", "host", "docker")
-	PreviewMax     int           // TERRA_PREVIEW_MAX; 0 rejects all docker previews
-	PreviewTTL     time.Duration // TERRA_PREVIEW_TTL; <=0 disables expiry
+	PreviewMax     int           // TERRA_PREVIEW_MAX; 0 rejects all previews; counts apps, not repos
+	PreviewTTL     time.Duration // TERRA_PREVIEW_TTL; <=0 disables expiry; host and docker
 	PreviewImage   string        // TERRA_PREVIEW_IMAGE
 	PreviewNetwork string        // TERRA_PREVIEW_NETWORK
 	DockerBin      string        // TERRA_DOCKER

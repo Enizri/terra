@@ -24,7 +24,7 @@ What is **not** done, so you don't go looking for it:
 |---|---|
 | **Export JSON** and **Share map** are placeholder chips — visibly present, not wired | `apps/web/src/shared/shell/WorkspaceHeader.tsx` |
 | The workspace session is not persisted. The URL slug is cosmetic, never sent to the server, and in-memory state is lost on reload | `apps/web/src/routes/workspace/cache.ts` |
-| Live preview supports `package.json` frontends only; other repos need host-exec `make dev` | `backend/api/internal/preview/` |
+| Live preview boots every app in the checkout (web + API, plus mobile/desktop when previewable). Docker mode still needs the Node image for JS apps; Go/Python run on the host. | `backend/api/internal/preview/` |
 | No user accounts. `TERRA_TOKEN` is one shared secret, and empty leaves the API open | [`docs/SECURITY.md`](docs/SECURITY.md) |
 
 Live preview runs the analyzed repository's own code — in host-exec mode, directly on
@@ -139,13 +139,14 @@ token. `make dev` (loopback) stays open.
 **Live preview (Phase 1b):** Compose sets `TERRA_PREVIEW_MODE=docker`, mounts the
 host Docker socket, and shares checkouts via the named `terra-data` volume
 (`TERRA_CHECKOUT_VOLUME`) so Docker Desktop can mount them into siblings.
-`POST /preview` starts a Node sibling and returns `/__live/{id}/` (same origin)
-when the framework takes a base path on the command line (Vite, Angular, CRA);
-the rest are served at their own loopback origin instead, since their absolute
-asset paths cannot be moved under a prefix.
-Caps: `TERRA_PREVIEW_MAX` (default 2), idle TTL `TERRA_PREVIEW_TTL` (default 30m).
-Supports `package.json` frontends only; runfile/Go-only repos need `make dev`
-(host-exec).
+`POST /preview` starts every previewable app in the checkout. Node apps run in a
+sibling container and return `/__live/{id}/` (same origin) when the framework
+takes a base path on the command line (Vite, Angular, CRA); the rest are served
+at their own loopback origin instead, since their absolute asset paths cannot be
+moved under a prefix. Go and Python apps boot on the host — the default Node
+image has none of those toolchains.
+Caps: `TERRA_PREVIEW_MAX` (default 2, counting **apps** not repos), idle TTL
+`TERRA_PREVIEW_TTL` (default 30m). Both apply in host-exec and Docker.
 
 ## Commands
 
@@ -183,8 +184,8 @@ Supports `package.json` frontends only; runfile/Go-only repos need `make dev`
 | `TERRA_PREVIEW_MODE` | Go | _(empty)_ = host | `docker` for Compose sibling previews |
 | `TERRA_CHECKOUT_DIR` | Go | user cache | Shared checkout root (Compose: `/data/checkouts`) |
 | `TERRA_PUBLIC_URL` | Go | `http://127.0.0.1:8080` | Origin used in `/__live/...` preview URLs |
-| `TERRA_PREVIEW_MAX` | Go | `2` | Max concurrent Docker previews |
-| `TERRA_PREVIEW_TTL` | Go | `30m` | Idle TTL before a Docker preview is stopped |
+| `TERRA_PREVIEW_MAX` | Go | `2` | Max concurrent preview **apps** (host and Docker) |
+| `TERRA_PREVIEW_TTL` | Go | `30m` | Idle TTL before a preview is stopped (host and Docker) |
 | `TERRA_DEVICE` | local LLM + Go | `auto` (`mps` / `cuda` / `cpu`) | Device for `make run-llm` / Compose `llm`; also reported by `GET /host/capabilities` |
 | `TERRA_LOCAL_LLM_URL` | Go | `http://localhost:8020` | Sidecar the workspace picker loads local models into (`http://llm:8020` in Compose) |
 | `GITHUB_TOKEN` | Go scan | _(empty)_ | GitHub PAT for analyze/fetch; without it ~60 REST req/hour/IP, with it ~5,000/hour |
