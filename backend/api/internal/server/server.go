@@ -185,6 +185,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /preview", s.preview)
 	mux.HandleFunc("POST /preview/patch", s.previewPatch)
 	mux.HandleFunc("POST /preview/restart", s.previewRestart)
+	mux.HandleFunc("GET /preview/routes", s.previewRoutes)
+	mux.HandleFunc("POST /preview/probe", s.previewProbe)
 	mux.HandleFunc("POST /ask", s.ask)
 	mux.HandleFunc("GET /files", s.files)
 	mux.HandleFunc("GET /traces", s.traces)

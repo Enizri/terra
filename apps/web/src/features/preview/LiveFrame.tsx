@@ -3,6 +3,7 @@ import { useEffect, useState, type RefObject } from "react";
 import { previewEvents, type PreviewApp, type PreviewResult } from "./api.ts";
 import { PackageStage } from "./PackageStage.tsx";
 import { CliStage } from "./CliStage.tsx";
+import { ApiConsole } from "./ApiConsole.tsx";
 
 /** Shape select.js posts on click. */
 export type LiveSelection = {
@@ -75,6 +76,7 @@ export function LiveFrame({
   const apps = result?.apps ?? [];
   const packageView = !url && !error && result != null && apps.some((a) => a.status === "ready");
   const cliView = packageView && (active?.kind || result?.apps[0]?.kind) === "cli";
+  const apiView = Boolean(url) && active?.kind === "api";
 
   return (
     <div className="sh-live-shell">
@@ -84,7 +86,7 @@ export function LiveFrame({
             <AppChip key={app.id} app={app} active={app.id === activeId} onSelect={setActiveId} />
           ))}
         </div>
-        {!packageView && (
+        {!packageView && !apiView && (
           <button
             type="button"
             className={`sh-live-mode${picking ? " is-select" : " is-interact"}`}
@@ -100,6 +102,8 @@ export function LiveFrame({
         <CliStage repoUrl={repoUrl} reason={active?.reason || result?.apps[0]?.reason} />
       ) : packageView ? (
         <PackageStage repoUrl={repoUrl} reason={active?.reason || result?.apps[0]?.reason} />
+      ) : apiView ? (
+        <ApiConsole repoUrl={repoUrl} origin={url} />
       ) : !url ? (
         <div className="sh-live__status">{progress}</div>
       ) : (

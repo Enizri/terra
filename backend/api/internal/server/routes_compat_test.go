@@ -39,6 +39,8 @@ func TestPublicRoutesRegistered(t *testing.T) {
 		{"POST", "/preview"},
 		{"POST", "/preview/patch"},
 		{"POST", "/preview/restart"},
+		{"GET", "/preview/routes"},
+		{"POST", "/preview/probe"},
 		{"POST", "/ask"},
 	}
 	for _, tc := range cases {

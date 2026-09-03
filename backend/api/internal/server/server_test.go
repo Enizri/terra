@@ -1246,7 +1246,7 @@ func TestBodyTooLarge(t *testing.T) {
 	_, ts := testServer(t)
 	huge := `{"repo_url":"https://github.com/acme/notes","pad":"` +
 		strings.Repeat("x", 2<<20) + `"}`
-	for _, path := range []string{"/analyze", "/jobs/analyze", "/preview", "/preview/patch", "/preview/restart", "/jobs/ask", "/jobs/agent", "/jobs/preview", "/jobs/preview/test", "/jobs/preview/cli", "/traces/ingest"} {
+	for _, path := range []string{"/analyze", "/jobs/analyze", "/preview", "/preview/patch", "/preview/restart", "/preview/probe", "/jobs/ask", "/jobs/agent", "/jobs/preview", "/jobs/preview/test", "/jobs/preview/cli", "/traces/ingest"} {
 		resp, err := http.Post(ts.URL+path, "application/json", strings.NewReader(huge))
 		if err != nil {
 			t.Fatal(err)
