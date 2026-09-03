@@ -22,14 +22,14 @@ export const RESTITUTION = 0.6;
 export const REST_SPEED = 12;
 /** Below this the tumble is parked, rad/s. */
 const REST_ROLL = 0.02;
-/** Seconds at rest before the globe takes itself home. Short enough that a
- *  thrown globe does not hang in the sky after the reader has let go, but
- *  the timer still counts rest, not time since release, so a long slow
- *  drift is never cut short. */
-export const RETURN_DELAY = 0.8;
-/** Spring constant of the glide home. Critically damped, so it never
- *  overshoots the sun and bounces back off it. */
-export const HOME_STIFFNESS = 26;
+/** Seconds at rest before the globe takes itself home. Brief so it comes
+ *  back as soon as the reader has stopped playing with it, but the timer
+ *  still counts rest, not time since release, so a long slow drift is
+ *  never cut short. */
+export const RETURN_DELAY = 0.18;
+/** Spring constant of the glide home. Critically damped and soft, so it
+ *  eases back onto the sun without overshooting or snapping. */
+export const HOME_STIFFNESS = 10;
 /** Drag of one globe radius, applied at the rim, rolls this much. */
 export const ROLL_PER_RADIUS = 2.2;
 /** How much of the yaw/pitch turn a rim grab trades away for roll. */

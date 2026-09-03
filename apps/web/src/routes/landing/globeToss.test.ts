@@ -92,7 +92,7 @@ test("it rests, waits out the delay, then glides home and settles", () => {
   toss.x = 210;
   toss.y = -140;
 
-  for (let i = 0; i < Math.round((RETURN_DELAY - 0.2) * 60); i++) {
+  for (let i = 0; i < Math.round((RETURN_DELAY - STEP * 2) * 60); i++) {
     advanceToss(toss, STEP, false, BOX);
   }
   assert.equal(toss.homing, false, "the return waits out its delay");
