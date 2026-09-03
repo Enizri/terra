@@ -55,7 +55,7 @@ func TestStartWaitsForInFlightBoot(t *testing.T) {
 	ch := make(chan struct{})
 	r := &hostRunner{
 		byRepo: map[string]*instance{},
-		boots:  map[string]chan struct{}{key: ch},
+		boots:  map[string]*bootWait{key: {done: ch}},
 	}
 
 	done := make(chan string, 1)
@@ -75,7 +75,10 @@ func TestStartWaitsForInFlightBoot(t *testing.T) {
 	}
 
 	r.mu.Lock()
-	r.byRepo[key] = &instance{devPort: port, proxyURL: "http://proxy/"}
+	r.byRepo[key] = &instance{
+		proxyURL: "http://proxy/",
+		apps:     []*appProcess{{port: port, primary: true}},
+	}
 	delete(r.boots, key)
 	r.mu.Unlock()
 	close(ch)
@@ -100,7 +103,7 @@ func TestHostStopAllKillsStarting(t *testing.T) {
 		t.Fatal(err)
 	}
 	key := "https://github.com/acme/notes"
-	r.starting[key] = &instance{proxyLn: ln}
+	r.starting[key] = &instance{apps: []*appProcess{{proxyLn: ln}}}
 	r.StopAll()
 	if len(r.starting) != 0 {
 		t.Fatalf("starting left %d entries after StopAll", len(r.starting))
@@ -122,14 +125,14 @@ func TestHostRestartStopsExistingBeforeStart(t *testing.T) {
 	}
 	r := &hostRunner{
 		byRepo: map[string]*instance{},
-		cfg:    &config.Config{CheckoutDir: base},
+		cfg:    &config.Config{CheckoutDir: base, PreviewMax: 2},
 	}
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
 	key := "https://github.com/acme/notes"
-	r.byRepo[key] = &instance{proxyLn: ln, proxyURL: "http://old/"}
+	r.byRepo[key] = &instance{proxyURL: "http://old/", apps: []*appProcess{{proxyLn: ln}}}
 	if err := r.Restart(key); err == nil {
 		t.Fatal("Start should fail without a frontend")
 	}
@@ -144,11 +147,11 @@ func TestHostRestartStopsExistingBeforeStart(t *testing.T) {
 func TestDockerStopAllKillsStarting(t *testing.T) {
 	r := &dockerRunner{
 		cfg:      &config.Config{DockerBin: "/nonexistent-terra-docker"},
-		byRepo:   map[string]*dockerInstance{},
-		starting: map[string]*dockerInstance{},
+		byRepo:   map[string]*instance{},
+		starting: map[string]*instance{},
 	}
 	key := "https://github.com/acme/notes"
-	r.starting[key] = &dockerInstance{containerName: "terra-preview-test", liveID: "test"}
+	r.starting[key] = &instance{apps: []*appProcess{{containerName: "terra-preview-test", liveID: "test"}}}
 	r.StopAll()
 	if len(r.starting) != 0 || len(r.byRepo) != 0 {
 		t.Fatal("StopAll left starting/byRepo entries")
@@ -160,7 +163,20 @@ func TestDockerRunnerMissingBinary(t *testing.T) {
 	t.Setenv("TERRA_PREVIEW_MAX", "2")
 	t.Setenv("TERRA_DOCKER", "/nonexistent-terra-docker")
 	t.Setenv("TERRA_PREVIEW_TTL", "1h")
+	base := t.TempDir()
+	t.Setenv("TERRA_CHECKOUT_DIR", base)
 	c := config.FromEnv()
+
+	dir := filepath.Join(base, "acme-notes")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".terra-commit"), []byte("deadbeef"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"scripts":{"dev":"vite"},"devDependencies":{"vite":"^5"}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	// Fresh runner state: StopAll clears any prior test residue.
 	Docker(c).StopAll()
@@ -194,5 +210,64 @@ func TestPreviewTTLParsing(t *testing.T) {
 		if got := config.FromEnv().PreviewTTL; got != c.want {
 			t.Errorf("PreviewTTL(%q) = %s, want %s", c.raw, got, c.want)
 		}
+	}
+}
+
+func TestHostCapacityCountsApps(t *testing.T) {
+	r := &hostRunner{
+		byRepo: map[string]*instance{
+			"https://github.com/acme/a": {apps: []*appProcess{{}, {}}},
+		},
+		cfg: &config.Config{PreviewMax: 2, CheckoutDir: t.TempDir()},
+	}
+	_, err := r.Start("https://github.com/acme/b")
+	if err == nil || !strings.Contains(err.Error(), "capacity full") {
+		t.Fatalf("err = %v, want capacity full counting the two apps already running", err)
+	}
+}
+
+func TestDockerCapacityCountsApps(t *testing.T) {
+	r := &dockerRunner{
+		cfg: &config.Config{PreviewMax: 2, DockerBin: "/nonexistent-terra-docker"},
+		byRepo: map[string]*instance{
+			"https://github.com/acme/a": {apps: []*appProcess{{}, {}}},
+		},
+	}
+	_, err := r.Start("https://github.com/acme/b")
+	if err == nil || !strings.Contains(err.Error(), "capacity full") {
+		t.Fatalf("err = %v, want capacity full counting apps, not repos", err)
+	}
+}
+
+func TestHostIdleTTLExpires(t *testing.T) {
+	r := &hostRunner{
+		byRepo: map[string]*instance{},
+		cfg:    &config.Config{PreviewTTL: 40 * time.Millisecond, PreviewMax: 2},
+	}
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := "https://github.com/acme/notes"
+	inst := &instance{apps: []*appProcess{{proxyLn: ln}}}
+	r.byRepo[key] = inst
+	r.resetTTLLocked(key, inst, r.cfg.PreviewTTL)
+
+	deadline := time.After(time.Second)
+	for {
+		r.mu.Lock()
+		_, ok := r.byRepo[key]
+		r.mu.Unlock()
+		if !ok {
+			break
+		}
+		select {
+		case <-deadline:
+			t.Fatal("host TTL did not expire")
+		case <-time.After(15 * time.Millisecond):
+		}
+	}
+	if err := ln.Close(); err == nil {
+		t.Fatal("expected listener closed by TTL")
 	}
 }

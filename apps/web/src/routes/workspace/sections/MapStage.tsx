@@ -9,6 +9,7 @@ import {
   topLevelId,
 } from "../../../features/architecture-map";
 import { traces, LiveFrame, type LiveSelection } from "../../../features/preview";
+import { SearchIcon } from "../../../shared/shell/icons";
 import { emptyQueue, enqueue } from "../pulseQueue";
 
 function MapSearch({ map, onSelect }: { map: TerraMap; onSelect: (id: string) => void }) {
@@ -28,6 +29,9 @@ function MapSearch({ map, onSelect }: { map: TerraMap; onSelect: (id: string) =>
         if (results.length > 0) pick(results[0].id);
       }}
     >
+      <span className="sh-ws__find-glyph" aria-hidden>
+        <SearchIcon />
+      </span>
       <input
         className="sh-ws__find-input"
         value={query}
@@ -121,30 +125,39 @@ export function MapStage({
 
   return (
     <>
-      <div className="sh-ws__mapbar">
-        <b>{map.project.name}</b>
-        <em>{map.project.description}</em>
-        <span className="sh-chip">{map.components.length} components</span>
-        <span className="sh-chip">{map.relationships.length} relationships</span>
-        <span className="sh-chip">{map.project.primary_languages.join(" · ")}</span>
-        {view.hidden.length > 0 && !all && (
-          <button type="button" className="sh-chip sh-chip--btn" onClick={() => setAll(true)}>
-            +{view.hidden.length} more
+      {/* One row that cannot wrap: every row this strip grows by is a row the
+          map loses, and the stage clips rather than scrolls. Identity on the
+          left, counts in the middle, controls on the right. */}
+      <div className="sh-ws__toolbar">
+        <div className="sh-ws__toolbar-id">
+          <b>{map.project.name}</b>
+          <em>{map.project.description}</em>
+        </div>
+        <div className="sh-ws__toolbar-stats">
+          <span className="sh-chip">{map.components.length} components</span>
+          <span className="sh-chip">{map.relationships.length} relationships</span>
+          <span className="sh-chip">{map.project.primary_languages.join(" · ")}</span>
+        </div>
+        <div className="sh-ws__toolbar-actions">
+          {view.hidden.length > 0 && !all && (
+            <button type="button" className="sh-chip sh-chip--btn" onClick={() => setAll(true)}>
+              +{view.hidden.length} more
+            </button>
+          )}
+          {all && (
+            <button type="button" className="sh-chip sh-chip--btn" onClick={() => setAll(false)}>
+              Show the main parts
+            </button>
+          )}
+          <button
+            type="button"
+            className={`sh-chip sh-chip--btn${preview === "on" ? " is-on" : ""}`}
+            onClick={() => setPreview((p) => (p === "on" ? "off" : "on"))}
+          >
+            {preview === "on" ? "Close preview" : "Live preview"}
           </button>
-        )}
-        {all && (
-          <button type="button" className="sh-chip sh-chip--btn" onClick={() => setAll(false)}>
-            Show the main parts
-          </button>
-        )}
-        <button
-          type="button"
-          className={`sh-chip sh-chip--btn${preview === "on" ? " is-on" : ""}`}
-          onClick={() => setPreview((p) => (p === "on" ? "off" : "on"))}
-        >
-          {preview === "on" ? "Close preview" : "Live preview"}
-        </button>
-        <MapSearch map={map} onSelect={select} />
+          <MapSearch map={map} onSelect={select} />
+        </div>
       </div>
       <div className={`sh-ws__map${primary ? " has-details" : ""}`}>
         <RepoDiagram
@@ -172,13 +185,15 @@ export function MapStage({
           <div className="sh-ws__preview">
             {/* Boots a real dev server for the mapped repo — only some projects
                 have one, so this stays behind the button and says so on failure. */}
-            <LiveFrame picking frameRef={frameRef} repoUrl={map.project.repository_url} />
+            <LiveFrame frameRef={frameRef} repoUrl={map.project.repository_url} />
           </div>
         )}
+        {/* A real grid track, not an overlay: the diagram reflows into the
+            room that is left and re-measures its own arrows on the resize. */}
         {primary && (
-          <div className="sh-ws__details">
+          <aside className="sh-ws__details">
             <DetailsPanel map={map} selectedId={primary} onSelect={onSelect} />
-          </div>
+          </aside>
         )}
       </div>
     </>

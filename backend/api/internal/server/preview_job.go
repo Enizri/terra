@@ -1,0 +1,56 @@
+package server
+
+import (
+	"context"
+	"net/http"
+
+	"github.com/Enizri/terra/backend/api/internal/job"
+	"github.com/Enizri/terra/backend/api/internal/scan"
+)
+
+// enqueuePreview starts a preview boot as a job so the UI can show
+// checkout → detect → install → boot → ready and cancel it.
+func (s *Server) enqueuePreview(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		RepoURL string `json:"repo_url"`
+	}
+	if !decodeBody(w, r, &req, `body must be {"repo_url": "github.com/user/project"}`) {
+		return
+	}
+	if req.RepoURL == "" {
+		httpError(w, http.StatusBadRequest, `body must be {"repo_url": "github.com/user/project"}`)
+		return
+	}
+	if _, _, err := scan.NormalizeURL(req.RepoURL); err != nil {
+		httpError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	repoURL := req.RepoURL
+	j := s.Jobs.Start(func(ctx context.Context, emit func(job.Event)) {
+		if err := ctx.Err(); err != nil {
+			emit(job.Event{Stage: "error", Label: "cancelled"})
+			return
+		}
+		res, err := s.previewRunner().Boot(repoURL, func(stage, label string) {
+			if ctx.Err() != nil {
+				return
+			}
+			emit(job.Event{Stage: stage, Label: label})
+		})
+		if err != nil {
+			if ctx.Err() != nil {
+				emit(job.Event{Stage: "error", Label: "cancelled"})
+				return
+			}
+			emit(job.Event{Stage: "error", Label: err.Error()})
+			return
+		}
+		if ctx.Err() != nil {
+			emit(job.Event{Stage: "error", Label: "cancelled"})
+			return
+		}
+		emit(job.Event{Stage: "ready", Label: res.URL, Preview: res})
+		emit(job.Event{Stage: "done", Answer: res.URL, Preview: res})
+	})
+	writeJSON(w, map[string]string{"job_id": j.ID})
+}

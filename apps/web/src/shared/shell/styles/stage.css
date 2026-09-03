@@ -5,10 +5,23 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 20px;
-  padding: 32px;
+  gap: var(--sh-space-5);
+  padding: var(--sh-space-6);
   min-height: 0;
   overflow-y: auto;
+}
+
+/* ---- intake: drop target and field are one panel ---- */
+
+.sh-ws__intake {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sh-space-4);
+  width: min(560px, 100%);
+  padding: var(--sh-space-5);
+  border-radius: var(--sh-radius-lg);
+  background: var(--sh-window);
+  box-shadow: var(--sh-shadow-1);
 }
 
 .sh-ws-drop {
@@ -17,11 +30,11 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  width: min(560px, 100%);
-  padding: 56px 32px;
+  gap: var(--sh-space-2);
+  width: 100%;
+  padding: var(--sh-space-6) var(--sh-space-6);
   border: 1.5px dashed rgba(0, 0, 0, 0.28);
-  border-radius: 16px;
+  border-radius: var(--sh-radius-md);
   background: #fff;
   text-align: center;
   transition:
@@ -68,9 +81,9 @@
   position: relative;
   margin: 0;
   max-width: 40ch;
-  font-size: 15px;
+  font-size: var(--sh-text-xl);
   line-height: 1.45;
-  color: #525252;
+  color: var(--sh-muted);
 }
 
 /* ---- running ---- */
@@ -90,7 +103,7 @@
 .sh-ws__status {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--sh-space-3);
   min-height: 38px;
   font-size: 17px;
 }
@@ -114,7 +127,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
+  gap: var(--sh-space-4);
 }
 
 /* Compact status strip while a structural map is already on stage. */
@@ -126,9 +139,9 @@
   z-index: 4;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 8px 12px 8px 14px;
-  border-radius: 999px;
+  gap: var(--sh-space-3);
+  padding: var(--sh-space-2) var(--sh-space-3) var(--sh-space-2) 14px;
+  border-radius: var(--sh-radius-pill);
   background: color-mix(in srgb, var(--sh-bg, #0b0d10) 88%, transparent);
   border: 1px solid color-mix(in srgb, currentColor 14%, transparent);
   backdrop-filter: blur(8px);
@@ -137,7 +150,7 @@
 
 .sh-ws__mapping-bar .sh-ws__status {
   margin: 0;
-  gap: 10px;
+  gap: var(--sh-space-2);
 }
 
 .sh-ws__mapping-bar .sh-ws__stop {
@@ -146,12 +159,12 @@
 
 .sh-ws__stop {
   border: 1px solid currentColor;
-  border-radius: 999px;
+  border-radius: var(--sh-radius-pill);
   background: none;
   color: inherit;
   font: inherit;
-  font-size: 13px;
-  padding: 4px 16px;
+  font-size: var(--sh-text-md);
+  padding: var(--sh-space-1) var(--sh-space-4);
   cursor: pointer;
   opacity: 0.6;
 }
@@ -164,7 +177,7 @@
   margin: 0;
   max-width: 560px;
   color: #e8400d;
-  font-size: 14px;
+  font-size: var(--sh-text-lg);
   text-align: center;
   white-space: pre-wrap;
   overflow-wrap: break-word;
@@ -181,56 +194,107 @@
 
 /* ---- result: the map fills the stage, everything else is a strip on top ---- */
 
-/* Centering suits the drop zone and the status line; the map wants the room. */
+/* Centering suits the intake and the status line; the map wants the room. */
 .sh-ws__stage.is-map {
   position: relative;
   align-items: stretch;
   justify-content: flex-start;
-  gap: 14px;
-  padding: 20px;
+  gap: var(--sh-space-3);
+  padding: var(--sh-space-5);
   overflow: hidden;
 }
 
-.sh-ws__mapbar {
+/* ---- toolbar ---- */
+
+/* One row, fixed height, never wraps. The stage clips rather than scrolls in
+   map mode, so a strip that can grow a second row is a strip that can push the
+   bottom of the map out of the window. Identity | counts | controls. */
+.sh-ws__toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: var(--sh-space-4);
+  min-height: 34px;
+  font-size: var(--sh-text-xl);
+}
+
+.sh-ws__toolbar-id {
   display: flex;
   align-items: baseline;
-  flex-wrap: wrap;
-  gap: 10px;
-  font-size: 15px;
+  gap: var(--sh-space-2);
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
-.sh-ws__mapbar b {
+.sh-ws__toolbar-id b {
+  flex-shrink: 0;
   font-size: 18px;
   font-weight: 600;
+  letter-spacing: -0.02em;
 }
 
-.sh-ws__mapbar em {
-  flex: 1;
-  min-width: 200px;
+.sh-ws__toolbar-id em {
+  min-width: 0;
   font-style: normal;
-  font-size: 13px;
+  font-size: var(--sh-text-md);
   color: var(--sh-muted);
-  /* One line: every row this strip wraps to is a row the map loses. */
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.sh-ws__toolbar-stats,
+.sh-ws__toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sh-space-2);
+  flex-shrink: 0;
+}
+
+/* The counts are context, not controls — first thing to go when the row is
+   tight, since the details panel repeats them. */
+@media (max-width: 1500px) {
+  .sh-ws__toolbar-stats .sh-chip:not(:first-child) {
+    display: none;
+  }
+}
+
+@media (max-width: 1280px) {
+  .sh-ws__toolbar-stats {
+    display: none;
+  }
 }
 
 /* ---- find a component ---- */
 
 .sh-ws__find {
   position: relative;
-  margin-left: auto;
+  display: flex;
+  align-items: center;
+}
+
+.sh-ws__find-glyph {
+  position: absolute;
+  left: 10px;
+  display: grid;
+  place-items: center;
+  color: var(--sh-muted-2);
+  pointer-events: none;
+}
+
+.sh-ws__find-glyph svg {
+  width: 14px;
+  height: 14px;
 }
 
 .sh-ws__find-input {
   width: 190px;
-  padding: 6px 10px;
+  padding: 6px 12px 6px 30px;
   border: 1px solid var(--sh-border);
-  border-radius: 999px;
+  border-radius: var(--sh-radius-pill);
   background: var(--sh-window);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--sh-text-md);
   color: inherit;
 }
 
@@ -246,25 +310,25 @@
   right: 0;
   width: 260px;
   margin: 0;
-  padding: 4px;
+  padding: var(--sh-space-1);
   list-style: none;
   border: 1px solid var(--sh-border);
-  border-radius: 12px;
+  border-radius: var(--sh-radius-md);
   background: var(--sh-window);
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--sh-shadow-2);
 }
 
 .sh-ws__find-hit {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: var(--sh-space-2);
   width: 100%;
   padding: 7px 9px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--sh-radius-sm);
   background: none;
   font: inherit;
-  font-size: 13px;
+  font-size: var(--sh-text-md);
   text-align: left;
   color: inherit;
   cursor: pointer;
@@ -278,27 +342,44 @@
 .sh-ws__find-hit em {
   margin-left: auto;
   font-style: normal;
-  font-size: 11px;
+  font-size: var(--sh-text-xs);
   color: var(--sh-muted);
 }
 
 .sh-ws__find-empty {
   padding: 7px 9px;
-  font-size: 13px;
+  font-size: var(--sh-text-md);
   color: var(--sh-muted);
 }
 
+/* ---- map + details ---- */
+
+/* The details panel is a track, not an overlay: the diagram reflows into what
+   is left and re-measures its arrows on the resize, so nothing is left
+   pointing at a stale box. It used to be absolute, with the diagram carrying a
+   hardcoded padding-right to dodge it. */
 .sh-ws__map {
+  --sh-details-w: 0px;
   position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--sh-details-w);
   flex: 1;
   min-height: 0;
+  transition: grid-template-columns 0.18s ease;
 }
 
-/* The details panel overlays the right edge, which is where the storage column
-   sits. Inset the diagram instead of letting the panel cover a card — the
-   arrows re-measure on the resize, so nothing is left pointing at a stale box. */
-.sh-ws__map.has-details > .sh-diagram {
-  padding-right: 316px;
+.sh-ws__map.has-details {
+  --sh-details-w: 300px;
+}
+
+.sh-ws__details {
+  position: relative;
+  /* Above the preview overlay, as it was when both were absolute. */
+  z-index: 3;
+  min-width: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-left: 1px solid var(--sh-border);
 }
 
 /* A generated purpose is a paragraph, not the landing's hand-written one-liner.
@@ -331,53 +412,49 @@
    map is still what the question is about. */
 .sh-ws__preview {
   position: absolute;
+  /* Pinned to the diagram's track, not the whole grid: the preview replaces
+     the map, and the details panel beside it stays readable. An absolutely
+     positioned grid child still takes its containing block from the track it
+     is placed in. */
+  grid-area: 1 / 1;
   inset: 0;
   /* Above the diagram's cards, below the details panel. */
   z-index: 2;
   display: flex;
-  border-radius: 16px;
+  border-radius: var(--sh-radius-lg);
   overflow: hidden;
   background: var(--sh-window);
   border: 1px solid var(--sh-border);
 }
 
+.sh-ws__preview .sh-live-shell,
 .sh-ws__preview .sh-live {
   flex: 1;
   border: 0;
 }
 
-/* Overlaid rather than a fourth column — the grid is already three deep. */
-.sh-ws__details {
-  position: absolute;
-  z-index: 3;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 300px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
+/* ---- repo intake field ---- */
 
 .sh-ws__url {
   display: flex;
-  gap: 10px;
-  width: min(560px, 100%);
+  gap: var(--sh-space-2);
+  width: 100%;
 }
 
 .sh-ws__input {
   flex: 1;
   min-width: 0;
-  padding: 12px 16px;
+  padding: var(--sh-space-3) var(--sh-space-4);
   border: 1px solid rgba(0, 0, 0, 0.16);
-  border-radius: 8px;
+  border-radius: var(--sh-radius-sm);
   background: #fff;
   color: #111;
   font: inherit;
-  font-size: 15px;
+  font-size: var(--sh-text-xl);
 }
 
 .sh-ws__input::placeholder {
-  color: #737373;
+  color: var(--sh-muted-2);
 }
 
 .sh-ws__input:focus-visible {
@@ -385,3 +462,8 @@
   outline-offset: -1px;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .sh-ws__map {
+    transition: none;
+  }
+}

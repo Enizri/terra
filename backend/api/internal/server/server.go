@@ -174,6 +174,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /jobs/analyze", s.enqueueAnalyze)
 	mux.HandleFunc("POST /jobs/ask", s.enqueueAsk)
 	mux.HandleFunc("POST /jobs/agent", s.enqueueAgent)
+	mux.HandleFunc("POST /jobs/preview", s.enqueuePreview)
 	mux.HandleFunc("GET /jobs/{id}/events", s.jobEvents)
 	mux.HandleFunc("POST /jobs/{id}/cancel", s.cancelJob)
 	mux.HandleFunc("GET /analyses", s.list)
@@ -291,12 +292,12 @@ func (s *Server) preview(w http.ResponseWriter, r *http.Request) {
 		httpError(w, http.StatusBadRequest, `body must be {"repo_url": "github.com/user/project"}`)
 		return
 	}
-	url, err := s.previewRunner().Start(req.RepoURL)
+	res, err := s.previewRunner().Boot(req.RepoURL, nil)
 	if err != nil {
 		httpError(w, http.StatusBadGateway, err.Error())
 		return
 	}
-	writeJSON(w, map[string]string{"url": url})
+	writeJSON(w, res)
 }
 
 func (s *Server) previewPatch(w http.ResponseWriter, r *http.Request) {

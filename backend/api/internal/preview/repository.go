@@ -14,7 +14,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 )
 
@@ -119,35 +118,6 @@ func detectGoBackend(root string) (pkg string, ok bool) {
 		return "", false
 	}
 	return "./cmd/" + filepath.Base(filepath.Dir(mains[0])), true
-}
-
-// startBackend runs the repo Go server on a free port with a persistent data dir.
-func startBackend(root, pkg string) (int, *exec.Cmd, error) {
-	port, err := freePort()
-	if err != nil {
-		return 0, nil, err
-	}
-	cache, err := os.UserCacheDir()
-	if err != nil {
-		return 0, nil, err
-	}
-	data := filepath.Join(cache, "terra", "data", filepath.Base(root))
-
-	cmd := exec.Command("go", "run", pkg, "--port", strconv.Itoa(port), "--data", data)
-	cmd.Dir = root
-	cmd.Env = childEnv()
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	logs := &boundedBuf{}
-	cmd.Stdout = logs
-	cmd.Stderr = logs
-	if err := cmd.Start(); err != nil {
-		return 0, nil, fmt.Errorf("start backend (go run %s): %w", pkg, err)
-	}
-	if _, err := waitReady(port, logs, watch(cmd), 5*time.Minute); err != nil {
-		stop(cmd)
-		return 0, nil, fmt.Errorf("backend never came up: %v\n--- output ---\n%s", err, logs.String())
-	}
-	return port, cmd, nil
 }
 
 /* ---------- dev server readiness ---------- */

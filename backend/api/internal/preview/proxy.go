@@ -15,7 +15,7 @@ import (
 // serveProxy reverse-proxies a localhost/dev target on an ephemeral loopback
 // port. The caller owns the returned listener and must close it to stop.
 func serveProxy(repoKey, targetBase string, authFix func(*http.Request)) (string, net.Listener, error) {
-	handler, err := newInjectProxy(repoKey, targetBase, authFix, "")
+	handler, err := newInjectProxy(repoKey, targetBase, authFix, "", false)
 	if err != nil {
 		return "", nil, err
 	}
@@ -31,8 +31,9 @@ func serveProxy(repoKey, targetBase string, authFix func(*http.Request)) (string
 // authFix, when non-nil, is a per-repo hook that may rewrite outgoing request
 // auth headers (see seedDemoAuth). publicPrefix is empty for the host loopback
 // proxy, or "/__live/{id}" for the path proxy (Vite --base matches; full paths
-// are forwarded, not stripped).
-func newInjectProxy(repoKey, targetBase string, authFix func(*http.Request), publicPrefix string) (http.Handler, error) {
+// are forwarded, not stripped). stripPrefix rewrites /__live/{id}/... to /...
+// for frameworks that cannot be told a base path.
+func newInjectProxy(repoKey, targetBase string, authFix func(*http.Request), publicPrefix string, stripPrefix bool) (http.Handler, error) {
 	base := strings.TrimRight(targetBase, "/")
 	target, err := url.Parse(base)
 	if err != nil || target.Scheme == "" || target.Host == "" {
@@ -43,6 +44,15 @@ func newInjectProxy(repoKey, targetBase string, authFix func(*http.Request), pub
 	director := rp.Director
 	rp.Director = func(r *http.Request) {
 		director(r)
+		if stripPrefix && publicPrefix != "" {
+			path := r.URL.Path
+			switch {
+			case path == publicPrefix:
+				r.URL.Path = "/"
+			case strings.HasPrefix(path, publicPrefix+"/"):
+				r.URL.Path = path[len(publicPrefix):]
+			}
+		}
 		// Vite 6+ rejects unknown Host values (container DNS names). localhost
 		// is always allowed; the URL still targets the sibling container.
 		r.Host = "localhost"

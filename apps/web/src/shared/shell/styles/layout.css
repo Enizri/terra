@@ -4,23 +4,47 @@
 .sh-ws {
   /* Designed around a 1920×1080 CSS viewport. On 4K at 100% OS scale the
      CSS pixel is physically tiny, so Chrome zoom was the only way to read
-     it. Scale the whole shell in proportion and shrink the layout box so
-     the magnified UI still fills the window. */
+     it. Scale the whole shell in proportion so the magnified UI still fills
+     the window.
+
+     The two sizing lines below look inconsistent and are not: `zoom` resolves
+     viewport units against the element's own effective zoom, but leaves
+     percentages alone. So `100dvh` inside this box already *is* the window
+     height — dividing it by the scale again renders the shell at 1/scale of
+     the window and leaves a dead band under it (the 4K bug). A percentage
+     gets no such compensation, so `width` has to divide by hand. Do not
+     "fix" one to match the other. */
   --sh-ws-scale: clamp(1, min(100vw / 1920px, 100dvh / 1080px), 1.65);
+  /* Panel tracks. Collapsing is a track resize, so the stage genuinely gets
+     the room back instead of being covered. */
+  --sh-rail-w: 240px;
+  --sh-dock-w: 380px;
   zoom: var(--sh-ws-scale);
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr) 380px;
+  grid-template-columns: var(--sh-rail-w) minmax(0, 1fr) var(--sh-dock-w);
   grid-template-rows: auto minmax(0, 1fr);
   width: calc(100% / var(--sh-ws-scale));
-  height: calc(100dvh / var(--sh-ws-scale));
+  height: 100dvh;
   min-height: 0;
   overflow: hidden;
+  transition: grid-template-columns 0.18s ease;
 }
 
-@supports not (zoom: 1) {
+.sh-ws.is-rail-collapsed {
+  --sh-rail-w: 56px;
+}
+
+.sh-ws.is-dock-hidden {
+  --sh-dock-w: 0px;
+}
+
+.sh-ws.is-dock-hidden .sh-ws__dock {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
   .sh-ws {
-    transform: scale(var(--sh-ws-scale));
-    transform-origin: 0 0;
+    transition: none;
   }
 }
 
@@ -30,16 +54,46 @@
   grid-column: 1 / -1;
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 12px 20px;
+  gap: var(--sh-space-3);
+  padding: var(--sh-space-3) var(--sh-space-5);
   border-bottom: 1px solid var(--sh-border);
   background: var(--sh-window);
+}
+
+/* Rail / dock toggles. Square, quiet, and pressed-looking while the panel
+   they own is open. */
+.sh-ws__panel-btn {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--sh-radius-sm);
+  background: none;
+  color: var(--sh-muted-2);
+  cursor: pointer;
+}
+
+.sh-ws__panel-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.sh-ws__panel-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--sh-ink);
+}
+
+.sh-ws__panel-btn.is-on {
+  color: var(--sh-ink);
 }
 
 .sh-ws__logo {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--sh-space-2);
   font-size: 17px;
   font-weight: 500;
   letter-spacing: -0.02em;
@@ -70,8 +124,10 @@
 
 .sh-ws__chips {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  gap: var(--sh-space-2);
   margin-left: auto;
+  flex-shrink: 0;
 }
 
 .sh-ws__chips .sh-chip svg {
@@ -103,3 +159,29 @@
   border-color: transparent;
 }
 
+
+/* The header intake, once a map is on stage. Sits between the crumb and the
+   actions and takes the slack, so the stage below belongs wholly to the map. */
+.sh-ws__url--compact {
+  width: auto;
+  flex: 0 1 340px;
+  margin-left: auto;
+  gap: var(--sh-space-2);
+}
+
+.sh-ws__url--compact .sh-ws__input {
+  padding: 6px 12px;
+  border-radius: var(--sh-radius-sm);
+  font-size: var(--sh-text-md);
+  background: var(--sh-bg);
+}
+
+.sh-ws__url--compact .sh-btn {
+  flex-shrink: 0;
+  padding: 6px 10px;
+}
+
+/* With the intake in the header the chips no longer need the auto margin. */
+.sh-ws__url--compact ~ .sh-ws__chips {
+  margin-left: 0;
+}
