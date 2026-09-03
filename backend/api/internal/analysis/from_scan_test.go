@@ -76,6 +76,78 @@ func TestFromScanEmptyTreeGetsRootComponent(t *testing.T) {
 	}
 }
 
+func TestFromScanFlutterDirsAreMobile(t *testing.T) {
+	res := &scan.Result{
+		RepositoryURL:    "https://github.com/acme/notes",
+		Name:             "notes",
+		PrimaryLanguages: []string{"Dart"},
+		Stats:            scan.Stats{SourceFiles: 12, TopLevelDirs: []string{"lib", "ios", "android"}},
+		Tree: []scan.DirSummary{
+			{Path: "lib", Files: 8, Languages: []string{"Dart"}},
+			{Path: "ios", Files: 2, Languages: []string{"Swift"}},
+			{Path: "android", Files: 2, Languages: []string{"Kotlin"}},
+		},
+		Files:        []string{"lib/main.dart", "ios/Runner/AppDelegate.swift", "android/app/src/main/kotlin/Main.kt"},
+		Dependencies: []scan.Manifest{{Manifest: "pubspec.yaml", Ecosystem: "pub", Names: []string{"flutter", "http"}}},
+	}
+	m := FromScan(res)
+	for _, c := range m.Components {
+		if c.Type != "mobile" {
+			t.Errorf("%s type = %q, want mobile", c.ID, c.Type)
+		}
+	}
+}
+
+func TestFromScanTauriSrcTauriIsDesktop(t *testing.T) {
+	res := &scan.Result{
+		RepositoryURL:    "https://github.com/acme/desk",
+		Name:             "desk",
+		PrimaryLanguages: []string{"TypeScript", "Rust"},
+		Stats:            scan.Stats{SourceFiles: 10, TopLevelDirs: []string{"web", "src-tauri"}},
+		Tree: []scan.DirSummary{
+			{Path: "web", Files: 6, Languages: []string{"TypeScript"}},
+			{Path: "src-tauri", Files: 4, Languages: []string{"Rust"}},
+		},
+		Files: []string{"web/src/App.tsx", "src-tauri/src/main.rs"},
+		Dependencies: []scan.Manifest{
+			{Manifest: "package.json", Ecosystem: "npm", Names: []string{"@tauri-apps/api"}},
+			{Manifest: "src-tauri/Cargo.toml", Ecosystem: "cargo", Names: []string{"tauri", "serde"}},
+		},
+	}
+	m := FromScan(res)
+	byID := map[string]Component{}
+	for _, c := range m.Components {
+		byID[c.ID] = c
+	}
+	if byID["web"].Type != "frontend" {
+		t.Errorf("web type = %q, want frontend", byID["web"].Type)
+	}
+	if byID["src-tauri"].Type != "desktop" {
+		t.Errorf("src-tauri type = %q, want desktop", byID["src-tauri"].Type)
+	}
+}
+
+func TestFromScanElectronMainRendererAreDesktop(t *testing.T) {
+	res := &scan.Result{
+		RepositoryURL:    "https://github.com/acme/desk",
+		Name:             "desk",
+		PrimaryLanguages: []string{"JavaScript"},
+		Stats:            scan.Stats{SourceFiles: 4, TopLevelDirs: []string{"main", "renderer"}},
+		Tree: []scan.DirSummary{
+			{Path: "main", Files: 2, Languages: []string{"JavaScript"}},
+			{Path: "renderer", Files: 2, Languages: []string{"JavaScript"}},
+		},
+		Files:        []string{"main/index.js", "renderer/index.js"},
+		Dependencies: []scan.Manifest{{Manifest: "package.json", Ecosystem: "npm", Names: []string{"electron"}}},
+	}
+	m := FromScan(res)
+	for _, c := range m.Components {
+		if c.Type != "desktop" {
+			t.Errorf("%s type = %q, want desktop", c.ID, c.Type)
+		}
+	}
+}
+
 // TestFromScanAlwaysDrawsAConnectedGraph pins the structural map invariants that
 // the frontend relies on: connected blocks, valid verbs, and no JSON nulls.
 func TestFromScanAlwaysDrawsAConnectedGraph(t *testing.T) {
@@ -125,6 +197,36 @@ func TestFromScanAlwaysDrawsAConnectedGraph(t *testing.T) {
 		{
 			name: "empty repo",
 			res:  &scan.Result{RepositoryURL: "https://github.com/acme/empty", Name: "empty"},
+		},
+		{
+			name: "flutter mobile",
+			res: &scan.Result{
+				RepositoryURL:    "https://github.com/acme/notes",
+				Name:             "notes",
+				PrimaryLanguages: []string{"Dart"},
+				Stats:            scan.Stats{SourceFiles: 8, TopLevelDirs: []string{"lib", "ios"}},
+				Tree: []scan.DirSummary{
+					{Path: "lib", Files: 6, Languages: []string{"Dart"}},
+					{Path: "ios", Files: 2, Languages: []string{"Swift"}},
+				},
+				Files:        []string{"lib/main.dart", "ios/Runner/AppDelegate.swift"},
+				Dependencies: []scan.Manifest{{Manifest: "pubspec.yaml", Ecosystem: "pub", Names: []string{"flutter"}}},
+			},
+		},
+		{
+			name: "electron desktop",
+			res: &scan.Result{
+				RepositoryURL:    "https://github.com/acme/desk",
+				Name:             "desk",
+				PrimaryLanguages: []string{"JavaScript"},
+				Stats:            scan.Stats{SourceFiles: 4, TopLevelDirs: []string{"main", "renderer"}},
+				Tree: []scan.DirSummary{
+					{Path: "main", Files: 2, Languages: []string{"JavaScript"}},
+					{Path: "renderer", Files: 2, Languages: []string{"JavaScript"}},
+				},
+				Files:        []string{"main/index.js", "renderer/index.js"},
+				Dependencies: []scan.Manifest{{Manifest: "package.json", Ecosystem: "npm", Names: []string{"electron"}}},
+			},
 		},
 	}
 

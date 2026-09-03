@@ -59,6 +59,70 @@ func TestParsePyproject(t *testing.T) {
 	}
 }
 
+func TestParsePubspec(t *testing.T) {
+	got := mustParse(t, "pubspec.yaml")
+	want := []string{"flutter", "flutter_test", "http", "provider"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+func TestParseCargoTOML(t *testing.T) {
+	got := mustParse(t, "Cargo.toml")
+	want := []string{"serde", "tauri", "tokio"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+func TestParseGradle(t *testing.T) {
+	got := mustParse(t, "build.gradle")
+	want := []string{"androidx.core:core-ktx", "com.google.guava:guava"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+func TestParseGradleKts(t *testing.T) {
+	got := mustParse(t, "build.gradle.kts")
+	want := []string{"androidx.appcompat:appcompat", "com.google.dagger:dagger-compiler"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+func TestParsePodfile(t *testing.T) {
+	got := mustParse(t, "Podfile")
+	want := []string{"Alamofire", "Firebase/Auth"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+func TestParseGemfile(t *testing.T) {
+	got := mustParse(t, "Gemfile")
+	want := []string{"pg", "rails"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+func TestParseComposerJSON(t *testing.T) {
+	got := mustParse(t, "composer.json")
+	want := []string{"laravel/framework", "phpunit/phpunit"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v, want %v (php and ext-* must be excluded)", got, want)
+	}
+}
+
+func TestParsePOM(t *testing.T) {
+	got := mustParse(t, "pom.xml")
+	want := []string{"spring-boot-starter-web"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v, want %v (project artifactId must be excluded)", got, want)
+	}
+}
+
 func TestNormalizeURL(t *testing.T) {
 	cases := []struct {
 		in, url, name string
@@ -118,6 +182,75 @@ func TestScanTarballCollectsFilesAndDirs(t *testing.T) {
 	if len(res.Languages) == 0 || res.Languages[0].Name != "TypeScript" {
 		t.Errorf("languages = %+v, want TypeScript first (most bytes)", res.Languages)
 	}
+}
+
+func TestScanTarballFlutterParsesPubspec(t *testing.T) {
+	tgz := makeTarball(t, "notes-abc", map[string]string{
+		"pubspec.yaml":                        mustReadTestdata(t, "pubspec.yaml"),
+		"lib/main.dart":                       "void main() {}\n",
+		"ios/Runner/AppDelegate.swift":        "import UIKit\n",
+		"android/app/src/main/kotlin/Main.kt": "class Main\n",
+	})
+	var res Result
+	if err := scanTarball(bytes.NewReader(tgz), &res); err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Dependencies) != 1 || res.Dependencies[0].Ecosystem != "pub" {
+		t.Fatalf("dependencies = %+v, want one pubspec", res.Dependencies)
+	}
+	if !reflect.DeepEqual(res.Dependencies[0].Names, []string{"flutter", "flutter_test", "http", "provider"}) {
+		t.Errorf("pub names = %v", res.Dependencies[0].Names)
+	}
+}
+
+func TestScanTarballTauriParsesCargoAndNPM(t *testing.T) {
+	tgz := makeTarball(t, "desk-abc", map[string]string{
+		"package.json":          `{"dependencies":{"@tauri-apps/api":"2.0.0"}}`,
+		"src/App.tsx":           "export {}\n",
+		"src-tauri/Cargo.toml":  mustReadTestdata(t, "Cargo.toml"),
+		"src-tauri/src/main.rs": "fn main() {}\n",
+	})
+	var res Result
+	if err := scanTarball(bytes.NewReader(tgz), &res); err != nil {
+		t.Fatal(err)
+	}
+	byEco := map[string]Manifest{}
+	for _, m := range res.Dependencies {
+		byEco[m.Ecosystem] = m
+	}
+	if byEco["npm"].Manifest != "package.json" {
+		t.Errorf("npm manifest = %q", byEco["npm"].Manifest)
+	}
+	if byEco["cargo"].Manifest != "src-tauri/Cargo.toml" {
+		t.Errorf("cargo manifest = %q", byEco["cargo"].Manifest)
+	}
+}
+
+func TestScanTarballElectronParsesPackageJSON(t *testing.T) {
+	tgz := makeTarball(t, "desk-abc", map[string]string{
+		"package.json":      `{"dependencies":{"electron":"28.0.0"}}`,
+		"main/index.js":     "console.log(1)\n",
+		"renderer/index.js": "console.log(2)\n",
+	})
+	var res Result
+	if err := scanTarball(bytes.NewReader(tgz), &res); err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Dependencies) != 1 || res.Dependencies[0].Ecosystem != "npm" {
+		t.Fatalf("dependencies = %+v, want electron package.json", res.Dependencies)
+	}
+	if got := strings.Join(res.Stats.TopLevelDirs, ","); got != "main,renderer" {
+		t.Errorf("top-level dirs = %q, want main,renderer", got)
+	}
+}
+
+func mustReadTestdata(t *testing.T, base string) string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join("testdata", base))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data)
 }
 
 // makeTarball builds a gzipped tarball shaped like codeload's: every entry

@@ -7,7 +7,7 @@ You are given verified facts about one repository — its languages, its depende
 Rules:
 - "description" is one or two sentences about what this product does for the people who use it. Describe the product, never the repository, the files, or this map. Good: "Self-hosted note-taking app built for quick capture, markdown-native, with the data staying under the user's control."
 - "kind" is a short phrase naming what sort of software this is: "Self-hosted web application", "Command-line tool", "Mobile app", "Developer library".
-- Produce 8 to 15 components. A component is a part of the product a non-engineer could name and care about ("Memo Editor", "Authentication", "Data Storage") — not a single file, not a programming language, not a build tool.
+- Produce 8 to 16 components. A component is a part of the product a non-engineer could name and care about ("Memo Editor", "Authentication", "Data Storage") — not a single file, not a programming language, not a build tool.
 - Every component needs an "id": a short lowercase handle you invent, made of letters and dots, such as "web", "api", "auth", "data" or "runtime". An id is never empty, never a sentence, and never the same as another component's id.
 - "name" is the human label ("Memo Editor"). "id" is the handle ("web.editor"). They are different fields and both are required.
 - Start with 5 to 8 top-level components that together cover the whole product. A top-level component sets "parent_id" to the empty string "" and has a one-word id: "web", "api", "auth", "data", "runtime".

@@ -1,7 +1,7 @@
 """Draft enums and JSON schema shared with validate.py."""
 
 IMPORTANCE_VALUES = ["critical", "high", "medium", "low"]
-TYPE_VALUES = ["frontend", "backend", "database", "infrastructure"]
+TYPE_VALUES = ["frontend", "backend", "database", "infrastructure", "mobile", "desktop"]
 # Wire contract allows free-form verbs; schema pins these for small-model reliability.
 RELATION_VERBS = [
     "calls", "exposes", "uses", "reads", "reads_writes",
@@ -21,7 +21,7 @@ DRAFT_SCHEMA = {
         "components": {
             "type": "array",
             "minItems": 6,
-            "maxItems": 15,
+            "maxItems": 16,
             "items": {
                 "type": "object",
                 "properties": {

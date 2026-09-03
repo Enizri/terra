@@ -82,10 +82,17 @@ func sanitizeID(dir string) string {
 }
 
 func guessRepoType(res *scan.Result) string {
+	for _, m := range res.Dependencies {
+		if typ := typeFromManifest(m); typ != "" {
+			return typ
+		}
+	}
 	for _, lang := range res.PrimaryLanguages {
 		switch strings.ToLower(lang) {
 		case "typescript", "javascript", "tsx", "jsx":
 			return "frontend"
+		case "dart", "swift", "kotlin":
+			return "mobile"
 		}
 	}
 	return "backend"
@@ -102,15 +109,16 @@ func guessDirType(dir string, res *scan.Result) string {
 		return "database"
 	case "deploy", "infra", "infrastructure", "ops", "k8s", "kubernetes", "terraform", "docker", "charts", "helm":
 		return "infrastructure"
+	case "ios", "android", "mobile":
+		return "mobile"
+	case "src-tauri", "electron", "main", "renderer":
+		return "desktop"
 	}
 	// Manifests under this dir tip the scale.
 	for _, m := range res.Dependencies {
 		if m.Manifest == dir+"/"+path.Base(m.Manifest) || strings.HasPrefix(m.Manifest, dir+"/") {
-			switch m.Ecosystem {
-			case "npm":
-				return "frontend"
-			case "go", "pip":
-				return "backend"
+			if typ := typeFromManifest(m); typ != "" {
+				return typ
 			}
 		}
 	}
@@ -122,7 +130,9 @@ func guessDirType(dir string, res *scan.Result) string {
 			switch strings.ToLower(lang) {
 			case "typescript", "javascript", "tsx", "jsx", "css", "html":
 				return "frontend"
-			case "go", "python", "rust", "java", "ruby":
+			case "dart", "swift", "kotlin":
+				return "mobile"
+			case "go", "python", "rust", "java", "ruby", "php":
 				return "backend"
 			case "sql":
 				return "database"
@@ -130,6 +140,35 @@ func guessDirType(dir string, res *scan.Result) string {
 		}
 	}
 	return guessRepoType(res)
+}
+
+func typeFromManifest(m scan.Manifest) string {
+	switch m.Ecosystem {
+	case "pub", "gradle", "cocoapods":
+		return "mobile"
+	case "cargo":
+		if strings.Contains(m.Manifest, "src-tauri") {
+			return "desktop"
+		}
+		return "backend"
+	case "npm":
+		for _, n := range m.Names {
+			l := strings.ToLower(n)
+			if l == "electron" || strings.HasPrefix(l, "electron-") {
+				return "desktop"
+			}
+			if l == "tauri" || strings.HasPrefix(l, "@tauri-apps/") {
+				return "desktop"
+			}
+			if l == "react-native" || l == "expo" {
+				return "mobile"
+			}
+		}
+		return "frontend"
+	case "go", "pip", "bundler", "composer", "maven":
+		return "backend"
+	}
+	return ""
 }
 
 func primaryTech(res *scan.Result) []string {
@@ -225,8 +264,8 @@ func structuralRels(components []Component, res *scan.Result) []Relationship {
 	// sibling tail — connectivity is guaranteed up to 18 non-core components.
 	for _, c := range components {
 		switch c.Type {
-		case "frontend":
-			// Only call it a frontend→backend hop when the core really is backend.
+		case "frontend", "mobile", "desktop":
+			// Only call it a UI→backend hop when the core really is backend.
 			if core.Type == "backend" {
 				add(c.ID, core.ID, "calls", manifestBecause(res))
 			} else {

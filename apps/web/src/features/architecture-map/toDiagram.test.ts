@@ -93,3 +93,21 @@ test("an oversized map keeps the important cards and reports the rest", () => {
   // The critical one is never the card that gets cut.
   assert.ok(view.nodes.some((n) => n.id === "b0"));
 });
+
+test("mobile and desktop sit in the screens column", () => {
+  const map: TerraMap = {
+    project: golden.project,
+    components: [
+      { id: "ios", parent_id: null, name: "iOS", purpose: "", importance: "critical", type: "mobile", files: [] },
+      { id: "desk", parent_id: null, name: "Desktop", purpose: "", importance: "high", type: "desktop", files: [] },
+      { id: "api", parent_id: null, name: "API", purpose: "", importance: "high", type: "backend", files: [] },
+    ] as Component[],
+    relationships: [{ from: "ios", to: "api", type: "calls", because: [] }],
+    suggested_questions: [],
+  };
+  const view = toDiagram(map);
+  check(view);
+  assert.equal(view.nodes.find((n) => n.id === "ios")!.col, 0);
+  assert.equal(view.nodes.find((n) => n.id === "desk")!.col, 0);
+  assert.equal(view.nodes.find((n) => n.id === "ios")!.kind, "frontend");
+});

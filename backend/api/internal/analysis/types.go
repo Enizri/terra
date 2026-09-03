@@ -27,14 +27,15 @@ type ProjectStats struct {
 type Component struct {
 	ID string `json:"id"`
 	// ParentID is nil for top-level; empty string from the model normalizes to nil.
-	ParentID   *string  `json:"parent_id"`
-	Name       string   `json:"name"`
-	Purpose    string   `json:"purpose"`
-	Importance string   `json:"importance"`
-	Type       string   `json:"type"`
-	Tech       []string `json:"tech,omitempty"`
-	Files      []string `json:"files"`
-	FileCount  int      `json:"file_count,omitempty"`
+	ParentID   *string `json:"parent_id"`
+	Name       string  `json:"name"`
+	Purpose    string  `json:"purpose"`
+	Importance string  `json:"importance"`
+	// Type is frontend, backend, database, infrastructure, mobile, or desktop.
+	Type      string   `json:"type"`
+	Tech      []string `json:"tech,omitempty"`
+	Files     []string `json:"files"`
+	FileCount int      `json:"file_count,omitempty"`
 }
 
 type Relationship struct {
