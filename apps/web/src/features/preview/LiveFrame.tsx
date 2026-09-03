@@ -2,6 +2,7 @@
 import { useEffect, useState, type RefObject } from "react";
 import { previewEvents, type PreviewApp, type PreviewResult } from "./api.ts";
 import { PackageStage } from "./PackageStage.tsx";
+import { CliStage } from "./CliStage.tsx";
 
 /** Shape select.js posts on click. */
 export type LiveSelection = {
@@ -73,6 +74,7 @@ export function LiveFrame({
   const url = active?.url || result?.url || "";
   const apps = result?.apps ?? [];
   const packageView = !url && !error && result != null && apps.some((a) => a.status === "ready");
+  const cliView = packageView && (active?.kind || result?.apps[0]?.kind) === "cli";
 
   return (
     <div className="sh-live-shell">
@@ -94,6 +96,8 @@ export function LiveFrame({
       </div>
       {error ? (
         <div className="sh-live__status sh-live__status--error">Preview failed: {error}</div>
+      ) : cliView ? (
+        <CliStage repoUrl={repoUrl} reason={active?.reason || result?.apps[0]?.reason} />
       ) : packageView ? (
         <PackageStage repoUrl={repoUrl} reason={active?.reason || result?.apps[0]?.reason} />
       ) : !url ? (

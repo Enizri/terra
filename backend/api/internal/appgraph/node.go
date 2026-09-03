@@ -142,7 +142,7 @@ func fromNode(root, dir string) []App {
 
 func cliApp(base App) App {
 	base.Kind, base.Framework, base.Previewable = KindCLI, "node", false
-	base.Reason = "This is a command-line tool. It has no web UI to iframe — Terra will show a terminal in a later change."
+	base.Reason = "This is a command-line tool. Terra runs it in a terminal — type arguments after --help."
 	return base
 }
 

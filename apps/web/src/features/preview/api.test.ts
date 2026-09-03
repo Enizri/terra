@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { previewEvents, previewTestEvents, repoReadme } from "./api.ts";
+import { previewCLIEvents, previewEvents, previewTestEvents, repoReadme } from "./api.ts";
 
 test("previewEvents posts /jobs/preview and drives from job events", async () => {
   const calls: string[] = [];
@@ -69,6 +69,37 @@ test("previewTestEvents posts /jobs/preview/test", async () => {
   try {
     const stages: string[] = [];
     for await (const ev of previewTestEvents("https://github.com/acme/lib")) {
+      stages.push(ev.stage);
+    }
+    assert.deepEqual(stages, ["done"]);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+test("previewCLIEvents posts /jobs/preview/cli", async () => {
+  const original = globalThis.fetch;
+  globalThis.fetch = async (input: string | URL | Request, init?: RequestInit) => {
+    const url = String(input);
+    if (url === "/jobs/preview/cli") {
+      const body = JSON.parse(String(init?.body ?? "{}"));
+      assert.equal(body.args, "map gh");
+      return new Response(JSON.stringify({ job_id: "job-cli" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    if (url === "/jobs/job-cli/events") {
+      return new Response('{"stage":"done","label":"usage"}\n', {
+        status: 200,
+        headers: { "Content-Type": "application/x-ndjson" },
+      });
+    }
+    return new Response("missing", { status: 404 });
+  };
+  try {
+    const stages: string[] = [];
+    for await (const ev of previewCLIEvents("https://github.com/acme/cli", "map gh")) {
       stages.push(ev.stage);
     }
     assert.deepEqual(stages, ["done"]);
