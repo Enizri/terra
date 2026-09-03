@@ -179,9 +179,12 @@ func (r *dockerRunner) boot(key string, cfg *config.Config, emit Emitter) (*inst
 	apps, err := appgraph.For(root, scan.CheckoutCommit(root))
 	if err != nil {
 		ping(emit, "boot", "Starting from the runfile")
-		inst, err := bootRunfile(cfg, key, root, err)
-		if err != nil {
-			return nil, err
+		inst, rfErr := bootRunfile(cfg, key, root, err)
+		if rfErr != nil {
+			ping(emit, "ready", "Showing the repository")
+			inst := packageStage(root, nil)
+			r.trackStarting(key, inst)
+			return inst, nil
 		}
 		r.trackStarting(key, inst)
 		if err := r.reserveApps(key, 1); err != nil {
@@ -193,7 +196,10 @@ func (r *dockerRunner) boot(key string, cfg *config.Config, emit Emitter) (*inst
 	}
 	order := bootOrder(apps)
 	if len(order) == 0 {
-		return nil, noPreviewable(root, apps)
+		ping(emit, "ready", "Showing the repository")
+		inst := packageStage(root, apps)
+		r.trackStarting(key, inst)
+		return inst, nil
 	}
 	if err := r.reserveApps(key, len(order)); err != nil {
 		return nil, err

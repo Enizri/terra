@@ -106,3 +106,40 @@
   text-align: left;
   font-size: 0.8rem;
 }
+
+.sh-live-pack {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  overflow: auto;
+}
+
+.sh-live-pack__why {
+  margin: 0;
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+
+.sh-live-pack__readme,
+.sh-live-pack__log {
+  margin: 0;
+  padding: 12px;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid var(--sh-border, rgba(0, 0, 0, 0.12));
+  font-size: 0.78rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow: auto;
+  max-height: 50%;
+}
+
+.sh-live-pack__tests {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}

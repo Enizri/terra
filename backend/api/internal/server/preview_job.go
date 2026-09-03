@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/Enizri/terra/backend/api/internal/job"
+	"github.com/Enizri/terra/backend/api/internal/preview"
 	"github.com/Enizri/terra/backend/api/internal/scan"
 )
 
@@ -51,6 +52,40 @@ func (s *Server) enqueuePreview(w http.ResponseWriter, r *http.Request) {
 		}
 		emit(job.Event{Stage: "ready", Label: res.URL, Preview: res})
 		emit(job.Event{Stage: "done", Answer: res.URL, Preview: res})
+	})
+	writeJSON(w, map[string]string{"job_id": j.ID})
+}
+
+// enqueuePreviewTest runs the checkout's test script as a job (package stage).
+func (s *Server) enqueuePreviewTest(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		RepoURL string `json:"repo_url"`
+	}
+	if !decodeBody(w, r, &req, `body must be {"repo_url": "github.com/user/project"}`) {
+		return
+	}
+	if req.RepoURL == "" {
+		httpError(w, http.StatusBadRequest, `body must be {"repo_url": "github.com/user/project"}`)
+		return
+	}
+	root, _, ok := s.previewRunner().Lookup(req.RepoURL)
+	if !ok {
+		httpError(w, http.StatusConflict, "preview is not mounted; open live preview first")
+		return
+	}
+	dir := root
+	j := s.Jobs.Start(func(ctx context.Context, emit func(job.Event)) {
+		emit(job.Event{Stage: "boot", Label: "Running tests"})
+		out, err := preview.RunTests(ctx, dir)
+		if err != nil && out == "" {
+			emit(job.Event{Stage: "error", Label: err.Error()})
+			return
+		}
+		label := out
+		if err != nil {
+			label = err.Error() + "\n" + out
+		}
+		emit(job.Event{Stage: "done", Label: label, Answer: label})
 	})
 	writeJSON(w, map[string]string{"job_id": j.ID})
 }

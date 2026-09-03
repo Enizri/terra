@@ -2,6 +2,7 @@ package preview
 
 import (
 	"net"
+	"strings"
 	"testing"
 
 	"github.com/Enizri/terra/backend/api/internal/appgraph"
@@ -107,6 +108,33 @@ func TestSnapshotListsSkippedApps(t *testing.T) {
 	}
 	if got.Apps[0].Status != "ready" || got.Apps[1].Status != "skipped" || got.Apps[1].Reason == "" {
 		t.Fatalf("apps = %+v", got.Apps)
+	}
+}
+
+func TestSnapshotLibraryIsReadyWithoutURL(t *testing.T) {
+	inst := packageStage("/tmp/lib", []appgraph.App{
+		{ID: "lib", Dir: ".", Kind: appgraph.KindLibrary, Framework: "node", Reason: "library"},
+	})
+	if !inst.healthy() || !inst.staged {
+		t.Fatal("package stage must stay healthy without a process")
+	}
+	got := snapshot(inst)
+	if got.URL != "" || got.PrimaryID != "lib" || len(got.Apps) != 1 {
+		t.Fatalf("%+v", got)
+	}
+	if got.Apps[0].Status != "ready" || got.Apps[0].URL != "" || got.Apps[0].Kind != "library" {
+		t.Fatalf("app = %+v", got.Apps[0])
+	}
+}
+
+func TestPackageStageEmptyRepo(t *testing.T) {
+	inst := packageStage("/tmp/empty", nil)
+	got := snapshot(inst)
+	if !inst.healthy() || got.PrimaryID != "repo" || got.Apps[0].Kind != "library" {
+		t.Fatalf("%+v", got)
+	}
+	if !strings.Contains(got.Apps[0].Reason, "no app to boot") {
+		t.Fatalf("reason = %q", got.Apps[0].Reason)
 	}
 }
 

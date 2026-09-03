@@ -1,6 +1,7 @@
 /** Live-preview iframe + selection shapes posted by select.js. */
 import { useEffect, useState, type RefObject } from "react";
 import { previewEvents, type PreviewApp, type PreviewResult } from "./api.ts";
+import { PackageStage } from "./PackageStage.tsx";
 
 /** Shape select.js posts on click. */
 export type LiveSelection = {
@@ -71,6 +72,7 @@ export function LiveFrame({
   const active = result?.apps.find((a) => a.id === activeId);
   const url = active?.url || result?.url || "";
   const apps = result?.apps ?? [];
+  const packageView = !url && !error && result != null && apps.some((a) => a.status === "ready");
 
   return (
     <div className="sh-live-shell">
@@ -80,16 +82,20 @@ export function LiveFrame({
             <AppChip key={app.id} app={app} active={app.id === activeId} onSelect={setActiveId} />
           ))}
         </div>
-        <button
-          type="button"
-          className={`sh-live-mode${picking ? " is-select" : " is-interact"}`}
-          onClick={() => setPicking((p) => !p)}
-        >
-          {picking ? "Select" : "Interact"}
-        </button>
+        {!packageView && (
+          <button
+            type="button"
+            className={`sh-live-mode${picking ? " is-select" : " is-interact"}`}
+            onClick={() => setPicking((p) => !p)}
+          >
+            {picking ? "Select" : "Interact"}
+          </button>
+        )}
       </div>
       {error ? (
         <div className="sh-live__status sh-live__status--error">Preview failed: {error}</div>
+      ) : packageView ? (
+        <PackageStage repoUrl={repoUrl} reason={active?.reason || result?.apps[0]?.reason} />
       ) : !url ? (
         <div className="sh-live__status">{progress}</div>
       ) : (
@@ -108,7 +114,7 @@ function AppChip({
   active: boolean;
   onSelect: (id: string) => void;
 }) {
-  const skipped = app.status !== "ready" || !app.url;
+  const skipped = app.status === "skipped" || app.status === "error";
   return (
     <button
       type="button"
