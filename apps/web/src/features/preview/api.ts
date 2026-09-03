@@ -87,6 +87,31 @@ export async function* previewCLIEvents(
   yield* jobEvents<PreviewEvent>(job_id, signal);
 }
 
+export type ProbeHit = {
+  method: string;
+  path: string;
+  status: number;
+  body: string;
+};
+
+export async function previewRoutes(repoUrl: string, signal?: AbortSignal): Promise<string[]> {
+  const q = new URLSearchParams({ repo_url: repoUrl });
+  const res = await fetch(`/preview/routes?${q}`, { headers: authHeaders(), signal });
+  const data = await json<{ routes: string[] }>(res, "routes");
+  return data.routes ?? [];
+}
+
+export async function previewProbe(
+  repoUrl: string,
+  url: string,
+  method: string,
+  path: string,
+  signal?: AbortSignal,
+): Promise<ProbeHit> {
+  const res = await post("/preview/probe", { repo_url: repoUrl, url, method, path }, signal);
+  return json<ProbeHit>(res, "probe");
+}
+
 export async function* previewTestEvents(
   repoUrl: string,
   signal?: AbortSignal,

@@ -164,3 +164,38 @@
   font: inherit;
   font-size: 0.85rem;
 }
+
+.sh-live-api {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: auto;
+}
+
+.sh-live-api__hit {
+  border: 1px solid var(--sh-border, rgba(0, 0, 0, 0.12));
+  border-radius: 8px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.sh-live-api__hit header {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  font-size: 0.8rem;
+}
+
+.sh-live-api__hit pre {
+  margin: 0;
+  padding: 8px 10px;
+  border-top: 1px solid var(--sh-border, rgba(0, 0, 0, 0.08));
+  font-size: 0.75rem;
+  white-space: pre-wrap;
+  max-height: 10rem;
+  overflow: auto;
+}

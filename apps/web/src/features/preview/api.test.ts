@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { previewCLIEvents, previewEvents, previewTestEvents, repoReadme } from "./api.ts";
+import { previewCLIEvents, previewEvents, previewProbe, previewRoutes, previewTestEvents, repoReadme } from "./api.ts";
 
 test("previewEvents posts /jobs/preview and drives from job events", async () => {
   const calls: string[] = [];
@@ -103,6 +103,35 @@ test("previewCLIEvents posts /jobs/preview/cli", async () => {
       stages.push(ev.stage);
     }
     assert.deepEqual(stages, ["done"]);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+test("previewRoutes and previewProbe hit the API console endpoints", async () => {
+  const original = globalThis.fetch;
+  globalThis.fetch = async (input: string | URL | Request, init?: RequestInit) => {
+    const url = String(input);
+    if (url.startsWith("/preview/routes?")) {
+      return new Response(JSON.stringify({ routes: ["/", "/healthz"] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    if (url === "/preview/probe") {
+      const body = JSON.parse(String(init?.body ?? "{}"));
+      assert.equal(body.path, "/healthz");
+      return new Response(JSON.stringify({ method: "GET", path: "/healthz", status: 200, body: "ok" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    return new Response("missing", { status: 404 });
+  };
+  try {
+    assert.deepEqual(await previewRoutes("https://github.com/acme/api"), ["/", "/healthz"]);
+    const hit = await previewProbe("https://github.com/acme/api", "http://127.0.0.1:8080/__live/x/", "GET", "/healthz");
+    assert.equal(hit.status, 200);
   } finally {
     globalThis.fetch = original;
   }
