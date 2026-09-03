@@ -183,6 +183,15 @@
   overflow-wrap: break-word;
 }
 
+.sh-ws__note {
+  margin: 0;
+  max-width: 560px;
+  color: #525252;
+  font-size: 14px;
+  text-align: center;
+  overflow-wrap: break-word;
+}
+
 /* ---- result: the map fills the stage, everything else is a strip on top ---- */
 
 /* Centering suits the intake and the status line; the map wants the room. */

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"path"
@@ -25,8 +26,35 @@ var (
 	codeloadBase = "https://codeload.github.com"
 )
 
-// Tarball downloads can be large; commit resolution is a tiny JSON call.
-var httpClient = &http.Client{Timeout: 2 * time.Minute}
+// Dial and first-byte deadlines. The body itself has no whole-request
+// timeout so a large tarball can stream past two minutes.
+var (
+	dialTimeout           = 30 * time.Second
+	tlsHandshakeTimeout   = 10 * time.Second
+	responseHeaderTimeout = 2 * time.Minute
+)
+
+func newGitHubClient() *http.Client {
+	return &http.Client{
+		Transport: &http.Transport{
+			Proxy:                 http.ProxyFromEnvironment,
+			DialContext:           (&net.Dialer{Timeout: dialTimeout}).DialContext,
+			TLSHandshakeTimeout:   tlsHandshakeTimeout,
+			ResponseHeaderTimeout: responseHeaderTimeout,
+			ForceAttemptHTTP2:     true,
+		},
+	}
+}
+
+var httpClient = newGitHubClient()
+
+// Extract caps so a hostile or huge tarball cannot fill the disk.
+var (
+	maxExtractBytes int64 = 512 << 20 // 512 MiB
+	maxExtractFiles       = 100_000
+)
+
+const maxManifestBytes int64 = 2 << 20
 
 // RateLimitError is returned when GitHub rejects a request for quota reasons.
 type RateLimitError struct {
@@ -205,21 +233,25 @@ func Checkout(base, rawURL string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// Reuse an existing checkout (.git marks pre-tarball clones).
-	for _, marker := range []string{checkoutMarker, ".git"} {
-		if _, err := os.Stat(filepath.Join(dir, marker)); err == nil {
-			return dir, nil
-		}
+	// Pre-tarball clones keep working as they are.
+	if _, err := os.Stat(filepath.Join(dir, ".git")); err == nil {
+		return dir, nil
 	}
 	sha, err := ResolveCommit(owner, repo)
 	if err != nil {
 		return "", err
+	}
+	if CheckoutCommit(dir) == sha {
+		return dir, nil
 	}
 	body, err := fetchTarball(owner, repo, sha)
 	if err != nil {
 		return "", err
 	}
 	defer body.Close()
+	if err := os.RemoveAll(dir); err != nil {
+		return "", err
+	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}
@@ -254,6 +286,8 @@ func extractTarball(r io.Reader, dir string) error {
 	}
 	defer gz.Close()
 	tr := tar.NewReader(gz)
+	var totalBytes int64
+	files := 0
 	for {
 		hdr, err := tr.Next()
 		if err == io.EOF {
@@ -277,6 +311,10 @@ func extractTarball(r io.Reader, dir string) error {
 				return err
 			}
 		case tar.TypeReg:
+			files++
+			if files > maxExtractFiles {
+				return fmt.Errorf("extract tarball: too many files (limit %d)", maxExtractFiles)
+			}
 			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 				return err
 			}
@@ -288,13 +326,21 @@ func extractTarball(r io.Reader, dir string) error {
 			if err != nil {
 				return err
 			}
-			_, err = io.Copy(f, tr)
+			remain := maxExtractBytes - totalBytes
+			if remain < 0 {
+				remain = 0
+			}
+			n, err := io.Copy(f, io.LimitReader(tr, remain+1))
 			if cerr := f.Close(); err == nil {
 				err = cerr
 			}
 			if err != nil {
 				return err
 			}
+			if n > remain {
+				return fmt.Errorf("extract tarball: repository exceeds %d MB", maxExtractBytes>>20)
+			}
+			totalBytes += n
 		}
 	}
 }
