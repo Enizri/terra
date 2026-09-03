@@ -139,7 +139,10 @@ token. `make dev` (loopback) stays open.
 **Live preview (Phase 1b):** Compose sets `TERRA_PREVIEW_MODE=docker`, mounts the
 host Docker socket, and shares checkouts via the named `terra-data` volume
 (`TERRA_CHECKOUT_VOLUME`) so Docker Desktop can mount them into siblings.
-`POST /preview` starts a Node sibling and returns `/__live/{id}/` (same origin).
+`POST /preview` starts a Node sibling and returns `/__live/{id}/` (same origin)
+when the framework takes a base path on the command line (Vite, Angular, CRA);
+the rest are served at their own loopback origin instead, since their absolute
+asset paths cannot be moved under a prefix.
 Caps: `TERRA_PREVIEW_MAX` (default 2), idle TTL `TERRA_PREVIEW_TTL` (default 30m).
 Supports `package.json` frontends only; runfile/Go-only repos need `make dev`
 (host-exec).

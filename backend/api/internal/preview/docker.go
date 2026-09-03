@@ -2,6 +2,7 @@ package preview
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -37,6 +38,7 @@ type dockerInstance struct {
 	target        string
 	readyURL      string
 	liveID        string
+	proxyLn       net.Listener // set when the app is served at its own origin
 	timer         *time.Timer
 }
 
@@ -180,15 +182,24 @@ func (r *dockerRunner) boot(key string, cfg *config.Config) (string, *dockerInst
 	image := cfg.PreviewImage
 	network := cfg.PreviewNetwork
 
+	// Only a framework that takes its base path on the command line can be
+	// mounted under /__live/{id}/; the others are served at their own origin,
+	// or every absolute asset path they emit 404s.
+	spec := specFor(frameworkFor(root, appDir))
+	basePath := ""
+	if spec.SupportsBasePath {
+		basePath = "/__live/" + liveID + "/"
+	}
+	opts := launch{Port: dockerPreviewPort, BasePath: basePath, AllHosts: true}
+
 	args := []string{"run", "-d", "--name", name}
 	args = append(args, dockerMountArgs(cfg, root)...)
 	args = append(args,
 		"-w", appDir,
-		"-e", "PORT="+strconv.Itoa(dockerPreviewPort),
 		"-e", "BROWSER=none",
 		"-e", "NODE_OPTIONS=--require "+hookPath,
 	)
-	for _, kv := range dockerTraceVars(cfg, key) {
+	for _, kv := range append(spec.environ(opts), dockerTraceVars(cfg, key)...) {
 		args = append(args, "-e", kv)
 	}
 	if network != "" {
@@ -196,8 +207,7 @@ func (r *dockerRunner) boot(key string, cfg *config.Config) (string, *dockerInst
 	} else {
 		args = append(args, "-p", "127.0.0.1::"+strconv.Itoa(dockerPreviewPort))
 	}
-	basePath := "/__live/" + liveID + "/"
-	args = append(args, image, "bash", "-lc", dockerDevCommand(pm, script, basePath))
+	args = append(args, image, "bash", "-lc", dockerDevCommand(pm, script, spec, opts))
 
 	out, err := exec.Command(dockerBin, args...).CombinedOutput()
 	if err != nil {
@@ -211,7 +221,10 @@ func (r *dockerRunner) boot(key string, cfg *config.Config) (string, *dockerInst
 		_ = exec.Command(dockerBin, "rm", "-f", name).Run()
 		return "", nil, err
 	}
-	readyURL := strings.TrimRight(target, "/") + basePath
+	readyURL := strings.TrimRight(target, "/") + "/"
+	if basePath != "" {
+		readyURL = strings.TrimRight(target, "/") + basePath
+	}
 	if err := waitURLReady(readyURL, 3*time.Minute); err != nil {
 		logs, _ := exec.Command(dockerBin, "logs", "--tail", "80", name).CombinedOutput()
 		_ = exec.Command(dockerBin, "rm", "-f", name).Run()
@@ -219,7 +232,16 @@ func (r *dockerRunner) boot(key string, cfg *config.Config) (string, *dockerInst
 	}
 
 	authFix := seedDemoAuth(key, target)
-	publicURL, err := MountPathProxy(cfg.PublicBase(), liveID, target, key, authFix)
+	var publicURL string
+	var proxyLn net.Listener
+	if basePath != "" {
+		publicURL, err = MountPathProxy(cfg.PublicBase(), liveID, target, key, authFix)
+	} else {
+		// Same loopback origin proxy host mode returns: select.js injection and
+		// the demo-auth hook still apply, but the URL is only reachable from
+		// the machine running the API.
+		publicURL, proxyLn, err = serveProxy(key, target, authFix)
+	}
 	if err != nil {
 		_ = exec.Command(dockerBin, "rm", "-f", name).Run()
 		return "", nil, err
@@ -227,7 +249,8 @@ func (r *dockerRunner) boot(key string, cfg *config.Config) (string, *dockerInst
 
 	inst := &dockerInstance{
 		root: root, appDir: appDir, containerName: name,
-		publicURL: publicURL, target: target, readyURL: readyURL, liveID: liveID,
+		publicURL: publicURL, target: target, readyURL: readyURL,
+		liveID: liveID, proxyLn: proxyLn,
 	}
 	return publicURL, inst, nil
 }
@@ -289,6 +312,10 @@ func (r *dockerRunner) stopLocked(inst *dockerInstance) {
 		inst.timer = nil
 	}
 	UnmountPathProxy(inst.liveID)
+	if inst.proxyLn != nil {
+		inst.proxyLn.Close()
+		inst.proxyLn = nil
+	}
 	bin := r.cfg.DockerBin
 	_ = exec.Command(bin, "rm", "-f", inst.containerName).Run()
 	fmt.Fprintf(os.Stderr, "preview: stopped %s\n", inst.containerName)
@@ -372,21 +399,17 @@ func dockerMountArgs(c *config.Config, root string) []string {
 	return []string{"-v", root + ":" + root}
 }
 
-func dockerDevCommand(pm, script, basePath string) string {
+// dockerDevCommand is the install-then-run line the sibling container executes.
+// The flags come from the framework's spec: a dev server in a container has to
+// bind every interface, and only some of them can be told a base path.
+func dockerDevCommand(pm, script string, spec launchSpec, opts launch) string {
 	prefix := ""
 	switch pm {
 	case "pnpm", "yarn":
 		// node images ship corepack; enable the lockfile's package manager.
 		prefix = "corepack enable && "
 	}
-	args := "run " + script
-	if pm == "npm" {
-		args += " --"
-	}
-	// --host: Vite defaults to localhost-only (unreachable from the API container).
-	// --base: path proxy lives under /__live/{id}/; absolute /@vite/* must match.
-	args += fmt.Sprintf(" --host 0.0.0.0 --port %d --strictPort --base %s", dockerPreviewPort, basePath)
-	return fmt.Sprintf("%s%s install && %s %s", prefix, pm, pm, args)
+	return fmt.Sprintf("%s%s install && %s", prefix, pm, scriptCommand(pm, script, spec.args(opts)))
 }
 
 var safeKeyRe = regexp.MustCompile(`[^a-zA-Z0-9_.-]+`)
