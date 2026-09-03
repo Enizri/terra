@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Enizri/terra/backend/api/internal/preview"
 	"github.com/Enizri/terra/backend/api/internal/trace"
 )
 
@@ -21,6 +22,9 @@ type writePreview struct {
 }
 
 func (w *writePreview) Start(string) (string, error) { return "http://preview.test/", nil }
+func (w *writePreview) Boot(string, preview.Emitter) (preview.Result, error) {
+	return preview.Result{URL: "http://preview.test/"}, nil
+}
 func (w *writePreview) Lookup(string) (string, string, bool) {
 	return "", "", w.ready
 }

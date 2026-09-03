@@ -29,9 +29,17 @@ type hostRunner struct {
 // (minutes) would block Lookup — and with it every /files request — and
 // serialize unrelated repos behind one slow boot.
 func (r *hostRunner) Start(repoURL string) (string, error) {
-	key, _, err := scan.NormalizeURL(repoURL)
+	res, err := r.Boot(repoURL, nil)
 	if err != nil {
 		return "", err
+	}
+	return res.URL, nil
+}
+
+func (r *hostRunner) Boot(repoURL string, emit Emitter) (Result, error) {
+	key, _, err := scan.NormalizeURL(repoURL)
+	if err != nil {
+		return Result{}, err
 	}
 	for {
 		r.mu.Lock()
@@ -42,14 +50,15 @@ func (r *hostRunner) Start(repoURL string) (string, error) {
 		}
 
 		if inst, ok := r.byRepo[key]; ok {
-			url := inst.proxyURL
 			r.mu.Unlock()
 			if inst.healthy() {
 				r.mu.Lock()
 				if cur, ok := r.byRepo[key]; ok && cur == inst {
 					r.resetTTLLocked(key, inst, ttl)
+					out := snapshot(inst)
 					r.mu.Unlock()
-					return url, nil
+					ping(emit, "ready", "already running")
+					return out, nil
 				}
 				r.mu.Unlock()
 				continue
@@ -68,7 +77,7 @@ func (r *hostRunner) Start(repoURL string) (string, error) {
 		used := usedApps(r.byRepo, r.boots)
 		if limit >= 0 && used >= limit {
 			r.mu.Unlock()
-			return "", fmt.Errorf("preview capacity full (%d apps / %d); stop another preview or raise TERRA_PREVIEW_MAX", used, limit)
+			return Result{}, fmt.Errorf("preview capacity full (%d apps / %d); stop another preview or raise TERRA_PREVIEW_MAX", used, limit)
 		}
 		if r.boots == nil {
 			r.boots = map[string]*bootWait{}
@@ -77,13 +86,12 @@ func (r *hostRunner) Start(repoURL string) (string, error) {
 		r.boots[key] = wait
 		r.mu.Unlock()
 
-		url, err := r.runBoot(key, ttl, wait)
-		return url, err
+		return r.runBoot(key, ttl, wait, emit)
 	}
 }
 
 // runBoot runs boot and always clears the boots entry, even on panic.
-func (r *hostRunner) runBoot(key string, ttl time.Duration, wait *bootWait) (url string, err error) {
+func (r *hostRunner) runBoot(key string, ttl time.Duration, wait *bootWait, emit Emitter) (res Result, err error) {
 	var inst *instance
 	defer func() {
 		if rec := recover(); rec != nil {
@@ -94,6 +102,7 @@ func (r *hostRunner) runBoot(key string, ttl time.Duration, wait *bootWait) (url
 		if err == nil && inst != nil {
 			r.byRepo[key] = inst
 			r.resetTTLLocked(key, inst, ttl)
+			res = snapshot(inst)
 		} else {
 			if inst != nil {
 				r.stopInstanceLocked(inst)
@@ -106,8 +115,11 @@ func (r *hostRunner) runBoot(key string, ttl time.Duration, wait *bootWait) (url
 		close(wait.done)
 		r.mu.Unlock()
 	}()
-	url, inst, err = r.boot(key)
-	return url, err
+	inst, err = r.boot(key, emit)
+	if err == nil && inst != nil {
+		res = snapshot(inst)
+	}
+	return res, err
 }
 
 func (r *hostRunner) trackStarting(key string, inst *instance) {
@@ -135,32 +147,35 @@ func (r *hostRunner) reserveApps(key string, n int) error {
 
 // boot does the heavy lifting for one repo. It must not touch r.mu except
 // through trackStarting / reserveApps.
-func (r *hostRunner) boot(key string) (string, *instance, error) {
+func (r *hostRunner) boot(key string, emit Emitter) (*instance, error) {
+	ping(emit, "checkout", "Fetching the repository")
 	root, err := scan.Checkout(r.cfg.CheckoutDir, key)
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
+	ping(emit, "detect", "Finding apps")
 	apps, err := appgraph.For(root, scan.CheckoutCommit(root))
 	if err != nil {
-		return r.startViaRunfile(key, root, err)
+		return r.startViaRunfile(key, root, err, emit)
 	}
 	order := bootOrder(apps)
 	if len(order) == 0 {
-		return "", nil, noPreviewable(root, apps)
+		return nil, noPreviewable(root, apps)
 	}
 	if err := r.reserveApps(key, len(order)); err != nil {
-		return "", nil, err
+		return nil, err
 	}
 	primary, _ := appgraph.Primary(apps)
-	inst := &instance{root: root}
+	inst := &instance{root: root, graph: apps, primaryID: primary.ID}
 	r.trackStarting(key, inst)
 
 	var extraEnv []string
 	for _, app := range order {
+		ping(emit, "install", "Installing "+appName(app))
 		port, err := freePort()
 		if err != nil {
 			inst.stop("")
-			return "", nil, err
+			return nil, err
 		}
 		spec := specFor(app.Framework)
 		liveID := appLiveID(key, app.ID, app.ID == primary.ID)
@@ -168,10 +183,11 @@ func (r *hostRunner) boot(key string) (string, *instance, error) {
 		if spec.SupportsBasePath {
 			opts.BasePath = "/__live/" + liveID + "/"
 		}
+		ping(emit, "boot", "Starting "+appName(app))
 		proc, err := startHostApp(r.cfg, key, root, app, opts, extraEnv)
 		if err != nil {
 			inst.stop("")
-			return "", nil, err
+			return nil, err
 		}
 		proc.liveID = liveID
 		proc.primary = app.ID == primary.ID
@@ -179,7 +195,7 @@ func (r *hostRunner) boot(key string) (string, *instance, error) {
 		if err != nil {
 			proc.stop("")
 			inst.stop("")
-			return "", nil, fmt.Errorf("%s never came up: %v\n--- output ---\n%s", app.ID, err, proc.logs.String())
+			return nil, fmt.Errorf("%s never came up: %v\n--- output ---\n%s", app.ID, err, proc.logs.String())
 		}
 		proc.port = bound
 		proc.target = "http://localhost:" + strconv.Itoa(bound)
@@ -187,7 +203,7 @@ func (r *hostRunner) boot(key string) (string, *instance, error) {
 		if err := publishApp(r.cfg, key, proc, spec, true, authFix); err != nil {
 			proc.stop("")
 			inst.stop("")
-			return "", nil, err
+			return nil, err
 		}
 		inst.apps = append(inst.apps, proc)
 		if app.Kind == appgraph.KindAPI && extraEnv == nil {
@@ -197,10 +213,11 @@ func (r *hostRunner) boot(key string) (string, *instance, error) {
 	p := inst.primaryApp()
 	if p == nil {
 		inst.stop("")
-		return "", nil, fmt.Errorf("preview boot produced no apps")
+		return nil, fmt.Errorf("preview boot produced no apps")
 	}
 	inst.proxyURL = p.publicURL
-	return inst.proxyURL, inst, nil
+	ping(emit, "ready", "Preview is up")
+	return inst, nil
 }
 
 // Restart stops a live preview for repoURL and boots it again. A miss is a

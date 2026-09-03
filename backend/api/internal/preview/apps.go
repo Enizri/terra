@@ -34,12 +34,95 @@ type appProcess struct {
 	primary       bool
 }
 
+// AppInfo is one app in a POST /preview (or jobs/preview ready) payload.
+type AppInfo struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Kind      string `json:"kind"`
+	Framework string `json:"framework"`
+	URL       string `json:"url,omitempty"`
+	Status    string `json:"status"`
+	Reason    string `json:"reason,omitempty"`
+}
+
+// Result is the multi-app preview response. URL is the primary app, kept
+// for clients that still read only that field.
+type Result struct {
+	URL       string    `json:"url"`
+	PrimaryID string    `json:"primary_id"`
+	Apps      []AppInfo `json:"apps"`
+}
+
+// Emitter is optional boot progress (checkout → detect → install → boot → ready).
+type Emitter func(stage, label string)
+
+func ping(emit Emitter, stage, label string) {
+	if emit != nil {
+		emit(stage, label)
+	}
+}
+
+func appName(app appgraph.App) string {
+	if app.Dir != "" && app.Dir != "." {
+		return app.Dir
+	}
+	if app.Framework != "" {
+		return app.Framework
+	}
+	return app.ID
+}
+
+func snapshot(inst *instance) Result {
+	if inst == nil {
+		return Result{}
+	}
+	byID := map[string]*appProcess{}
+	for _, p := range inst.apps {
+		byID[p.id] = p
+	}
+	primaryID := inst.primaryID
+	if primaryID == "" {
+		if p := inst.primaryApp(); p != nil {
+			primaryID = p.id
+		}
+	}
+	var apps []AppInfo
+	if len(inst.graph) > 0 {
+		for _, g := range inst.graph {
+			info := AppInfo{
+				ID: g.ID, Name: appName(g), Kind: string(g.Kind),
+				Framework: g.Framework, Status: "skipped", Reason: g.Reason,
+			}
+			if p, ok := byID[g.ID]; ok && p.publicURL != "" {
+				info.URL = p.publicURL
+				info.Status = "ready"
+				info.Reason = ""
+			} else if !g.Previewable {
+				info.Status = "skipped"
+			} else {
+				info.Status = "error"
+			}
+			apps = append(apps, info)
+		}
+	} else {
+		for _, p := range inst.apps {
+			apps = append(apps, AppInfo{
+				ID: p.id, Name: p.id, Kind: string(p.kind),
+				Framework: p.framework, URL: p.publicURL, Status: "ready",
+			})
+		}
+	}
+	return Result{URL: inst.proxyURL, PrimaryID: primaryID, Apps: apps}
+}
+
 // instance is one previewed repository: every app Terra booted for it.
 type instance struct {
-	root     string
-	apps     []*appProcess
-	proxyURL string
-	timer    *time.Timer
+	root      string
+	apps      []*appProcess
+	graph     []appgraph.App
+	primaryID string
+	proxyURL  string
+	timer     *time.Timer
 }
 
 // bootWait is an in-flight Start. apps is 0 until detect finishes, then the

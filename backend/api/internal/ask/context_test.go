@@ -7,12 +7,16 @@ import (
 	"testing"
 
 	"github.com/Enizri/terra/backend/api/internal/analyzerclient"
+	"github.com/Enizri/terra/backend/api/internal/preview"
 	"github.com/Enizri/terra/backend/api/internal/scan"
 )
 
 type stubPreview struct{}
 
-func (stubPreview) Start(string) (string, error)            { return "", nil }
+func (stubPreview) Start(string) (string, error) { return "", nil }
+func (stubPreview) Boot(string, preview.Emitter) (preview.Result, error) {
+	return preview.Result{}, nil
+}
 func (stubPreview) Lookup(string) (string, string, bool)    { return "", "", false }
 func (stubPreview) ApplyPatch(string, string, string) error { return nil }
 func (stubPreview) Restart(string) error                    { return nil }

@@ -10,6 +10,7 @@ import (
 // Phase 1a: host-exec. Phase 1b: Docker sibling containers.
 type Runner interface {
 	Start(repoURL string) (proxyURL string, err error)
+	Boot(repoURL string, emit Emitter) (Result, error)
 	Lookup(repoURL string) (root, appDir string, ok bool)
 	ApplyPatch(repoURL, path, unifiedDiff string) error
 	Restart(repoURL string) error
@@ -50,6 +51,10 @@ type invalidRunner struct{ mode string }
 
 func (r invalidRunner) Start(string) (string, error) {
 	return "", fmt.Errorf("unknown TERRA_PREVIEW_MODE %q (want host or docker)", r.mode)
+}
+
+func (r invalidRunner) Boot(string, Emitter) (Result, error) {
+	return Result{}, fmt.Errorf("unknown TERRA_PREVIEW_MODE %q (want host or docker)", r.mode)
 }
 
 func (r invalidRunner) Lookup(string) (string, string, bool) { return "", "", false }

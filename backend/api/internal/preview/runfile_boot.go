@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Enizri/terra/backend/api/internal/appgraph"
 	"github.com/Enizri/terra/backend/api/internal/config"
 	"github.com/Enizri/terra/backend/api/internal/runfile"
 	"github.com/Enizri/terra/backend/api/internal/scan"
@@ -18,17 +19,19 @@ import (
 // startViaRunfile boots a repo with no frontend from its inferred Runfile —
 // a plain Go or Python service gets proxied (with select.js injected) just
 // like a dev server would. Runs outside r.mu (see hostRunner.boot).
-func (r *hostRunner) startViaRunfile(key, root string, detectErr error) (string, *instance, error) {
+func (r *hostRunner) startViaRunfile(key, root string, detectErr error, emit Emitter) (*instance, error) {
+	ping(emit, "boot", "Starting from the runfile")
 	inst, err := bootRunfile(r.cfg, key, root, detectErr)
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
 	r.trackStarting(key, inst)
 	if err := r.reserveApps(key, 1); err != nil {
 		inst.stop("")
-		return "", nil, err
+		return nil, err
 	}
-	return inst.proxyURL, inst, nil
+	ping(emit, "ready", "Preview is up")
+	return inst, nil
 }
 
 func bootRunfile(cfg *config.Config, key, root string, detectErr error) (*instance, error) {
@@ -74,7 +77,13 @@ func bootRunfile(cfg *config.Config, key, root string, detectErr error) (*instan
 		id: "app", dir: workDir(root, rf), cmd: cmd, logs: logs,
 		port: port, liveID: liveID, primary: true,
 	}
-	inst := &instance{root: root, apps: []*appProcess{proc}}
+	inst := &instance{
+		root: root, apps: []*appProcess{proc}, primaryID: "app",
+		graph: []appgraph.App{{
+			ID: "app", Dir: ".", Kind: appgraph.KindAPI,
+			Framework: rf.Source, Previewable: true,
+		}},
+	}
 	// Go services may compile first; same budget as startBackend.
 	bound, err := waitReady(port, logs, watch(cmd), 5*time.Minute)
 	if err != nil {
