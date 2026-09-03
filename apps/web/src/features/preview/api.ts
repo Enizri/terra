@@ -77,6 +77,16 @@ export async function repoReadme(repoUrl: string, signal?: AbortSignal): Promise
 }
 
 /** Stream `npm test` / `go test` from the mounted checkout. */
+export async function* previewCLIEvents(
+  repoUrl: string,
+  args: string,
+  signal?: AbortSignal,
+): AsyncGenerator<PreviewEvent> {
+  const created = await post("/jobs/preview/cli", { repo_url: repoUrl, args }, signal);
+  const { job_id } = await json<{ job_id: string }>(created, "cli");
+  yield* jobEvents<PreviewEvent>(job_id, signal);
+}
+
 export async function* previewTestEvents(
   repoUrl: string,
   signal?: AbortSignal,

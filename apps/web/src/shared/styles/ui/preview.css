@@ -143,3 +143,24 @@
   gap: 8px;
   align-items: flex-start;
 }
+
+.sh-live-pack__log--tall {
+  max-height: none;
+  flex: 1;
+}
+
+.sh-live-cli {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.sh-live-cli__in {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--sh-border, rgba(0, 0, 0, 0.16));
+  border-radius: 8px;
+  font: inherit;
+  font-size: 0.85rem;
+}
