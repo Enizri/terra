@@ -136,6 +136,38 @@ forwards `TERRA_TOKEN` from `.env` through the Vite proxy.
 inside Compose and `terra serve` refuses a non-loopback bind with an empty
 token. `make dev` (loopback) stays open.
 
+### Verifying the whole loop end to end
+
+`make check` stubs scan, analyze, and preview, so it says nothing about the
+assembled deployment. `make smoke` drives the real Compose stack instead:
+
+```sh
+TERRA_SMOKE=1 make smoke
+```
+
+It boots the stack and asserts, in order: the analyzer actually reached the
+provider; `TERRA_TOKEN` gates what it should and leaves `/healthz`, `/models`,
+`/host/capabilities` open while `GET /` sets the HttpOnly cookie; the probe gate
+spends no tokens; analyze returns a map whose components carry evidence files and
+whose API key never appears in an event or a log; the stored map survives
+`docker compose restart api` on the `terra-data` volume; ask and the read-only
+guide answer; a Node app boots in docker mode and serves HTML through `/__live/`;
+`/preview/routes` and `/preview/probe` work against it; `/preview/patch` writes,
+`/preview/restart` recovers, and a `../../` path escape is refused; and a burst
+from one address gets a 429. Knobs are in `.env.example` under "Tests only".
+
+One stage pins a known limitation rather than hiding it: `dockerable()` is false
+for Go and Python apps, so in docker mode they fall back to host-exec *inside* the
+api container, which has neither toolchain. Their preview cannot boot today, and
+the suite asserts it fails as a readable error instead of hanging.
+
+A green run is **not** a production sign-off. It does not test preview isolation
+(the container has no capability drops, no read-only root, no resource limits, and
+the api mounts the Docker socket — see [`docs/SECURITY.md`](docs/SECURITY.md)),
+concurrent load or SQLite durability under writers, or anything multi-user
+(`TERRA_TOKEN` is one shared secret). The workspace session is still lost on
+reload.
+
 **Live preview (Phase 1b):** Compose sets `TERRA_PREVIEW_MODE=docker`, mounts the
 host Docker socket, and shares checkouts via the named `terra-data` volume
 (`TERRA_CHECKOUT_VOLUME`) so Docker Desktop can mount them into siblings.
@@ -163,6 +195,7 @@ Caps: `TERRA_PREVIEW_MAX` (default 2, counting **apps** not repos), idle TTL
 | `make check` | Fixtures + Go/Python/web tests + lint (CI entry point; Python `-m 'not slow'`) |
 | `make test` | Fixtures + Go/Python/web tests |
 | `make eval` | Harness evals in `terra_analyzer/evals/` (no live LLM) |
+| `make smoke` | End-to-end run against the Compose stack (opt-in: `TERRA_SMOKE=1`) |
 | `make sync-fixtures` | Copy `case-studies/memos.map.json` → `apps/web/src/data/` |
 | `terra scan <url>` | Clone + deterministic scan, JSON to stdout |
 | `terra map <url>` | Scan, ask the analyzer for a map, store in `terra.db` |
