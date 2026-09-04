@@ -1,5 +1,5 @@
 .PHONY: run-analyzer run-server run-llm run-web build-web dev dev-api up down up-llm \
-	test test-fixtures sync-fixtures test-go test-py test-web test-integration eval \
+	test test-fixtures sync-fixtures test-go test-py test-web test-integration eval smoke \
 	lint lint-go lint-web lint-py check check-contracts fmt-go venv venv-local
 
 # One-command local stack (host processes, hot reload):
@@ -19,6 +19,7 @@
 #   make test             # fixtures + Go/Python/web tests (no lint)
 #   make eval             # programmatic harness evals (no live LLM)
 #   make test-integration # opt-in live GitHub + live LLM (needs env + services)
+#   make smoke            # opt-in end-to-end run against the Compose stack
 
 VENV := backend/.venv
 GOIMPORTS := $(shell go env GOPATH)/bin/goimports
@@ -119,3 +120,9 @@ test-web:
 # TERRA_LIVE / TERRA_SLOW knobs (see README).
 test-integration:
 	./scripts/test-integration.sh
+
+# Full loop against the production-shaped Compose stack: boot, auth gate, probe
+# gate, analyze, restart persistence, ask, docker-mode preview, editor writes,
+# rate limit. Opt-in: it builds images, fetches repos, and spends tokens.
+smoke:
+	./scripts/smoke.sh
