@@ -101,6 +101,28 @@ test("FAQ sits above the sticky globe layer as a positioned stacking context", (
   assert.match(scale, /radial-gradient\(#00000021 1px/);
 });
 
+test("the FAQ-to-footer flight does not keep a still globe at display rate", () => {
+  // `dockInView` / "opacity > 0" pinned a rAF loop from the questions down,
+  // so every pointer composite re-blended the flight. A docked globe parks;
+  // scroll and drag wake it. CSS filters on the WebGL canvas did the same
+  // job as the glow and are gone — drop-shadow on that sheet was the jank.
+  assert.doesNotMatch(journeySource, /dockInView/);
+  assert.match(journeySource, /easing \|\| progress < 1/);
+  assert.match(journeySource, /classList.toggle\("is-lit", cleanActive\)/);
+  assert.doesNotMatch(css, /is-clean-flight \.gx-journey__sphere \{[\s\S]*?filter:/);
+  assert.doesNotMatch(css, /drop-shadow\(0 0 130px/);
+  const footerCss = readFileSync(
+    path.join(import.meta.dirname, "styles/faq-footer.css"),
+    "utf8",
+  );
+  assert.match(footerCss, /\.terra-finale__sun\.is-lit \.terra-finale__sky/);
+  assert.doesNotMatch(
+    footerCss,
+    /\.terra-finale__sun \.terra-finale__sky \{\s*filter:/,
+  );
+  assert.doesNotMatch(footerCss, /\.terra-finale__glow \{[\s\S]*?will-change:/);
+});
+
 test("reload plays the character bloom before the globe settles", () => {
   assert.match(journeySource, /let globeT = 0/);
   assert.match(journeySource, /globeT \+= dt \* globeJourneyClockRate\(progress\)/);

@@ -384,7 +384,10 @@
   );
 }
 
-.terra-finale__sun .terra-finale__sky {
+/* Blur only while the disc is lit. A 72px filter on a full-card photo is
+   cheap as a still layer and ruinous if it is rasterized from the first
+   paint, including while the FAQ is on screen and the sun is still opacity 0. */
+.terra-finale__sun.is-lit .terra-finale__sky {
   filter: blur(clamp(36px, 4.6vw, 72px));
   transform: scale(1.16);
   transform-origin: var(--sun-x, 42%) var(--sun-y, 42%);
@@ -408,7 +411,6 @@
     transparent 78%
   );
   mix-blend-mode: screen;
-  will-change: transform, width, height;
   pointer-events: none;
 }
 

@@ -42,6 +42,26 @@ const MAP_FILL = 0.72;
 const GRAB_UNTIL = 0.03;
 /** Matches `.terra-finale__floor` so the clip and the card share a corner. */
 const FINALE_RADIUS = 24;
+/** Easing leftover smaller than this is a still frame — park the loop. */
+const SETTLE = 0.0008;
+
+/** Skip writes that would only dirty a filtered/masked compositor layer. */
+function setCss(el: HTMLElement | null, prop: string, value: string) {
+  if (!el) return;
+  if (el.style.getPropertyValue(prop) === value) return;
+  if (value) el.style.setProperty(prop, value);
+  else el.style.removeProperty(prop);
+}
+
+function setDim(
+  el: HTMLElement | null,
+  prop: "width" | "height" | "opacity" | "transform" | "objectPosition",
+  value: string,
+) {
+  if (!el) return;
+  if (el.style[prop] === value) return;
+  el.style[prop] = value;
+}
 
 /** One canvas owns the globe from the hero through its entry into the screen. */
 export function GlobeJourney({ children }: { children: ReactNode }) {
@@ -63,6 +83,15 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
     const renderer = createGlobeRenderer(canvas);
     if (!renderer || renderer === "lost") return;
     let sphereRenderer: CelestialGlobeRenderer | null = null;
+    const screen = root.querySelector<HTMLElement>(
+      ".sh-power-theater__screen .sh-window",
+    );
+    const dock = root.querySelector<HTMLElement>(".gx-journey__footer-dock");
+    const glow = root.querySelector<HTMLElement>(".terra-finale__glow");
+    const sun = root.querySelector<HTMLElement>(".terra-finale__sun");
+    const fore = root.querySelector<HTMLElement>(".terra-finale__fore");
+    const haze = root.querySelector<HTMLElement>(".terra-finale__haze");
+    const skies = root.querySelectorAll<HTMLElement>(".terra-finale__sky");
 
     let disposed = false;
     let frame = 0;
@@ -92,18 +121,10 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
     let grabCenterY = 0;
 
     const draw = (dt: number) => {
-      if (disposed || width <= 0 || height <= 0) return 1;
+      if (disposed || width <= 0 || height <= 0) return false;
       const rootRect = root.getBoundingClientRect();
-      if (rootRect.bottom < 0 || rootRect.top > height) return 1;
-      const screen = root.querySelector<HTMLElement>(
-        ".sh-power-theater__screen .sh-window",
-      );
-      const dock = root.querySelector<HTMLElement>(".gx-journey__footer-dock");
-      const glow = root.querySelector<HTMLElement>(".terra-finale__glow");
-      const sun = root.querySelector<HTMLElement>(".terra-finale__sun");
-      const fore = root.querySelector<HTMLElement>(".terra-finale__fore");
-      const haze = root.querySelector<HTMLElement>(".terra-finale__haze");
-      if (!screen || !dock) return 1;
+      if (rootRect.bottom < 0 || rootRect.top > height) return false;
+      if (!screen || !dock) return false;
 
       const canvasRect = canvas.getBoundingClientRect();
       const screenRect = screen.getBoundingClientRect();
@@ -160,10 +181,14 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
       const centerX = startX + (targetX - startX) * travel;
       const centerY = startY + (targetY - startY) * travel;
       const discFade = 1 - globeJourneyInk(progress);
-      backdrop.style.width = `${size}px`;
-      backdrop.style.height = `${size}px`;
-      backdrop.style.opacity = String(discFade);
-      backdrop.style.transform = `translate3d(${centerX - size / 2}px, ${centerY - size / 2}px, 0)`;
+      setDim(backdrop, "width", `${size}px`);
+      setDim(backdrop, "height", `${size}px`);
+      setDim(backdrop, "opacity", String(discFade));
+      setDim(
+        backdrop,
+        "transform",
+        `translate3d(${centerX - size / 2}px, ${centerY - size / 2}px, 0)`,
+      );
       if (!reduceMotion && shownCleanProgress > 0 && !dragging) cleanT += dt;
       const fit = finaleGlobeFit(dockRect, canvasRect);
       const cleanOpacity = cleanGlobeJourneyOpacity(shownCleanProgress);
@@ -194,56 +219,49 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
       const cleanY = fit.y + toss.y;
       const sticky = sphereCanvas.parentElement;
       sticky?.classList.toggle("is-clean-flight", cleanActive);
-      if (sticky) {
-        sticky.style.setProperty(
-          "clip-path",
-          cleanActive ? clipRectToViewport(dockRect, canvasRect, FINALE_RADIUS) : "",
-        );
-      }
+      setCss(
+        sticky,
+        "clip-path",
+        cleanActive ? clipRectToViewport(dockRect, canvasRect, FINALE_RADIUS) : "",
+      );
       // The photo's crop is solved in one place and handed to both copies of
       // the <img>, so the picture and the globe can never drift apart.
       const focus = `${(fit.focusX * 100).toFixed(3)}% ${(fit.focusY * 100).toFixed(3)}%`;
-      for (const sky of root.querySelectorAll<HTMLElement>(".terra-finale__sky")) {
-        sky.style.objectPosition = focus;
-      }
-      if (fore) {
-        fore.style.setProperty("--fore-cut", `${fit.ridge}px`);
-        fore.style.setProperty("--fore-fade", `${fit.ridgeFade}px`);
-      }
-      if (haze) {
-        haze.style.setProperty(
-          "--gx",
-          `${cleanX + canvasRect.left - dockRect.left}px`,
-        );
-        haze.style.setProperty(
-          "--gy",
-          `${cleanY + canvasRect.top - dockRect.top}px`,
-        );
-        haze.style.setProperty("--gd", `${cleanDiameter * FINALE_HAZE_SPREAD}px`);
-        haze.style.opacity = String(cleanActive ? cleanOpacity : 0);
-      }
-      if (sun) {
-        // Stay on the painted sun: the disc is the out-of-focus backdrop
-        // sitting behind the mesh.
-        const sunX = fit.x + canvasRect.left - dockRect.left;
-        const sunY = fit.y + canvasRect.top - dockRect.top;
-        sun.style.setProperty("--sun-x", `${sunX}px`);
-        sun.style.setProperty("--sun-y", `${sunY}px`);
-        sun.style.setProperty(
-          "--sun-r",
-          `${fit.diameter * FINALE_SUN_BLUR_RADIUS}px`,
-        );
-        sun.style.opacity = String(cleanActive ? cleanOpacity : 0);
-      }
-      if (glow) {
-        // The sky is lit by the sphere, so the spill tracks it frame by frame.
-        glow.style.width = `${cleanDiameter * 2.6}px`;
-        glow.style.height = `${cleanDiameter * 2.6}px`;
-        glow.style.opacity = String(cleanActive ? cleanOpacity : 0);
-        glow.style.transform = `translate3d(${
+      for (const sky of skies) setDim(sky, "objectPosition", focus);
+      setCss(fore, "--fore-cut", `${fit.ridge}px`);
+      setCss(fore, "--fore-fade", `${fit.ridgeFade}px`);
+      setCss(
+        haze,
+        "--gx",
+        `${cleanX + canvasRect.left - dockRect.left}px`,
+      );
+      setCss(
+        haze,
+        "--gy",
+        `${cleanY + canvasRect.top - dockRect.top}px`,
+      );
+      setCss(haze, "--gd", `${cleanDiameter * FINALE_HAZE_SPREAD}px`);
+      setDim(haze, "opacity", String(cleanActive ? cleanOpacity : 0));
+      // Stay on the painted sun: the disc is the out-of-focus backdrop
+      // sitting behind the mesh. `is-lit` is what arms the 72px blur.
+      const sunX = fit.x + canvasRect.left - dockRect.left;
+      const sunY = fit.y + canvasRect.top - dockRect.top;
+      setCss(sun, "--sun-x", `${sunX}px`);
+      setCss(sun, "--sun-y", `${sunY}px`);
+      setCss(sun, "--sun-r", `${fit.diameter * FINALE_SUN_BLUR_RADIUS}px`);
+      setDim(sun, "opacity", String(cleanActive ? cleanOpacity : 0));
+      sun?.classList.toggle("is-lit", cleanActive);
+      // The sky is lit by the sphere, so the spill tracks it when it moves.
+      setDim(glow, "width", `${cleanDiameter * 2.6}px`);
+      setDim(glow, "height", `${cleanDiameter * 2.6}px`);
+      setDim(glow, "opacity", String(cleanActive ? cleanOpacity : 0));
+      setDim(
+        glow,
+        "transform",
+        `translate3d(${
           cleanX + canvasRect.left - dockRect.left - cleanDiameter * 1.3
-        }px, ${cleanY + canvasRect.top - dockRect.top - cleanDiameter * 1.3}px, 0)`;
-      }
+        }px, ${cleanY + canvasRect.top - dockRect.top - cleanDiameter * 1.3}px, 0)`,
+      );
       sphereRenderer?.render({
         width,
         height,
@@ -270,21 +288,33 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
         grabRadius = cleanDiameter / 2;
         grabCenterX = canvasRect.left + cleanX;
         grabCenterY = canvasRect.top + cleanY;
-        pad.style.width = `${cleanDiameter}px`;
-        pad.style.height = `${cleanDiameter}px`;
-        pad.style.transform =
-          `translate3d(${cleanX - cleanDiameter / 2}px, ${cleanY - cleanDiameter / 2}px, 0)`;
+        setDim(pad, "width", `${cleanDiameter}px`);
+        setDim(pad, "height", `${cleanDiameter}px`);
+        setDim(
+          pad,
+          "transform",
+          `translate3d(${cleanX - cleanDiameter / 2}px, ${cleanY - cleanDiameter / 2}px, 0)`,
+        );
       } else {
         grabRadius = size / 2;
         grabCenterX = canvasRect.left + centerX;
         grabCenterY = canvasRect.top + centerY;
-        pad.style.width = `${size}px`;
-        pad.style.height = `${size}px`;
-        pad.style.transform =
-          `translate3d(${centerX - size / 2}px, ${centerY - size / 2}px, 0)`;
+        setDim(pad, "width", `${size}px`);
+        setDim(pad, "height", `${size}px`);
+        setDim(
+          pad,
+          "transform",
+          `translate3d(${centerX - size / 2}px, ${centerY - size / 2}px, 0)`,
+        );
       }
       pad.classList.toggle("is-grabbable", finaleGrab || progress < GRAB_UNTIL);
-      return Math.min(progress, shownCleanProgress);
+      // A still docked globe is a still frame. Sitting on the FAQ used to
+      // keep this loop at display rate, so every pointer composite
+      // re-blended the flight. Scroll, drag, and an unfinished ease wake it.
+      const easing =
+        Math.abs(shownProgress - targetProgress) > SETTLE ||
+        Math.abs(shownCleanProgress - targetCleanProgress) > SETTLE;
+      return dragging || spinning || tossing || easing || progress < 1;
     };
 
     const tick = (now: number) => {
@@ -292,24 +322,7 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
       if (disposed || document.hidden) return;
       const dt = last ? Math.min(0.05, (now - last) / 1000) : 1 / 60;
       last = now;
-      const progress = draw(dt);
-      const dockNow = root.querySelector(".gx-journey__footer-dock");
-      const dockBox = dockNow?.getBoundingClientRect();
-      const dockInView = Boolean(
-        dockBox && dockBox.bottom > 0 && dockBox.top < (height || window.innerHeight),
-      );
-      if (
-        !reduceMotion &&
-        (progress < 1 ||
-          dragging ||
-          spinning ||
-          tossing ||
-          dockInView ||
-          shownCleanProgress < 1 ||
-          cleanGlobeJourneyOpacity(shownCleanProgress) > 0)
-      ) {
-        frame = requestAnimationFrame(tick);
-      }
+      if (!reduceMotion && draw(dt)) frame = requestAnimationFrame(tick);
     };
     const play = () => {
       if (disposed || document.hidden) return;

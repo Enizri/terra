@@ -61,6 +61,7 @@ export async function createCelestialGlobeRenderer(
   let loaded = false;
   let modelDiameter = 1;
   let lastOpacity = -1;
+  let lastFrame = "";
   const materials: MeshStandardMaterial[] = [];
 
   new GLTFLoader().load(
@@ -118,6 +119,7 @@ export async function createCelestialGlobeRenderer(
 
   return {
     resize(width, height, dpr) {
+      lastFrame = "";
       renderer.setPixelRatio(Math.min(1.5, dpr));
       renderer.setSize(width, height, false);
       camera.left = -width / 2;
@@ -127,6 +129,20 @@ export async function createCelestialGlobeRenderer(
       camera.updateProjectionMatrix();
     },
     render(frame) {
+      const next = [
+        frame.width,
+        frame.height,
+        frame.diameter,
+        frame.x,
+        frame.y,
+        frame.yaw,
+        frame.pitch,
+        frame.spin,
+        frame.opacity,
+        frame.hallLight ?? 0,
+      ].join(",");
+      if (next === lastFrame) return;
+      lastFrame = next;
       renderer.clear();
       if (!loaded || frame.opacity <= 0) return;
       globe.position.set(frame.x - frame.width / 2, frame.height / 2 - frame.y, 0);

@@ -365,17 +365,11 @@
   background: transparent;
 }
 
-/* Atmospheric perspective. Hung in the night sky the sphere is far away and
-   behind a landscape's worth of lit air, so it loses contrast and edge before
-   the foreground does: softened, desaturated and pulled toward the orb's
-   amber, and it throws a real halo because it is the scene's light source.
-   Anything sharper reads as a render pasted on the photo. The hero globe on
-   paper stays neutral — only the flight is graded. */
-.gx-journey__sticky.is-clean-flight .gx-journey__sphere {
-  filter: blur(0.7px) contrast(0.86) saturate(0.9) brightness(0.96)
-    sepia(0.18) drop-shadow(0 0 48px rgba(255, 168, 76, 0.5))
-    drop-shadow(0 0 130px rgba(255, 132, 40, 0.3));
-}
+/* No CSS filter on the WebGL canvas. blur + drop-shadow here re-rasterized
+   the whole sticky sheet on every pointer composite once the FAQ-to-footer
+   flight armed, which is why the custom cursor felt like low fps from the
+   questions down. The amber grade is the renderer's hall light; the halo is
+   `.terra-finale__glow`. */
 
 .gx-journey__canvas {
   z-index: 2;
