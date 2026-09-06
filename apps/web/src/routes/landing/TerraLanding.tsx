@@ -15,14 +15,17 @@ import { PowerSection } from "./sections/PowerSection";
 import { Faq } from "./sections/Faq";
 import { Final } from "./sections/Final";
 
-const SMOOTH_SCROLL_EASE = 0.12;
+const SMOOTH_SCROLL_EASE = 0.18;
 /** Anchor glides are a ride, not a jump: gentler pull than the wheel's. */
 const ANCHOR_EASE = 0.07;
 /** How fast the glide's pull comes up from nothing, so it eases in as well as
  *  out instead of launching at full speed. */
 const ANCHOR_RAMP = 0.07;
-/** Wheel delta multiplier — under 1 so one flick covers less ground. */
-const SMOOTH_SCROLL_GAIN = 0.24;
+/** Wheel delta multiplier — under 1 so one flick covers less ground, but not
+ *  so far under that the page reads as sluggish. At 0.24 a flick travelled a
+ *  quarter of its native distance over a third of a second, which is felt as
+ *  the site being slow rather than as smoothing. */
+const SMOOTH_SCROLL_GAIN = 0.7;
 /** A "line" of wheel delta (deltaMode 1) in px. */
 const WHEEL_LINE_PX = 16;
 
