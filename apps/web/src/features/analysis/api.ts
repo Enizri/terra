@@ -36,8 +36,9 @@ export type AnalyzeEvent = {
   recommendation?: Recommendation;
 };
 
-/** What the picker needs before the gate can render. */
-export type ModelChoice = { modelId: string; apiKey?: string };
+/** What the picker needs before the gate can render. `provider` is not sent
+ * on the wire — it is how a remembered choice finds its stored key again. */
+export type ModelChoice = { modelId: string; apiKey?: string; provider?: string };
 
 /** Cheap first half: fetch, scan, recommend a model. No LLM call, no gate
  * decision — the caller shows the recommendation and waits for the user. */

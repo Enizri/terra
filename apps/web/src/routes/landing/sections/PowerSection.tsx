@@ -18,17 +18,20 @@ function OpsPreview({
   chatHints,
   designMode = false,
   demoReplica,
+  zoomOut = false,
 }: {
   chatHints?: readonly string[];
   designMode?: boolean;
   demoReplica: "home" | "explore";
+  /** Read the replica from a step back — see `.sh-theater__panel--zoom`. */
+  zoomOut?: boolean;
 }) {
   const web = diagramNodes.find((n) => n.id === "web")!;
   return (
     <TheaterPanel
       node={web}
       onClose={() => {}}
-      className="sh-theater__panel--inline"
+      className={`sh-theater__panel--inline${zoomOut ? " sh-theater__panel--zoom" : ""}`}
       chatHints={chatHints}
       designMode={designMode}
       demoReplica={demoReplica}
@@ -123,7 +126,7 @@ function OpsStage({
     <motion.div className="sh-ops" variants={rise}>
       <div className="sh-ops__frame">
         <div className="sh-ops__state">
-          {pane("ask", <OpsPreview chatHints={ASK_HINTS} demoReplica="home" />)}
+          {pane("ask", <OpsPreview chatHints={ASK_HINTS} demoReplica="home" zoomOut />)}
           {pane(
             "implement",
             <OpsPreview chatHints={IMPLEMENT_HINTS} designMode demoReplica="explore" />,

@@ -3,6 +3,18 @@
 from ...contracts import Draft, ScanResult
 from .schema import IMPORTANCE_VALUES, TYPE_VALUES
 
+# The map is drawn as three columns, and a card is only ever nested inside a
+# parent from its own column. A child the model filed under another column is
+# therefore invisible on the diagram, so it is repaired to top-level here.
+COLUMN = {
+    "frontend": "client",
+    "mobile": "client",
+    "desktop": "client",
+    "backend": "work",
+    "infrastructure": "work",
+    "database": "storage",
+}
+
 
 def known_paths(res: ScanResult) -> set[str]:
     """Real scan files and dirs — used to reject invented paths."""
@@ -51,6 +63,7 @@ def validate(draft: Draft, known: set[str], strict: bool) -> tuple[list[str], li
     draft.components = kept
 
     # parent_id must resolve against survivors only.
+    type_of = {component.id: component.type for component in draft.components}
     for component in draft.components:
         if component.parent_id is None or not component.parent_id.strip():
             # Infer parent from dotted id when model left parent_id blank.
@@ -66,8 +79,26 @@ def validate(draft: Draft, known: set[str], strict: bool) -> tuple[list[str], li
         elif parent not in seen:
             issues.append(f'component "{component.id}" has parent "{parent}", which is not a component; made top-level')
             component.parent_id = None
+        elif COLUMN.get(type_of[parent]) != COLUMN.get(component.type):
+            issues.append(
+                f'component "{component.id}" ({component.type}) has parent "{parent}" '
+                f'({type_of[parent]}); nest a component only inside one of its own kind, '
+                f"or leave parent_id null — made top-level"
+            )
+            component.parent_id = None
         else:
             component.parent_id = parent
+
+    # A hierarchy that leaves one card is a map nobody can read: the diagram
+    # draws top-level components, so everything else vanishes.
+    if len(draft.components) > 1 and sum(c.parent_id is None for c in draft.components) < 2:
+        issues.append(
+            "every component is nested under one parent, so the map would draw a "
+            "single card; leave parent_id null unless a component is genuinely "
+            "part of another"
+        )
+        for component in draft.components:
+            component.parent_id = None
 
     rels = []
     for relationship in draft.relationships:

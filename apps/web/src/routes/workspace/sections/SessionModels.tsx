@@ -57,7 +57,7 @@ export function SessionModels({
       setPendingKey(entry);
       return;
     }
-    onChoose({ modelId: entry.id, apiKey: stored || undefined });
+    onChoose({ modelId: entry.id, apiKey: stored || undefined, provider: entry.provider });
     setOpen(false);
   };
 
@@ -90,7 +90,7 @@ export function SessionModels({
             setApiKey(pendingKey.provider ?? "", key);
             const entry = pendingKey;
             setPendingKey(null);
-            onChoose({ modelId: entry.id, apiKey: key });
+            onChoose({ modelId: entry.id, apiKey: key, provider: entry.provider });
             setOpen(false);
           }}
           onCancel={() => setPendingKey(null)}

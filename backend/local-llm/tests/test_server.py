@@ -208,10 +208,10 @@ def test_model_id_must_name_a_gguf_file():
         local._split_model_id("Qwen/Qwen2.5-0.5B-Instruct")
 
 
-def test_n_gpu_layers_defaults_to_laptop_sweet_spot(monkeypatch):
+def test_n_gpu_layers_defaults_to_the_whole_accelerator(monkeypatch):
     monkeypatch.delenv("TERRA_N_GPU_LAYERS", raising=False)
-    assert local.n_gpu_layers_for("mps") == local._DEFAULT_GPU_LAYERS
-    assert local.n_gpu_layers_for("cuda") == local._DEFAULT_GPU_LAYERS
+    assert local.n_gpu_layers_for("mps") == -1
+    assert local.n_gpu_layers_for("cuda") == -1
     assert local.n_gpu_layers_for("cpu") == 0
 
 
@@ -222,6 +222,17 @@ def test_n_gpu_layers_env_overrides_default(monkeypatch):
     assert local.n_gpu_layers_for("cuda") == 0
 
 
+def test_offload_plan_steps_down_from_the_whole_accelerator(monkeypatch):
+    monkeypatch.delenv("TERRA_N_GPU_LAYERS", raising=False)
+    assert local.offload_plan("cuda") == local.GPU_LAYER_STEPS
+    assert local.offload_plan("cpu") == (0,)
+
+
+def test_offload_plan_honours_an_explicit_split(monkeypatch):
+    monkeypatch.setenv("TERRA_N_GPU_LAYERS", "8")
+    assert local.offload_plan("cuda") == (8,)
+
+
 def test_load_model_installs_its_weights(monkeypatch):
     _fake_backends(monkeypatch)
     assert local.load_model(GOOD, gen=local.state.load_gen) is True
@@ -229,26 +240,44 @@ def test_load_model_installs_its_weights(monkeypatch):
     assert local.state.loaded is True
 
 
-def test_load_model_uses_partial_gpu_offload_on_metal(monkeypatch):
-    seen = {}
+def _capture_llama(monkeypatch, device, fail_until=0):
+    """Install fake backends and return the kwargs of each Llama attempt."""
+    attempts = []
 
     def capture(repo, filename, **_kw):
         return f"/fake/{repo}/{filename}"
 
     class FakeLlama:
         def __init__(self, model_path, **kw):
-            seen.update(kw)
+            attempts.append(kw)
+            if len(attempts) <= fail_until:
+                raise RuntimeError("not enough device memory")
             self.model_path = model_path
 
     monkeypatch.setitem(sys.modules, "huggingface_hub",
                         types.SimpleNamespace(hf_hub_download=capture))
     monkeypatch.setitem(sys.modules, "llama_cpp", types.SimpleNamespace(Llama=FakeLlama))
-    monkeypatch.setattr(local, "pick_device", lambda _requested="": "mps")
+    monkeypatch.setattr(local, "pick_device", lambda _requested="": device)
     monkeypatch.delenv("TERRA_N_GPU_LAYERS", raising=False)
+    return attempts
 
+
+def test_load_model_offloads_every_layer_on_metal(monkeypatch):
+    attempts = _capture_llama(monkeypatch, "mps")
     assert local.load_model(GOOD, gen=local.state.load_gen) is True
-    assert seen["n_gpu_layers"] == local._DEFAULT_GPU_LAYERS
-    assert seen["n_gpu_layers"] != -1
+    assert [a["n_gpu_layers"] for a in attempts] == [-1]
+
+
+def test_load_model_steps_down_when_the_card_is_too_small(monkeypatch):
+    attempts = _capture_llama(monkeypatch, "cuda", fail_until=1)
+    assert local.load_model(GOOD, gen=local.state.load_gen) is True
+    assert [a["n_gpu_layers"] for a in attempts] == [-1, 16]
+
+
+def test_load_model_reports_the_failure_when_even_the_cpu_load_fails(monkeypatch):
+    _capture_llama(monkeypatch, "cuda", fail_until=len(local.GPU_LAYER_STEPS))
+    with pytest.raises(RuntimeError, match="device memory"):
+        local.load_model(GOOD, gen=local.state.load_gen)
 
 
 def test_load_model_gives_up_when_cancelled_during_the_download(monkeypatch):

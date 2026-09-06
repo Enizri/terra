@@ -29,6 +29,9 @@ export {
   apiKeyStorageKey,
   clearApiKey,
   getApiKey,
+  getModelChoice,
   isAuthFailure,
   setApiKey,
+  setModelChoice,
+  type StoredChoice,
 } from "./modelKeys.ts";

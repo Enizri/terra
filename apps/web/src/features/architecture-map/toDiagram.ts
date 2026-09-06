@@ -47,10 +47,24 @@ function dirOf(component: Component): string {
   return parts.length > 1 ? `${parts[0]}/` : first;
 }
 
+/** Components this diagram draws as cards.
+ *
+ * Nesting only reads as nesting inside one column, so a child the map filed
+ * under another column (a database under the web app, say) is promoted rather
+ * than dropped. And a hierarchy that leaves fewer than two roots is flattened
+ * outright: one card is not a map of anything.
+ */
+export function topLevel(components: Component[]): Component[] {
+  const byId = new Map(components.map((c) => [c.id, c]));
+  const roots = components.filter((c) => {
+    const parent = c.parent_id ? byId.get(c.parent_id) : undefined;
+    return !parent || parent.id === c.id || COL[parent.type] !== COL[c.type];
+  });
+  return roots.length < 2 && components.length > 1 ? components : roots;
+}
+
 export function toDiagram(map: TerraMap, opts: { all?: boolean } = {}): DiagramView {
-  const ids = new Set(map.components.map((c) => c.id));
-  // Unresolved parent_id → top-level (same as layoutMap).
-  const top = map.components.filter((c) => !c.parent_id || !ids.has(c.parent_id));
+  const top = topLevel(map.components);
 
   const perCol = opts.all ? MAX_PER_COL_ALL : MAX_PER_COL;
   const total = opts.all ? Infinity : MAX_NODES;

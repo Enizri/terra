@@ -28,8 +28,11 @@ N_THREADS = int(os.environ.get("TERRA_N_THREADS") or 0) or max(
     1, (os.cpu_count() or 4) // 2
 )
 
-# Partial GPU offload. Override with TERRA_N_GPU_LAYERS (-1 = all, 0 = CPU).
-_DEFAULT_GPU_LAYERS = 16
+# Offloads tried in order on a GPU host, best first (-1 = every layer, 0 = CPU).
+# A 3B map generation runs about 5x faster fully offloaded than on the partial
+# 16-layer split this used to default to; the smaller steps are the fallback for
+# weights that will not fit beside whatever else is on the card.
+GPU_LAYER_STEPS = (-1, 16, 0)
 
 
 class _State:
@@ -76,14 +79,32 @@ def pick_device(requested: str = "") -> str:
     return "cpu"
 
 
-def n_gpu_layers_for(device: str) -> int:
-    """Layers to offload: 0 = CPU, -1 = all, else TERRA_N_GPU_LAYERS or the default."""
+def _requested_gpu_layers() -> int | None:
+    """TERRA_N_GPU_LAYERS, or None when the operator left the split to us."""
     raw = os.environ.get("TERRA_N_GPU_LAYERS")
-    if raw is not None and str(raw).strip() != "":
-        return int(raw)
+    if raw is None or str(raw).strip() == "":
+        return None
+    return int(raw)
+
+
+def n_gpu_layers_for(device: str) -> int:
+    """Layers to offload first: 0 = CPU, -1 = all, else TERRA_N_GPU_LAYERS."""
+    requested = _requested_gpu_layers()
+    if requested is not None:
+        return requested
     if device in ("mps", "metal", "cuda"):
-        return _DEFAULT_GPU_LAYERS
+        return GPU_LAYER_STEPS[0]
     return 0
+
+
+def offload_plan(device: str) -> tuple[int, ...]:
+    """Offloads to try in order. An explicit TERRA_N_GPU_LAYERS is used alone:
+    the operator asked for that split and a silent step down would hide why the
+    machine is slow."""
+    first = n_gpu_layers_for(device)
+    if _requested_gpu_layers() is not None or first == 0:
+        return (first,)
+    return tuple(dict.fromkeys((first, *GPU_LAYER_STEPS)))
 
 
 def _split_model_id(model_id: str) -> tuple[str, str]:
@@ -110,20 +131,34 @@ def load_model(model_id: str = "", device: str = "", gen: int | None = None) -> 
     model_id = model_id or os.environ.get("TERRA_MODEL") or DEFAULT_MODEL
     repo, filename = _split_model_id(model_id)
     device = pick_device(device)
-    layers = n_gpu_layers_for(device)
 
     path = hf_hub_download(repo, filename)
     if gen is not None and gen != state.load_gen:  # cancelled during download
         return False
 
-    model = Llama(
-        model_path=path,
-        n_ctx=N_CTX,
-        n_gpu_layers=layers,
-        n_threads=N_THREADS,
-        n_threads_batch=N_THREADS,
-        verbose=False,
-    )
+    model = None
+    plan = offload_plan(device)
+    for index, layers in enumerate(plan):
+        try:
+            model = Llama(
+                model_path=path,
+                n_ctx=N_CTX,
+                n_gpu_layers=layers,
+                n_threads=N_THREADS,
+                n_threads_batch=N_THREADS,
+                verbose=False,
+            )
+            break
+        # Out of VRAM surfaces differently per backend, so catch the lot.
+        except Exception as e:
+            if index == len(plan) - 1:
+                raise
+            print(
+                f"load: {layers} GPU layers failed ({e}); retrying with {plan[index + 1]}",
+                file=sys.stderr,
+            )
+    if model is None:  # pragma: no cover — the loop either breaks or raises
+        raise RuntimeError(f"could not load {model_id}")
 
     with state_lock:
         if gen is not None and gen != state.load_gen:

@@ -8,6 +8,7 @@ from typing import Any
 
 from ...inference.client import preflight
 from ...inference.config import Config
+from ...retrieve import format_hits, retrieve
 from ...roles.guide import SYSTEM_PROMPT, TOOLS
 from ...runtime import DEFAULT_MAX_TURNS, PolicyError, iter_loop
 from ...tools import GUIDE_TOOLS, lookup_component, read_snippet, retrieve_files
@@ -34,9 +35,16 @@ def _user_content(inp: AgentInput) -> str:
         parts.append("Selected component:\n" + json.dumps(inp.selection, indent=2))
     if inp.file_snippet:
         parts.append("Source snippet:\n```\n" + str(inp.file_snippet) + "\n```")
+    elif inp.map is not None:
+        # Seed the first turn with the same ranked map context `qa` gets. A
+        # local model that never reaches for a tool still has to answer from
+        # this repository rather than from nothing.
+        block = format_hits(retrieve(inp.question, inp.map, inp.selection, inp.selections))
+        if block:
+            parts.append("Retrieved context:\n" + block)
     parts.append(
         "Use lookup_component, retrieve_files, and read_snippet when you need "
-        "map or file context. Answer from evidence. Do not invent paths."
+        "more map or file context. Answer from evidence. Do not invent paths."
     )
     return "\n\n".join(parts)
 

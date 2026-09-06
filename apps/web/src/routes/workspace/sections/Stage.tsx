@@ -72,7 +72,7 @@ export function DropStage({
         <ModelGate
           recommendation={recommendation}
           onContinue={(modelId, apiKey, provider) => {
-            onModel({ modelId, apiKey });
+            onModel({ modelId, apiKey, provider });
             proceed(modelId, apiKey, provider);
           }}
           onCancel={cancel}

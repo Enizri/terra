@@ -115,7 +115,7 @@ export function useAnalyze() {
 
       // The choice is the session's model: Ask reuses it.
       gateRef.current = recommendation;
-      wsCache.selectedModel = { modelId, apiKey };
+      wsCache.selectedModel = { modelId, apiKey, provider };
       setRecommendation(null);
       setError(null);
       setElapsed(0);

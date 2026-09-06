@@ -72,5 +72,10 @@ test("a model that needs a key is closed until one is saved locally", async () =
   fireEvent.click(screen.getByRole("button", { name: /Save API key locally/ }));
 
   expect(localStorage.getItem("terra_key_openai")).toBe("sk-local");
-  expect(onChoose).toHaveBeenCalledWith({ modelId: "remote-a", apiKey: "sk-local" });
+  expect(onChoose).toHaveBeenCalledWith({
+    modelId: "remote-a",
+    apiKey: "sk-local",
+    // The provider rides along so a remembered choice can find this key again.
+    provider: "openai",
+  });
 });

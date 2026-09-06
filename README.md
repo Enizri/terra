@@ -215,7 +215,7 @@ Caps: `TERRA_PREVIEW_MAX` (default 2, counting **apps** not repos), idle TTL
 | `TERRA_ANALYZE_CONCURRENCY` | Go | `4` | Max analyze jobs in flight; extra requests get 429 |
 | `TERRA_MODEL` | analyzer + local LLM | `Qwen/Qwen2.5-0.5B-Instruct-GGUF/qwen2.5-0.5b-instruct-q4_k_m.gguf` | GGUF quant as `<hf-repo>/<file>.gguf` |
 | `TERRA_N_CTX` | local LLM | `18432` | Context window; must clear the largest prompt plus 4096 output tokens |
-| `TERRA_N_GPU_LAYERS` | local LLM | `16` on GPU/Metal, `0` on CPU | Layers offloaded to the accelerator (`-1` = all, hottest) |
+| `TERRA_N_GPU_LAYERS` | local LLM | `-1` (all) on GPU/Metal, `0` on CPU | Layers offloaded to the accelerator; unset, the server falls back to 16 then CPU if the weights do not fit |
 | `TERRA_TOKEN` | Go + analyzer | _(empty)_ | Shared secret; empty leaves API open (local-only). Analyzer sends it on `GET /files` and preview write routes |
 | `TERRA_PREVIEW_MODE` | Go | _(empty)_ = host | `docker` for Compose sibling previews |
 | `TERRA_CHECKOUT_DIR` | Go | user cache | Shared checkout root (Compose: `/data/checkouts`) |

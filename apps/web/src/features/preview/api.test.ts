@@ -50,7 +50,7 @@ test("previewEvents posts /jobs/preview and drives from job events", async () =>
 
 test("previewTestEvents posts /jobs/preview/test", async () => {
   const original = globalThis.fetch;
-  globalThis.fetch = async (input: string | URL | Request, init?: RequestInit) => {
+  globalThis.fetch = async (input: string | URL | Request, _init?: RequestInit) => {
     const url = String(input);
     if (url === "/jobs/preview/test") {
       return new Response(JSON.stringify({ job_id: "job-test" }), {

@@ -4,7 +4,13 @@ import type { Component, TerraMap } from "../../features/architecture-map";
 import type { LiveSelection } from "../../features/preview";
 import { AskDock } from "../../features/ask";
 import memosFixture from "../../data/memos.map.json";
-import { analyses, analysis, deleteAnalysis } from "../../features/analysis";
+import {
+  analyses,
+  analysis,
+  deleteAnalysis,
+  setModelChoice,
+  type ModelChoice,
+} from "../../features/analysis";
 import { wsCache } from "./cache";
 import { useAnalyze } from "./useAnalyze";
 import { nextSelection } from "./selection";
@@ -90,8 +96,9 @@ export default function Workspace() {
   // land out of order (and a late response can't set state after unmount).
   const openAbort = useRef<AbortController | null>(null);
   useEffect(() => () => openAbort.current?.abort(), []);
-  const chooseModel = (choice: { modelId: string; apiKey?: string }) => {
+  const chooseModel = (choice: ModelChoice) => {
     wsCache.selectedModel = choice;
+    setModelChoice({ modelId: choice.modelId, provider: choice.provider });
     setSessionModel(choice);
   };
 
@@ -99,8 +106,8 @@ export default function Workspace() {
     openAbort.current?.abort();
     const ac = new AbortController();
     openAbort.current = ac;
-    wsCache.selectedModel = null;
-    setSessionModel(null);
+    // The session model is deliberately kept: opening a stored map is not a
+    // new run, and Ask still has to name a model the host is serving.
     try {
       const m = await analysis(entry.id, ac.signal);
       wsCache.storedMap = m;

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlparse
@@ -355,6 +356,47 @@ def _parse_tool_calls(raw: Any) -> list[ToolCall]:
     return calls
 
 
+# Hermes/Qwen tool-call syntax. Servers that render `tools` through the model's
+# own chat template (llama.cpp, and this repo's GGUF sidecar) hand the reply back
+# verbatim, so the call arrives as text instead of in `message.tool_calls`.
+_TOOL_CALL_BLOCK = re.compile(r"<tool_call>\s*(.*?)\s*</tool_call>", re.DOTALL)
+
+
+def _loads_object(raw: str) -> dict[str, Any] | None:
+    """Parse one JSON object, tolerating the doubled braces some chat
+    templates emit around a tool call ({{"name": ...}})."""
+    text = (raw or "").strip()
+    for candidate in (text, text[1:-1] if text.startswith("{{") and text.endswith("}}") else ""):
+        if not candidate:
+            continue
+        try:
+            parsed = json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, dict):
+            return parsed
+    return None
+
+
+def _text_tool_calls(content: str) -> list[ToolCall]:
+    """Tool calls the model wrote into its message text.
+
+    Without this the agent loop reads a `<tool_call>` block as the final
+    answer and hands the user raw XML instead of running the tool.
+    """
+    calls: list[ToolCall] = []
+    for index, block in enumerate(_TOOL_CALL_BLOCK.findall(content)):
+        parsed = _loads_object(block)
+        if parsed is None:
+            continue
+        name = str(parsed.get("name") or "")
+        if not name:
+            continue
+        raw_args = parsed["arguments"] if "arguments" in parsed else parsed.get("parameters")
+        calls.append(ToolCall(id=f"text_{index}", name=name, arguments=_arguments_json(raw_args)))
+    return calls
+
+
 def complete(
     cfg: Config,
     items: list[dict[str, Any]],
@@ -396,6 +438,14 @@ def complete(
     content = "" if raw_content is None else str(raw_content)
     tool_calls = _parse_tool_calls(message.get("tool_calls"))
     reason = choices[0].get("finish_reason") or ""
+    if tools and not tool_calls:
+        # Only when tools were offered: a `<tool_call>` block in a toolless
+        # reply is the model quoting, not calling.
+        tool_calls = _text_tool_calls(content)
+        if tool_calls:
+            # The server saw plain text and said "stop"; the turn is a call.
+            content = _TOOL_CALL_BLOCK.sub("", content).strip()
+            reason = "tool_calls"
     if tool_calls and not reason:
         reason = "tool_calls"
     if not content.strip() and not tool_calls:

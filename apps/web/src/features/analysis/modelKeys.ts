@@ -46,3 +46,32 @@ export function clearApiKey(provider: string): void {
 export function isAuthFailure(message: string): boolean {
   return /\b(401|403|unauthorized|invalid[_ ]api[_ ]key|incorrect api key)\b/i.test(message);
 }
+
+/** The model this browser last worked with. Ask and the agent must send a
+ * model the host is actually serving: with the field empty the analyzer falls
+ * back to the operator's TERRA_MODEL env, which is not necessarily what the
+ * local sidecar has loaded, and every question fails preflight. */
+const modelKey = "terra_model_choice";
+
+export type StoredChoice = { modelId: string; provider?: string };
+
+export function getModelChoice(): StoredChoice | null {
+  try {
+    const raw = localStorage.getItem(modelKey);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as StoredChoice;
+    return parsed?.modelId ? parsed : null;
+  } catch {
+    // Absent, unreadable, or written by an older build: no choice remembered.
+    return null;
+  }
+}
+
+export function setModelChoice(choice: StoredChoice): void {
+  if (!choice.modelId) return;
+  try {
+    localStorage.setItem(modelKey, JSON.stringify(choice));
+  } catch {
+    // Nothing to do: the choice just won't survive this tab.
+  }
+}

@@ -188,3 +188,47 @@ def test_chat_still_returns_str_and_skips_tools(good_draft_dict):
     out = chat(_cfg(handle), [{"role": "user", "content": "map this"}])
     assert isinstance(out, str)
     assert json.loads(out)["kind"] == good_draft_dict["kind"]
+
+
+def test_complete_parses_a_tool_call_the_model_wrote_as_text():
+    """llama.cpp renders `tools` through the model's own chat template and hands
+    the reply back verbatim, so a Qwen/Hermes call arrives as content."""
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=_completion({
+            "role": "assistant",
+            "content": (
+                "Let me look.\n<tool_call>\n"
+                '{"name": "lookup_component", "arguments": {"q": "web"}}\n'
+                "</tool_call>"
+            ),
+        }))
+
+    turn = complete(_cfg(handle), [{"role": "user", "content": "where is web?"}], tools=[LOOKUP])
+    assert turn.finish_reason == "tool_calls"
+    assert turn.content == "Let me look."
+    assert [tc.name for tc in turn.tool_calls] == ["lookup_component"]
+    assert json.loads(turn.tool_calls[0].arguments) == {"q": "web"}
+
+
+def test_complete_parses_a_text_tool_call_with_doubled_braces():
+    def handle(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=_completion({
+            "role": "assistant",
+            "content": '<tool_call>\n{{"name": "lookup_component", "arguments": {"q": null}}}\n</tool_call>',
+        }))
+
+    turn = complete(_cfg(handle), [{"role": "user", "content": "x"}], tools=[LOOKUP])
+    assert [tc.name for tc in turn.tool_calls] == ["lookup_component"]
+    assert json.loads(turn.tool_calls[0].arguments) == {"q": None}
+
+
+def test_complete_leaves_a_quoted_tool_call_alone_when_no_tools_were_offered():
+    quoted = 'The agent replies with <tool_call>{"name": "lookup_component"}</tool_call>.'
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=_completion({"role": "assistant", "content": quoted}))
+
+    turn = complete(_cfg(handle), [{"role": "user", "content": "how do tools work?"}])
+    assert turn.tool_calls == []
+    assert turn.content == quoted

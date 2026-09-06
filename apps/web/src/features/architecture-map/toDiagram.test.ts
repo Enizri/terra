@@ -111,3 +111,43 @@ test("mobile and desktop sit in the screens column", () => {
   assert.equal(view.nodes.find((n) => n.id === "desk")!.col, 0);
   assert.equal(view.nodes.find((n) => n.id === "ios")!.kind, "frontend");
 });
+
+test("a child filed under another column becomes its own card", () => {
+  // A small model that parents everything under the web app used to leave the
+  // stage with one card and no way to reach the rest of the repository.
+  const map: TerraMap = {
+    project: golden.project,
+    components: [
+      { id: "web", parent_id: null, name: "Web", purpose: "", importance: "critical", type: "frontend", files: [] },
+      { id: "api", parent_id: "web", name: "API", purpose: "", importance: "high", type: "backend", files: [] },
+      { id: "store", parent_id: "web", name: "Store", purpose: "", importance: "high", type: "database", files: [] },
+      { id: "web.editor", parent_id: "web", name: "Editor", purpose: "", importance: "medium", type: "frontend", files: [] },
+    ] as Component[],
+    relationships: [{ from: "web", to: "api", type: "calls", because: [] }],
+    suggested_questions: [],
+  };
+  const view = toDiagram(map);
+  check(view);
+  assert.deepEqual(
+    view.nodes.map((n) => n.id).sort(),
+    ["api", "store", "web"],
+  );
+  // A same-column child still belongs to its parent's card.
+  assert.ok(!view.nodes.some((n) => n.id === "web.editor"));
+});
+
+test("a hierarchy that would draw one card is flattened", () => {
+  const map: TerraMap = {
+    project: golden.project,
+    components: [
+      { id: "web", parent_id: null, name: "Web", purpose: "", importance: "critical", type: "frontend", files: [] },
+      { id: "web.editor", parent_id: "web", name: "Editor", purpose: "", importance: "high", type: "frontend", files: [] },
+      { id: "web.timeline", parent_id: "web", name: "Timeline", purpose: "", importance: "high", type: "frontend", files: [] },
+    ] as Component[],
+    relationships: [],
+    suggested_questions: [],
+  };
+  const view = toDiagram(map);
+  check(view);
+  assert.equal(view.nodes.length + view.hidden.length, 3);
+});

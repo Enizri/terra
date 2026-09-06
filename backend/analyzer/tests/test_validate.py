@@ -77,6 +77,42 @@ def test_self_and_unknown_parent_made_top_level():
     assert any('"ghost"' in err for err in errs)
 
 
+def test_parent_from_another_column_is_made_top_level():
+    """The diagram draws a card inside its parent, so a database nested under
+    the web app would simply vanish."""
+    result = draft(
+        [comp(), comp(id="store", parent_id="web", type="database", files=["store/"]),
+         comp(id="server", parent_id="web", type="backend", files=["server/"])],
+        [{"from": "web", "to": "server", "type": "calls", "because": ["x"]},
+         {"from": "server", "to": "store", "type": "reads_writes", "because": ["x"]}],
+    )
+    _, errs = validate(result, KNOWN, strict=True)
+    assert all(component.parent_id is None for component in result.components)
+    assert any('"store" (database) has parent "web" (frontend)' in err for err in errs)
+
+
+def test_same_column_parent_survives():
+    result = draft(
+        [comp(), comp(id="web.editor", parent_id="web", type="frontend", files=["web/src/"]),
+         comp(id="server", files=["server/"])],
+        [{"from": "web", "to": "server", "type": "calls", "because": ["x"]}],
+    )
+    validate(result, KNOWN, strict=True)
+    by_id = {component.id: component for component in result.components}
+    assert by_id["web.editor"].parent_id == "web"
+
+
+def test_a_hierarchy_that_would_draw_one_card_is_flattened():
+    result = draft(
+        [comp(), comp(id="web.editor", parent_id="web", files=["web/src/"]),
+         comp(id="web.timeline", parent_id="web", files=["web/src/app.tsx"])],
+        [{"from": "web.editor", "to": "web.timeline", "type": "calls", "because": ["x"]}],
+    )
+    _, errs = validate(result, KNOWN, strict=True)
+    assert all(component.parent_id is None for component in result.components)
+    assert any("single card" in err for err in errs)
+
+
 def test_drops_bad_relationships():
     result = draft([comp(), comp(id="server", files=["server/"])],
                    [{"from": "web", "to": "server", "type": "calls", "because": ["x"]},
