@@ -322,6 +322,7 @@ export function TheaterPanel({
         <div
           ref={shellRef}
           className="sh-theater__dock"
+          onPointerDown={onHeadPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={endGesture}
           onPointerCancel={endGesture}

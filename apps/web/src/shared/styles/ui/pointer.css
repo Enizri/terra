@@ -1,0 +1,39 @@
+/* App-wide custom pointer. Trail stays on open paper; the glyph sits above chrome. */
+.hx-field {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.hx-field--trail {
+  z-index: 0;
+}
+
+.hx-field--cursor {
+  z-index: 80;
+}
+
+.hx-field__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+html.is-custom-pointer,
+html.is-custom-pointer * {
+  cursor: none !important;
+}
+
+/* Over a press target or a field the OS cursor takes back over, so the
+   affordance is the real one. `--sh-native-cursor` inherits from <html>. */
+html.is-custom-pointer.is-native-pointer,
+html.is-custom-pointer.is-native-pointer * {
+  cursor: var(--sh-native-cursor, default) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hx-field--trail,
+  .hx-field--cursor {
+    display: none;
+  }
+}

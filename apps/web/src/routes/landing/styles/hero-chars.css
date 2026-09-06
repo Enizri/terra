@@ -10,7 +10,10 @@
   min-height: calc(100svh - 5.5rem);
   padding: 0;
   overflow: hidden;
-  background: var(--wl-bg);
+  background-color: var(--wl-bg);
+  background-image: var(--wl-dot-grid);
+  background-size: var(--wl-dot-pitch) var(--wl-dot-pitch);
+  background-attachment: fixed;
   color: var(--wl-ink);
 }
 
@@ -36,7 +39,7 @@
   flex-direction: column;
   justify-content: center;
   padding: 48px 24px 40px;
-  font-family: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font);
   color: var(--wl-ink);
 }
 
@@ -51,11 +54,11 @@
   margin: 0 0 20px;
   font-family: "Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
-  font-weight: 400;
+  font-weight: 500;
   line-height: 16px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--wl-grey-150);
+  color: #e8400d;
 }
 
 /* `.sh-root h1.hx-title` — the specificity is load-bearing. `global.css` sets
@@ -65,18 +68,18 @@
 .sh-root h1.hx-title {
   margin: 0 0 32px;
   font-family: var(--font-heading);
-  /* Sized so "humans can understand." holds one line in the half-column;
+  /* Sized so "Then ask it anything." holds one line in the half-column;
      the explicit break is the design, a third line is not. */
-  font-size: clamp(34px, 3.6vw, 64px);
-  /* Gilda Display ships 400 only; anything heavier would synthesise. */
-  font-weight: 400;
-  line-height: 1;
-  letter-spacing: -0.05em;
+  font-size: clamp(36px, 3.8vw, 68px);
+  font-weight: 500;
+  font-optical-sizing: auto;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
   color: var(--wl-ink);
 }
 
 .hx-title__muted {
-  color: var(--wl-grey);
+  color: var(--wl-grey-200);
 }
 
 .hx-body {
@@ -85,7 +88,7 @@
   font-size: 18px;
   font-weight: 400;
   line-height: 1.5;
-  color: var(--wl-grey-150);
+  color: var(--wl-grey-200);
 }
 
 .hx-cta {
@@ -110,8 +113,8 @@
   border: 1px solid transparent;
   border-radius: 999px;
   background: var(--wl-ink);
-  color: var(--wl-bg);
-  font-family: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  color: #fff;
+  font-family: var(--font);
   font-size: 16px;
   font-weight: 400;
   /* `leading-none`: the pill's height is its padding, not its line box. */
@@ -135,10 +138,15 @@
   transform: scale(0.98);
 }
 
-.sh-root a.hx-cta__btn--ghost {
+.sh-root .sh-section--herochars a.hx-cta__btn {
+  background: #e8400d;
+  color: #fff;
+}
+
+.sh-root .sh-section--herochars a.hx-cta__btn--ghost {
   background: transparent;
   color: var(--wl-ink);
-  border-color: color-mix(in srgb, var(--wl-grey) 40%, transparent);
+  border-color: color-mix(in srgb, var(--wl-ink) 22%, transparent);
 }
 
 .sh-circle-arrow {
@@ -301,7 +309,10 @@
 .gx-journey {
   position: relative;
   isolation: isolate;
-  background: var(--wl-bg);
+  background-color: var(--wl-bg);
+  background-image: var(--wl-dot-grid);
+  background-size: var(--wl-dot-pitch) var(--wl-dot-pitch);
+  background-attachment: fixed;
 }
 
 .gx-journey__sticky {
@@ -313,7 +324,10 @@
   margin-bottom: -100svh;
   overflow: hidden;
   pointer-events: none;
-  background: var(--wl-bg);
+  background-color: var(--wl-bg);
+  background-image: var(--wl-dot-grid);
+  background-size: var(--wl-dot-pitch) var(--wl-dot-pitch);
+  background-attachment: fixed;
 }
 
 .gx-journey__disc,
@@ -412,6 +426,9 @@
 .gx-journey > .terra-section {
   max-width: none;
   background: var(--wl-bg);
+  background-image: var(--wl-dot-grid);
+  background-size: var(--wl-dot-pitch) var(--wl-dot-pitch);
+  background-attachment: fixed;
 }
 
 .gx-journey > .sh-section.sh-section--hero.sh-section--herochars {

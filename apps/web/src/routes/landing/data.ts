@@ -203,17 +203,17 @@ export const copy = {
     to: "humans",
     tail: "can understand",
   },
-  heroEyebrow: "Built for agentic development.",
-  heroHeadline: "Software that only humans can understand.",
+  heroEyebrow: "A map of any GitHub repo.",
+  heroHeadline: "See the whole codebase. Then ask it anything.",
   /** Two-tone hero headline: `lead` in ink, `muted` in grey, split on an
       explicit line break. Distinct from `heroTitle`, which feeds the retired
       word-swap hero in `sections/Hero.tsx`. */
   heroHeadlineParts: {
-    lead: "Software that only",
-    muted: "humans can understand.",
+    lead: "See the whole codebase.",
+    muted: "Then ask it anything.",
   },
   heroSubtitle:
-    "Terra maps your repo, then runs it in the cloud so you can change the live software — no local setup.",
+    "Terra turns a repository into a readable architecture map — components, how they connect, and the files that prove it. Then you can ask the map and run the software.",
   /** Wrapped around the hero globe as one glyph per cell. Away from the
       cursor the field is scrambled; the lens reconstitutes this stream so
       functions, classes and library calls from several languages read as

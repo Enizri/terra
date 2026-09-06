@@ -220,7 +220,7 @@
 
 .sh-play-presence {
   position: absolute;
-  top: 74px;
+  top: 14px;
   right: 22px;
   z-index: 40;
   display: flex;

@@ -1,4 +1,5 @@
 /* Shared UI import order preserves the original cascade. */
+@import "./ui/pointer.css";
 @import "./ui/controls.css";
 @import "./ui/architecture-map.css";
 @import "./ui/chat.css";

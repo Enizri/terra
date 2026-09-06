@@ -198,7 +198,7 @@ export function TerraChatDock({
             ) : (
               <span className="sh-terra-chat__crumb">{crumb}</span>
             ))}
-          <div className="sh-terra-chat__thread" ref={threadRef}>
+          <div className="sh-terra-chat__thread" ref={threadRef} data-no-drag>
             {!scripted && selectionKey && options.length === 0 && (
               <p className="sh-terra-chat__msg sh-terra-chat__msg--terra">{exhaustedMsg}</p>
             )}

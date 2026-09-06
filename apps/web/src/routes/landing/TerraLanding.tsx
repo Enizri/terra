@@ -2,8 +2,8 @@ import { MotionConfig, useReducedMotion } from "motion/react";
 import { useEffect, useRef } from "react";
 import "@fontsource-variable/geist";
 import "@fontsource-variable/geist-mono";
-// Gilda Display: the landing's serif display face. 400 is the only weight it ships.
-import "@fontsource/gilda-display/400.css";
+// Newsreader: landing display face. opsz so large headlines use the display cut.
+import "@fontsource-variable/newsreader/opsz.css";
 import "../../shared/styles/tokens.css";
 import "../../shared/styles/ui.css";
 import "./landing.css";

@@ -39,14 +39,55 @@ export function useFloatingDrag(boundsRef: RefObject<HTMLElement | null>) {
     el.style.transform = `translate3d(${offset.current.x}px, ${offset.current.y}px, 0)`;
   };
 
+  const applyMove = (pointerId: number, clientX: number, clientY: number) => {
+    const g = gesture.current;
+    if (!g || pointerId !== g.pointerId) return;
+    const maxX = Math.max(g.minX, g.maxX);
+    const maxY = Math.max(g.minY, g.maxY);
+    offset.current = {
+      x: clamp(g.originX + (clientX - g.startX), g.minX, maxX),
+      y: clamp(g.originY + (clientY - g.startY), g.minY, maxY),
+    };
+    paint();
+  };
+
+  const stopGesture = (pointerId: number) => {
+    const g = gesture.current;
+    if (!g || pointerId !== g.pointerId) return;
+    gesture.current = null;
+    dragging.current = false;
+    window.removeEventListener("pointermove", onWindowMove);
+    window.removeEventListener("pointerup", onWindowUp);
+    window.removeEventListener("pointercancel", onWindowUp);
+    const shell = shellRef.current;
+    shell?.classList.remove("is-dragging");
+    try {
+      shell?.releasePointerCapture(pointerId);
+    } catch {
+      /* already released */
+    }
+  };
+
+  const onWindowMove = (e: PointerEvent) => {
+    applyMove(e.pointerId, e.clientX, e.clientY);
+  };
+  const onWindowUp = (e: PointerEvent) => {
+    stopGesture(e.pointerId);
+  };
+
   const onHeadPointerDown = (e: ReactPointerEvent<HTMLElement>) => {
+    if (dragging.current) return;
     if ((e.target as HTMLElement).closest("button, input, a, [data-no-drag]")) return;
     const shell = shellRef.current;
     const bounds = resolveDragBounds(boundsRef.current, shell ?? (e.currentTarget as HTMLElement));
     if (!shell || !bounds) return;
 
     e.preventDefault();
-    shell.setPointerCapture(e.pointerId);
+    try {
+      shell.setPointerCapture(e.pointerId);
+    } catch {
+      /* capture is optional — window listeners still drive the drag */
+    }
 
     const br = bounds.getBoundingClientRect();
     const sr = shell.getBoundingClientRect();
@@ -68,31 +109,17 @@ export function useFloatingDrag(boundsRef: RefObject<HTMLElement | null>) {
     };
     dragging.current = true;
     shell.classList.add("is-dragging");
+    window.addEventListener("pointermove", onWindowMove);
+    window.addEventListener("pointerup", onWindowUp);
+    window.addEventListener("pointercancel", onWindowUp);
   };
 
   const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
-    const g = gesture.current;
-    if (!g || e.pointerId !== g.pointerId) return;
-    const maxX = Math.max(g.minX, g.maxX);
-    const maxY = Math.max(g.minY, g.maxY);
-    offset.current = {
-      x: clamp(g.originX + (e.clientX - g.startX), g.minX, maxX),
-      y: clamp(g.originY + (e.clientY - g.startY), g.minY, maxY),
-    };
-    paint();
+    applyMove(e.pointerId, e.clientX, e.clientY);
   };
 
   const endGesture = (e: ReactPointerEvent<HTMLDivElement>) => {
-    const g = gesture.current;
-    if (!g || e.pointerId !== g.pointerId) return;
-    gesture.current = null;
-    dragging.current = false;
-    shellRef.current?.classList.remove("is-dragging");
-    try {
-      shellRef.current?.releasePointerCapture(e.pointerId);
-    } catch {
-      /* already released */
-    }
+    stopGesture(e.pointerId);
   };
 
   return { shellRef, onHeadPointerDown, onPointerMove, endGesture };
