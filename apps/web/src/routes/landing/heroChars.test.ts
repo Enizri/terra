@@ -28,8 +28,13 @@ test("hero is a 1:1 split with the globe on charcoal", () => {
   assert.doesNotMatch(source, /HeroPixelType/);
   assert.match(appSource, /HeroPixelField/);
   assert.match(pointerCss, /is-custom-pointer[\s\S]*?cursor:\s*none/);
-  // Press targets hand back the real OS cursor, chosen per hit by JS.
-  assert.match(pointerCss, /is-native-pointer[\s\S]*?cursor:\s*var\(--sh-native-cursor/);
+  // Press targets hand back the real OS cursor, marked by JS on the one
+  // element under the tip. Keying it on <html> restyles the whole document
+  // every time the pointer crosses a link, so the value must not live there.
+  assert.match(pointerCss, /html\.is-custom-pointer \*[\s\S]*?cursor:\s*inherit/);
+  assert.match(pointerCss, /\.sh-cursor-pointer[\s\S]*?cursor:\s*pointer/);
+  assert.match(pointerCss, /\.sh-cursor-text[\s\S]*?cursor:\s*text/);
+  assert.doesNotMatch(pointerCss, /--sh-native-cursor/);
   const fieldSource = readFileSync(
     path.join(import.meta.dirname, "sections/HeroPixelField.tsx"),
     "utf8",
@@ -39,8 +44,15 @@ test("hero is a 1:1 split with the globe on charcoal", () => {
   assert.match(fieldSource, /getBoundingClientRect/);
   assert.match(fieldSource, /useLocation/);
   assert.match(fieldSource, /pathname === "\/"/);
-  assert.match(fieldSource, /is-native-pointer/);
-  assert.match(fieldSource, /nativeCursorFor/);
+  assert.match(fieldSource, /nativeCursorTarget/);
+  assert.match(fieldSource, /sh-cursor-pointer/);
+  // The loop has to be able to stop: a `hovering` that only ever goes true
+  // pins the page at 60fps for the rest of the session.
+  assert.match(fieldSource, /hovering = false/);
+  // The hit test is a style-and-layout flush. It belongs on the frame, not on
+  // every `pointermove` — moves arrive faster than frames do.
+  const fromMove = fieldSource.slice(fieldSource.indexOf("const onMove"));
+  assert.doesNotMatch(fromMove.slice(0, fromMove.indexOf("\n    };")), /syncHit/);
 });
 
 test("the globe is grabbed and spun, with no hover effects left", () => {

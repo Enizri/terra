@@ -110,6 +110,68 @@ export function paintPointerArrow(
   paintGlyph(ctx, x, y, scale, rotation, halo, traceArrow);
 }
 
+/** Room around the glyph for the halo stroke, the rim and the drop shadow. */
+const SPRITE_PAD = 8;
+
+/** Rotated glyph bounds in CSS px relative to the tip, padded for the halo,
+ *  rim and shadow. Sizes the offscreen sprite. */
+export function pointerSpriteBox(scale = 1, rotation = POINTER_REST) {
+  const cos = Math.cos(rotation);
+  const sin = Math.sin(rotation);
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const p of ARROW_PATH) {
+    const x = (p.x * cos - p.y * sin) * scale;
+    const y = (p.x * sin + p.y * cos) * scale;
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+  }
+  const pad = SPRITE_PAD * Math.max(1, scale);
+  // Whole pixels: a sprite with a fractional hotspot lands off the pixel grid
+  // and resamples, which shows up as a softer rim than the traced glyph had.
+  return {
+    minX: Math.floor(minX - pad),
+    minY: Math.floor(minY - pad),
+    maxX: Math.ceil(maxX + pad),
+    maxY: Math.ceil(maxY + pad),
+  };
+}
+
+export type PointerSprite = {
+  canvas: HTMLCanvasElement;
+  /** Where the tip sits inside the sprite, in CSS px. */
+  hotX: number;
+  hotY: number;
+  width: number;
+  height: number;
+};
+
+/** Bake the glyph once at the device ratio. Re-tracing a shadowed, stroked
+ *  path every frame is the most expensive thing a cursor can do; blitting the
+ *  same bitmap is not. Re-bake when the ratio changes, not per frame. */
+export function createPointerSprite(
+  dpr = 1,
+  scale = 1,
+  rotation = POINTER_REST,
+  halo = true,
+): PointerSprite | null {
+  const box = pointerSpriteBox(scale, rotation);
+  const width = box.maxX - box.minX;
+  const height = box.maxY - box.minY;
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.ceil(width * dpr));
+  canvas.height = Math.max(1, Math.ceil(height * dpr));
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  paintPointerArrow(ctx, -box.minX, -box.minY, scale, rotation, halo);
+  return { canvas, hotX: -box.minX, hotY: -box.minY, width, height };
+}
+
 /** Anything you can press — native hand, not the custom glyph. `[data-sel]`
  *  covers the replica elements you pick inside the Ask Terra card, which are
  *  plain boxes with a click handler rather than buttons. */
@@ -135,13 +197,20 @@ export function isClickableElement(el: Element | null): boolean {
   return Boolean(hit) && !inert(hit as Element);
 }
 
-/** The native cursor to hand back to the OS here, or `null` to keep the
+export type NativeCursor = "pointer" | "text";
+
+/** Which native cursor to hand back to the OS here and, just as importantly,
+ *  the element to hang it on — the override is scoped to that subtree so
+ *  crossing a link does not restyle the whole document. `null` keeps the
  *  custom glyph. Clickable wins over text: a checkbox inside a label is a
  *  press target, not a field. */
-export function nativeCursorFor(el: Element | null): "pointer" | "text" | null {
+export function nativeCursorTarget(
+  el: Element | null,
+): { target: Element; kind: NativeCursor } | null {
   if (!el) return null;
-  if (isClickableElement(el)) return "pointer";
+  const press = el.closest(CLICKABLE);
+  if (press && !inert(press)) return { target: press, kind: "pointer" };
   const field = el.closest(TEXT_FIELD);
-  if (field && !inert(field)) return "text";
+  if (field && !inert(field)) return { target: field, kind: "text" };
   return null;
 }

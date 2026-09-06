@@ -19,16 +19,26 @@
   height: 100%;
 }
 
-html.is-custom-pointer,
-html.is-custom-pointer * {
+/* The OS cursor is hidden once, on <html>, and the page inherits that. The
+   class is set at mount and never toggled, so nothing here re-runs. */
+html.is-custom-pointer {
   cursor: none !important;
 }
 
+html.is-custom-pointer * {
+  cursor: inherit !important;
+}
+
 /* Over a press target or a field the OS cursor takes back over, so the
-   affordance is the real one. `--sh-native-cursor` inherits from <html>. */
-html.is-custom-pointer.is-native-pointer,
-html.is-custom-pointer.is-native-pointer * {
-  cursor: var(--sh-native-cursor, default) !important;
+   affordance is the real one. JS marks the single element under the tip and
+   its subtree inherits from it: a rule keyed on <html> would restyle every
+   element on the page each time the pointer crossed a link. */
+html.is-custom-pointer .sh-cursor-pointer {
+  cursor: pointer !important;
+}
+
+html.is-custom-pointer .sh-cursor-text {
+  cursor: text !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

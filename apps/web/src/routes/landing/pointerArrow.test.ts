@@ -6,7 +6,7 @@ import {
   POINTER_FILL,
   POINTER_REST,
   isClickableElement,
-  nativeCursorFor,
+  nativeCursorTarget,
 } from "./pointerArrow.ts";
 
 test("the Codex-style cursor is a taupe pointer whose tip is the hotspot", () => {
@@ -71,12 +71,19 @@ test("press targets get the hand, fields get the caret, paper keeps the glyph", 
     <label id="pick" for="agree"><input id="agree" type="checkbox" /> Agree</label>
     <p id="copy">paper</p>`;
   const q = (id: string) => document.getElementById(id)!;
-  assert.equal(nativeCursorFor(q("go")), "pointer");
-  assert.equal(nativeCursorFor(q("ask")), "text");
-  assert.equal(nativeCursorFor(q("send")), "pointer", "submit is a press target");
-  assert.equal(nativeCursorFor(q("agree")), "pointer", "checkbox in a label is not a field");
-  assert.equal(nativeCursorFor(q("pick")), "pointer");
-  assert.equal(nativeCursorFor(q("copy")), null, "custom glyph stays on plain copy");
+  const kind = (id: string) => nativeCursorTarget(q(id))?.kind ?? null;
+  assert.equal(kind("go"), "pointer");
+  assert.equal(kind("ask"), "text");
+  assert.equal(kind("send"), "pointer", "submit is a press target");
+  assert.equal(kind("agree"), "pointer", "checkbox in a label is not a field");
+  assert.equal(kind("pick"), "pointer");
+  assert.equal(kind("copy"), null, "custom glyph stays on plain copy");
   q("go").setAttribute("aria-disabled", "true");
-  assert.equal(nativeCursorFor(q("go")), null, "a dead button keeps the glyph");
+  assert.equal(kind("go"), null, "a dead button keeps the glyph");
+
+  // The override rides the press target itself, not the span you happened to
+  // be over — that is what keeps the restyle inside one subtree.
+  const inner = q("go").appendChild(document.createElement("span"));
+  q("go").removeAttribute("aria-disabled");
+  assert.equal(nativeCursorTarget(inner)?.target, q("go"));
 });
