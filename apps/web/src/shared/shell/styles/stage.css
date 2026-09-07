@@ -354,22 +354,27 @@
 
 /* ---- map + details ---- */
 
-/* The details panel is a track, not an overlay: the diagram reflows into what
-   is left and re-measures its arrows on the resize, so nothing is left
-   pointing at a stale box. It used to be absolute, with the diagram carrying a
-   hardcoded padding-right to dodge it. */
+/* The details column is reserved, not opened.
+ *
+ * It used to be a grid track animating 0 → 300px on every click, which meant
+ * the diagram reflowed, re-measured every arrow, and shoved the card out from
+ * under the pointer that had just clicked it — the panel appeared and the thing
+ * you were reading moved. Nothing about the map changes when a card is
+ * selected now: the track is the same width empty or full, so the columns, the
+ * routes and the fit scale are all computed once and stay put.
+ *
+ * The width is affordable because the column is never empty — with no selection
+ * the panel is the map's table of contents (DetailsPanel's overview), so the
+ * room it holds is doing work either way.
+ */
 .sh-ws__map {
-  --sh-details-w: 0px;
+  --sh-details-w: 320px;
   position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) var(--sh-details-w);
+  gap: var(--sh-space-4);
   flex: 1;
   min-height: 0;
-  transition: grid-template-columns 0.18s ease;
-}
-
-.sh-ws__map.has-details {
-  --sh-details-w: 300px;
 }
 
 .sh-ws__details {
@@ -377,28 +382,43 @@
   /* Above the preview overlay, as it was when both were absolute. */
   z-index: 3;
   min-width: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  border-left: 1px solid var(--sh-border);
-}
-
-/* A generated purpose is a paragraph, not the landing's hand-written one-liner.
-   Clamp it to one line: the canvas clips, and a four-card middle column with
-   two-line purposes stands taller than the canvas — the first screen showed
-   every card cut off. The full text is in the details panel. */
-.sh-ws__map .sh-diagram__purpose {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 1;
-  line-clamp: 1;
+  /* The panel scrolls its own body under a fixed head — see DetailsPanel. */
   overflow: hidden;
+  border-radius: var(--sh-radius-lg);
+  background: var(--sh-window);
+  /* The same resting panel as the intake card, so the reading column reads as
+     a sibling of the dark map rather than a flap hinged onto it. */
+  box-shadow: var(--sh-shadow-1);
 }
 
-/* The hint slot reserves 16px per card for a file path only shown on focus —
-   here a click opens the details panel, which lists every file. Dropping the
-   row buys the height that keeps the middle column inside the canvas. */
-.sh-ws__map .sh-diagram__hint {
-  display: none;
+/* Below the design's own 1920 there is not room for both: three columns of
+   cards need about 730px before they start colliding, and the rail and the ask
+   dock have already spent 620 of the window. So under ~1750px the panel lifts
+   off the map instead of taking a track from it — the diagram keeps the full
+   width whether or not a card is open.
+ *
+ * That is the same promise either way, and the one that matters: opening a card
+ * never resizes the diagram, so no arrow is re-measured and no card moves out
+ * from under the pointer. The cost here is that the open panel covers the right
+ * of the canvas; Escape and "All parts" put it away again. */
+@media (max-width: 1750px) {
+  .sh-ws__map {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .sh-ws__details {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 300px;
+    box-shadow: var(--sh-shadow-2);
+  }
+
+  .sh-ws__map:not(.has-details) .sh-ws__details {
+    display: none;
+  }
 }
 
 /* Two-line card names still leave the middle column a hair taller than the
@@ -460,10 +480,4 @@
 .sh-ws__input:focus-visible {
   outline: 2px solid #e8400d;
   outline-offset: -1px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .sh-ws__map {
-    transition: none;
-  }
 }

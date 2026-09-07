@@ -30,6 +30,41 @@
   transition: grid-template-columns 0.18s ease;
 }
 
+/* The demo notice is a second full-width row between the header and the
+   panels. Rail / stage / dock are auto-placed, so the extra track has to be
+   declared or they would land in the banner's row. Demo builds only. */
+.sh-ws.has-demo-banner {
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.sh-ws__demo {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  gap: var(--sh-space-2);
+  padding: var(--sh-space-2) var(--sh-space-5);
+  border-bottom: 1px solid var(--sh-border);
+  background: var(--sh-window);
+  color: var(--sh-muted-2);
+  font-size: var(--sh-text-sm);
+  line-height: 1.4;
+}
+
+.sh-ws__demo b {
+  flex-shrink: 0;
+  color: var(--sh-ink);
+}
+
+.sh-ws__demo span {
+  min-width: 0;
+}
+
+.sh-ws__demo a {
+  flex-shrink: 0;
+  margin-left: auto;
+  color: inherit;
+}
+
 .sh-ws.is-rail-collapsed {
   --sh-rail-w: 56px;
 }

@@ -9,7 +9,15 @@ from ...inference.config import Config
 from ...roles.mapper import SYSTEM_PROMPT
 from .models import ArchitectureInput, ArchitectureOutput
 from .prompt import build_prompt
-from .validate import count_files, known_paths, retry_message, validate
+from .schema import MAX_MAP_TOKENS, MAX_PATH_CHOICES, draft_schema
+from .validate import (
+    count_files,
+    known_paths,
+    path_choices,
+    retry_message,
+    unusable,
+    validate,
+)
 
 
 def unfence(content: str) -> str:
@@ -68,7 +76,7 @@ class ArchitectureMapper:
         client: httpx.Client | None = None,
         api_key: str = "",
     ) -> tuple[Draft, list[str]]:
-        """One chat call; second only if validation fails."""
+        """One chat call; second only if the repaired map is unusable."""
         cfg = Config(
             model=model,
             base_url=base_url,
@@ -78,19 +86,19 @@ class ArchitectureMapper:
         preflight(cfg)
 
         known = known_paths(res)
+        schema = draft_schema(path_choices(res, MAX_PATH_CHOICES))
         msgs = [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": build_prompt(res)},
         ]
 
         for attempt in range(2):
-            strict = attempt == 0
-            content = chat(cfg, msgs)
+            content = chat(cfg, msgs, schema=schema, max_tokens=MAX_MAP_TOKENS)
 
             try:
                 draft = Draft.model_validate_json(unfence(content))
             except ValidationError as e:
-                if not strict:
+                if attempt == 1:
                     raise LLMError(
                         f"model {cfg.model} did not return usable JSON: {e}"
                     ) from e
@@ -106,15 +114,18 @@ class ArchitectureMapper:
                 ]
                 continue
 
-            warnings, errs = validate(draft, known, strict)
-            if errs:
-                if not strict:
+            # Repair in place. A second generation costs as long as the first,
+            # so only a map that would mislead is worth asking again.
+            warnings, errs = validate(draft, known, strict=False)
+            reasons = list(errs) + unusable(draft)
+            if reasons:
+                if attempt == 1:
                     raise LLMError(
-                        f"map from model {cfg.model} is unusable: " + "; ".join(errs)
+                        f"map from model {cfg.model} is unusable: " + "; ".join(reasons)
                     )
                 msgs += [
                     {"role": "assistant", "content": content},
-                    {"role": "user", "content": retry_message(errs)},
+                    {"role": "user", "content": retry_message(reasons + warnings)},
                 ]
                 continue
             count_files(draft, res.files)

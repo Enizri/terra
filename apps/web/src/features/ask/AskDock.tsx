@@ -25,6 +25,7 @@ export function AskDock({
   selected,
   elements,
   askReady = true,
+  pending,
   onDropComponent,
   onDropElement,
   model,
@@ -36,6 +37,10 @@ export function AskDock({
   elements: LiveSelection[];
   /** False while a structural/partial map is still upgrading. */
   askReady?: boolean;
+  /** The map asking for the composer: focus it, and send `question` when the
+   *  caller already knows what to ask. `nonce` is what makes a repeat of the
+   *  same question a second ask rather than a no-op. */
+  pending?: { nonce: number; question?: string };
   onDropComponent: (id: string) => void;
   onDropElement: (el: LiveSelection) => void;
   model?: ModelChoice;
@@ -47,6 +52,7 @@ export function AskDock({
   const [used, setUsed] = useState<Set<string>>(new Set());
   const [draft, setDraft] = useState("");
   const threadRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
   const dockRef = useRef<HTMLDivElement | null>(null);
   // Same gesture as the theater's chat: transform-only drag, clamped to the arena.
   const { shellRef, onHeadPointerDown, onPointerMove, endGesture } = useFloatingDrag(dockRef);
@@ -57,6 +63,9 @@ export function AskDock({
     const thread = threadRef.current;
     if (thread) thread.scrollTop = thread.scrollHeight;
   }, [messages, thinking]);
+
+  // Read at mount so a remount cannot replay the last question.
+  const lastPending = useRef(pending?.nonce ?? 0);
 
   // qa.py JSON-dumps these straight into the prompt. `file` is the one key the
   // Go side reads by name — it's what unlocks the source snippet.
@@ -91,6 +100,17 @@ export function AskDock({
     setUsed((prev) => new Set(prev).add(q));
     ask(q, primary, selections);
   };
+
+  // Selection state lands in the same batch as the nonce, so by the time this
+  // runs `selections` already carries the component the map is asking about.
+  useEffect(() => {
+    if (!pending || pending.nonce === lastPending.current) return;
+    lastPending.current = pending.nonce;
+    inputRef.current?.focus();
+    if (pending.question) send(pending.question);
+    // `send` is rebuilt every render; the nonce is the trigger.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pending]);
 
   // Power theater style: stream suggestions in the prompt while idle (no
   // selection). Chips appear only after a card/element is picked.
@@ -161,7 +181,7 @@ export function AskDock({
                     ? "Drop a repo and I'll answer questions about it — what talks to what, where a change lands, why a part exists."
                     : !askReady
                       ? `${map.project.name} structure is up — Terra is still reading the architecture. Browse the map; ask unlocks when the full pass finishes.`
-                      : `${map.project.name} is mapped. Click any box for its purpose, tech and files — shift-click to ask about several at once.`}
+                      : `${map.project.name} is mapped. Open a card to read what it does and what it talks to — "Ask about it" brings it down here. Shift-click to stack a few parts into one question.`}
                 </p>
               </div>
             )}
@@ -198,6 +218,7 @@ export function AskDock({
               </span>
             )}
             <input
+              ref={inputRef}
               className="sh-ws__ask-input"
               value={draft}
               onChange={(e) => setDraft(e.target.value)}

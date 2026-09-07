@@ -7,6 +7,8 @@ export type DiagramNodeView = {
   label: string;
   purpose: string;
   hint: string;
+  /** How much code is behind the card ("530 files") — sits beside the hint. */
+  meta?: string;
   kind: DiagramKind;
   /** Flow column: 0 entry, 1 work, 2 storage. */
   col: 0 | 1 | 2;

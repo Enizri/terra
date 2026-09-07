@@ -101,14 +101,14 @@ def preflight(cfg: Config) -> None:
 _schema_unsupported: set[str] = set()
 
 
-def _body(cfg: Config, msgs: list[dict], mode: str) -> dict:
+def _body(cfg: Config, msgs: list[dict], mode: str, schema: dict, max_tokens: int) -> dict:
     """mode: "schema" | "json_object" | "none". Never mutates msgs."""
     body: dict = {
         "model": cfg.model,
         "messages": msgs,
         "stream": False,
         "temperature": 0,
-        "max_tokens": MAX_OUTPUT_TOKENS,
+        "max_tokens": max_tokens,
     }
     if mode == "schema":
         body["response_format"] = {
@@ -116,7 +116,7 @@ def _body(cfg: Config, msgs: list[dict], mode: str) -> dict:
             "json_schema": {
                 "name": "terra_map",
                 "strict": True,
-                "schema": _draft_schema(),
+                "schema": schema,
             },
         }
     elif mode == "json_object":
@@ -124,7 +124,7 @@ def _body(cfg: Config, msgs: list[dict], mode: str) -> dict:
         body["messages"] = msgs + [{
             "role": "system",
             "content": "Reply with one JSON object matching exactly this JSON Schema "
-                       "and nothing else:\n" + json.dumps(_draft_schema()),
+                       "and nothing else:\n" + json.dumps(schema),
         }]
     return body
 
@@ -160,19 +160,34 @@ def _post(cfg: Config, body: dict) -> httpx.Response:
         raise LLMError(f"chat: {e}") from e
 
 
-def chat(cfg: Config, msgs: list[dict], *, use_schema: bool = True) -> str:
-    """POST /v1/chat/completions. Returns assistant message content."""
+def chat(
+    cfg: Config,
+    msgs: list[dict],
+    *,
+    use_schema: bool = True,
+    schema: dict | None = None,
+    max_tokens: int | None = None,
+) -> str:
+    """POST /v1/chat/completions. Returns assistant message content.
+
+    schema and max_tokens default to the repository-agnostic Draft grammar
+    and MAX_OUTPUT_TOKENS. The mapper passes a per-scan schema (real paths
+    as an enum) and a tighter token ceiling so a map cannot fill a 4096-token
+    budget that a small model would spend a minute on.
+    """
+    used_schema = schema if schema is not None else (_draft_schema() if use_schema else {})
+    tokens = MAX_OUTPUT_TOKENS if max_tokens is None else max_tokens
     mode = "schema" if use_schema else "none"
     if mode == "schema" and cfg.base_url in _schema_unsupported:
         mode = "json_object"
 
-    resp = _post(cfg, _body(cfg, msgs, mode))
+    resp = _post(cfg, _body(cfg, msgs, mode, used_schema, tokens))
     if resp.status_code == 400 and mode == "schema":
         # Provider rejects strict json_schema: retry once with json_object
         # and the schema embedded in the prompt; validation downstream is
         # unchanged and still gates the result.
         _schema_unsupported.add(cfg.base_url)
-        resp = _post(cfg, _body(cfg, msgs, "json_object"))
+        resp = _post(cfg, _body(cfg, msgs, "json_object", used_schema, tokens))
     if resp.status_code != 200:
         raise _provider_error(cfg, resp)
     try:
@@ -192,7 +207,7 @@ def chat(cfg: Config, msgs: list[dict], *, use_schema: bool = True) -> str:
 
     if reason == "length":
         raise LLMError(
-            f"model {cfg.model} hit the {MAX_OUTPUT_TOKENS}-token output limit and "
+            f"model {cfg.model} hit the {tokens}-token output limit and "
             f"its answer was cut off; ask for fewer components or raise MAX_OUTPUT_TOKENS"
         )
     if not content or not str(content).strip():

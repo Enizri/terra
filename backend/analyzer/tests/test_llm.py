@@ -2,11 +2,12 @@ import json
 
 import httpx
 import pytest
+
 from terra_analyzer.contracts import Draft
 from terra_analyzer.inference.client import LLMError, chat, preflight
 from terra_analyzer.inference.config import Config
 from terra_analyzer.tasks.architecture import ArchitectureMapper
-from terra_analyzer.tasks.architecture.schema import DRAFT_SCHEMA
+from terra_analyzer.tasks.architecture.schema import DRAFT_SCHEMA, MAX_MAP_TOKENS
 
 from .conftest import (
     DEFAULT_MODEL,
@@ -99,10 +100,36 @@ def test_config_omits_authorization_when_api_key_unset(monkeypatch):
     assert seen == [None]
 
 
-def test_retry_once_on_validation_errors(scan, good_draft_dict):
+def test_repairable_citation_errors_do_not_retry(scan, good_draft_dict):
+    """An invented path is dropped in validate(); the rest of the map is still
+    a map, so a second generation would only double the wait."""
     bad = json.loads(json.dumps(good_draft_dict))
     bad["components"][0]["files"] = ["made/up.go"]
-    answers = [draft_json(bad), draft_json(good_draft_dict)]
+    chats = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v1/models":
+            return httpx.Response(200, json={"data": [{"id": DEFAULT_MODEL}]})
+        chats.append(json.loads(request.content))
+        return httpx.Response(200, json={
+            "choices": [{"message": {"content": draft_json(bad)},
+                         "finish_reason": "stop"}],
+        })
+
+    draft, warnings = generate(scan, base_url="http://llm/v1", client=mock_client(handle))
+    assert len(chats) == 1
+    assert chats[0]["max_tokens"] == MAX_MAP_TOKENS
+    files_schema = chats[0]["response_format"]["json_schema"]["schema"][
+        "properties"]["components"]["items"]["properties"]["files"]["items"]
+    assert "web/" in files_schema["enum"]
+    assert draft.components[0].files == []
+    assert any("made/up.go" in warning for warning in warnings)
+
+
+def test_retry_when_the_repaired_map_is_unusable(scan, good_draft_dict):
+    empty = json.loads(json.dumps(good_draft_dict))
+    empty["relationships"] = []
+    answers = [draft_json(empty), draft_json(good_draft_dict)]
     chats = []
 
     def handle(request: httpx.Request) -> httpx.Response:
@@ -116,13 +143,10 @@ def test_retry_once_on_validation_errors(scan, good_draft_dict):
 
     draft, _ = generate(scan, base_url="http://llm/v1", client=mock_client(handle))
     assert len(chats) == 2
-    # Schema-constrained request on every chat call.
-    assert chats[0]["response_format"]["type"] == "json_schema"
-    assert chats[0]["response_format"]["json_schema"]["schema"] == DRAFT_SCHEMA
     retry_msgs = chats[1]["messages"]
     assert retry_msgs[-2]["role"] == "assistant"
-    assert "made/up.go" in retry_msgs[-1]["content"]
-    assert draft.components[0].files == ["web/"]
+    assert "no relationship" in retry_msgs[-1]["content"]
+    assert [component.id for component in draft.components] == ["web", "server", "data"]
 
 
 def test_falls_back_to_json_object_on_400(scan, good_draft_dict):

@@ -1,6 +1,7 @@
 // Shape /analyze results for the three-column flow renderer (truncate to fit).
 
 import type { DiagramEdgeView, DiagramGroupView, DiagramKind, DiagramNodeView } from "./diagramViews";
+import { fileNote } from "./explain.ts";
 import type { Component, TerraMap } from "./types";
 
 /** Column: frontend | work | storage. */
@@ -21,6 +22,12 @@ const KIND: Record<Component["type"], DiagramKind> = {
   infrastructure: "service",
   database: "data",
 };
+
+/** Card colour family for a component type — the details panel reuses it so
+ *  its header icon matches the card the reader just clicked. */
+export function kindOf(type: Component["type"]): DiagramKind {
+  return KIND[type];
+}
 
 export const MAX_NODES = 9;
 export const MAX_PER_COL = 4;
@@ -99,6 +106,9 @@ export function toDiagram(map: TerraMap, opts: { all?: boolean } = {}): DiagramV
         purpose: c.purpose,
         // The hint slot is a code path — the card's evidence at a glance.
         hint: c.files[0] ?? "",
+        // …and how much of the repository sits behind it, so the footer says
+        // both where to look and how big the thing is.
+        meta: fileNote(c),
         kind: KIND[c.type],
         tech: c.tech,
         col: col as 0 | 1 | 2,

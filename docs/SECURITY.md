@@ -90,6 +90,16 @@ or a log, and provider errors are scrubbed before becoming event labels
 (`backend/api/internal/server/model_select.go`). It is still a secret in browser
 storage on a page with no user separation — use a scoped key with a spend limit.
 
+The operator can also hold a key: with `TERRA_LLM_API_KEY` set, a request that
+names no `model_id` deliberately falls back to the analyzer's own environment
+(`backend/analyzer/terra_analyzer/inference/config.py`). That is the point of
+the hosted-key Compose recipe, and it is a spending hole the moment the API is
+reachable by anyone but the operator — the workspace hands its access cookie to
+everyone it serves the UI to. Set **`TERRA_REQUIRE_MODEL=1`** on any such
+deployment: analyze and ask then refuse a request that names no model
+(`backend/api/internal/server/server.go`), so a caller can only spend a key it
+supplied itself.
+
 ## Supported versions
 
 Terra is pre-1.0. Fixes land on `staging` and go out in the next release; there are

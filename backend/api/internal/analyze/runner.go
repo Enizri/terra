@@ -6,6 +6,7 @@ package analyze
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/Enizri/terra/backend/api/internal/analysis"
 	"github.com/Enizri/terra/backend/api/internal/analyzerclient"
@@ -53,6 +54,9 @@ type Result struct {
 	Warnings []string
 	Scan     *scan.Result
 	Cached   bool
+	// Timings is the per-stage wall clock of this run, in the order the
+	// stages ran. Callers surface it; nothing in the pipeline branches on it.
+	Timings []job.StageTiming
 }
 
 // Run executes scan → analyze → optional store. If cached is non-nil it is
@@ -67,6 +71,27 @@ func (r *Runner) RunBackground(ctx context.Context, repoURL string, opts analyze
 }
 
 func (r *Runner) run(ctx context.Context, repoURL string, opts analyzerclient.LLMOpts, cached *scan.Result, bg *Background) (*Result, error) {
+	clock := newClock()
+	// Every event leaves through here so the elapsed stamp cannot be forgotten
+	// on one branch and present on another.
+	emit := func(ev job.Event) {
+		if bg == nil {
+			return
+		}
+		ev.ElapsedMS = clock.elapsed().Milliseconds()
+		bg.Emit(ev)
+	}
+	fail := func(stage string, err error) (*Result, error) {
+		clock.stop(stage)
+		log.Printf("terra: analyze %s failed at %s: %s", repoURL, stage, clock.summary())
+		return nil, &Error{Stage: stage, Err: err}
+	}
+	finish := func(res *Result) (*Result, error) {
+		res.Timings = clock.stages
+		log.Printf("terra: analyze %s %s", repoURL, clock.summary())
+		return res, nil
+	}
+
 	res := cached
 	if res == nil {
 		if bg != nil {
@@ -74,71 +99,84 @@ func (r *Runner) run(ctx context.Context, repoURL string, opts analyzerclient.LL
 			if label == "" {
 				label = "Fetching " + repoURL
 			}
-			bg.Emit(job.Event{Stage: "fetch", Label: label})
+			emit(job.Event{Stage: "fetch", Label: label})
 			if err := ctx.Err(); err != nil {
-				return nil, &Error{Stage: "context", Err: err}
+				return fail("context", err)
 			}
 		}
 		commit := ""
 		if r.Resolve != nil {
 			canonical, _, resolved, err := r.Resolve(repoURL)
+			clock.stop("resolve")
 			if err != nil && bg != nil {
-				return nil, &Error{Stage: "scan", Err: err}
+				return fail("scan", err)
 			}
 			if err == nil {
 				commit = resolved
 			}
 			if err == nil {
 				if m := cachedAt(r.DB, canonical, commit); m != nil {
-					return &Result{Map: m, Cached: true}, nil
+					clock.stop("cache")
+					return finish(&Result{Map: m, Cached: true})
 				}
+				clock.stop("cache")
 			}
 		}
 		var err error
 		res, err = r.Scan(repoURL, commit)
 		if err != nil {
-			return nil, &Error{Stage: "scan", Err: err}
+			return fail("scan", err)
 		}
+		clock.stop("scan")
+	} else {
+		// Probe reuse: the fetch and scan were already paid for at the gate.
+		clock.skip()
 	}
 	if bg != nil {
-		bg.Emit(job.Event{
+		emit(job.Event{
 			Stage: "scan",
 			Label: fmt.Sprintf("Read %d files across %d languages", res.Stats.SourceFiles, len(res.Languages)),
 			Map:   ProvisionalMap(res),
 		})
+		clock.stop("provisional_map")
 	}
 	if r.DB != "" {
 		if m := cachedAt(r.DB, res.RepositoryURL, res.Commit); m != nil {
-			return &Result{Map: m, Scan: res, Cached: true}, nil
+			clock.stop("cache")
+			return finish(&Result{Map: m, Scan: res, Cached: true})
 		}
+		clock.stop("cache")
 	}
 	if err := ctx.Err(); err != nil {
-		return nil, &Error{Stage: "context", Err: err}
+		return fail("context", err)
 	}
 	if bg != nil && bg.EnsureModel != nil {
-		if err := bg.EnsureModel(ctx, bg.Emit); err != nil {
-			return nil, &Error{Stage: "ensure_model", Err: err}
+		if err := bg.EnsureModel(ctx, emit); err != nil {
+			return fail("ensure_model", err)
 		}
+		clock.stop("ensure_model")
 	}
 	if bg != nil {
-		bg.Emit(job.Event{Stage: "analyze", Label: "Terra is reading the architecture"})
+		emit(job.Event{Stage: "analyze", Label: "Terra is reading the architecture"})
 	}
 	repoMap, warnings, err := r.Analyze(ctx, res, opts)
 	if err != nil {
-		return nil, &Error{Stage: "analyze", Err: err}
+		return fail("analyze", err)
 	}
+	clock.stop("analyze")
 	if err := ctx.Err(); err != nil {
-		return nil, &Error{Stage: "context", Err: err}
+		return fail("context", err)
 	}
 	if r.DB != "" {
 		if bg != nil {
-			bg.Emit(job.Event{Stage: "store", Label: fmt.Sprintf("Saving %d components", len(repoMap.Components))})
+			emit(job.Event{Stage: "store", Label: fmt.Sprintf("Saving %d components", len(repoMap.Components))})
 		}
 		if err := store.Save(r.DB, res, repoMap); err != nil {
-			return nil, &Error{Stage: "store", Err: fmt.Errorf("store: %w", err)}
+			return fail("store", fmt.Errorf("store: %w", err))
 		}
+		clock.stop("store")
 	}
-	return &Result{Map: repoMap, Warnings: warnings, Scan: res}, nil
+	return finish(&Result{Map: repoMap, Warnings: warnings, Scan: res})
 }
 
 func cachedAt(db, repoURL, commit string) *analysis.Map {

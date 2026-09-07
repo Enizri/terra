@@ -14,6 +14,12 @@ type Config struct {
 	Addr  string // TERRA_ADDR (serve overrides with --addr)
 	Token string // TERRA_TOKEN; empty leaves the API open
 
+	// RequireModel makes an explicit model_id mandatory on /analyze and /ask.
+	// Off, an HTTP caller that names no model runs on the analyzer's own
+	// TERRA_LLM_* environment — the operator's key. That is the intended
+	// behaviour for a private deployment and a spending hole on a public one.
+	RequireModel bool // TERRA_REQUIRE_MODEL
+
 	RateLimit          float64       // TERRA_RATE_LIMIT req/s per IP; 0 disables
 	AnalyzeConcurrency int           // TERRA_ANALYZE_CONCURRENCY
 	AnalyzeTimeout     time.Duration // TERRA_ANALYZE_TIMEOUT
@@ -93,6 +99,11 @@ func FromEnv() *Config {
 	}
 	if b := strings.TrimSpace(os.Getenv("TERRA_DOCKER")); b != "" {
 		c.DockerBin = b
+	}
+	// Anything but a recognised true value leaves the fallback in place: this
+	// gate must never switch on by accident, only by intent.
+	if v, err := strconv.ParseBool(strings.TrimSpace(os.Getenv("TERRA_REQUIRE_MODEL"))); err == nil {
+		c.RequireModel = v
 	}
 	return c
 }

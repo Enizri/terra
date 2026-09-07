@@ -3,6 +3,7 @@ import type { TerraMap } from "../../../features/architecture-map";
 import {
   DetailsPanel,
   RepoDiagram,
+  drawnAncestor,
   matchComponents,
   matchSpan,
   toDiagram,
@@ -63,11 +64,14 @@ export function MapStage({
   map,
   selectedIds,
   onSelect,
+  onAsk,
   onElements,
 }: {
   map: TerraMap;
   selectedIds: string[];
   onSelect: (id: string | null, additive?: boolean) => void;
+  /** Put a component in the ask composer, optionally with a question to send. */
+  onAsk: (id: string, question?: string) => void;
   onElements: (picked: LiveSelection[]) => void;
 }) {
   const [all, setAll] = useState(false);
@@ -76,6 +80,14 @@ export function MapStage({
   // Stable view — diagram measure effect depends on it.
   const view = useMemo(() => toDiagram(map, { all }), [map, all]);
   const primary = selectedIds[selectedIds.length - 1] ?? null;
+  // The panel can be reading a component the canvas never drew — a nested part,
+  // or one a node cap left off — reached from the rail, from search, or from a
+  // connection link. Light its nearest drawn ancestor so the canvas and the
+  // panel are never talking about different places.
+  const lit = useMemo(
+    () => drawnAncestor(map.components, new Set(view.nodes.map((n) => n.id)), primary),
+    [map.components, view.nodes, primary],
+  );
 
   const [pulseId, setPulseId] = useState<string | null>(null);
   useEffect(() => {
@@ -161,10 +173,11 @@ export function MapStage({
       </div>
       <div className={`sh-ws__map${primary ? " has-details" : ""}`}>
         <RepoDiagram
+          dense
           nodes={view.nodes}
           edges={view.edges}
           groups={view.groups}
-          selectedId={primary}
+          selectedId={lit}
           pulseId={pulseId}
           onSelect={select}
           labelsOnHover
@@ -188,13 +201,17 @@ export function MapStage({
             <LiveFrame frameRef={frameRef} repoUrl={map.project.repository_url} />
           </div>
         )}
-        {/* A real grid track, not an overlay: the diagram reflows into the
-            room that is left and re-measures its own arrows on the resize. */}
-        {primary && (
-          <aside className="sh-ws__details">
-            <DetailsPanel map={map} selectedId={primary} onSelect={onSelect} />
-          </aside>
-        )}
+        {/* Always mounted, never resized — see `.sh-ws__map` in stage.css. With
+            nothing selected it is the map's table of contents, which is why the
+            column can afford to be permanent. */}
+        <aside className="sh-ws__details" aria-label="Details for the selected part">
+          <DetailsPanel
+            map={map}
+            selectedIds={selectedIds}
+            onSelect={(id) => select(id)}
+            onAsk={onAsk}
+          />
+        </aside>
       </div>
     </>
   );

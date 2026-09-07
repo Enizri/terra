@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	analyzepipeline "github.com/Enizri/terra/backend/api/internal/analyze"
-	"github.com/Enizri/terra/backend/api/internal/analyzerclient"
 	"github.com/Enizri/terra/backend/api/internal/job"
 	"github.com/Enizri/terra/backend/api/internal/scan"
 )
@@ -50,12 +49,20 @@ func (s *Server) analyze(w http.ResponseWriter, r *http.Request) {
 		httpError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	// This route has no picker, so it names no model and runs on the
+	// analyzer's own environment. Routed through selectModel anyway: that is
+	// where TERRA_REQUIRE_MODEL refuses an unrouted request, and this path
+	// spends the operator's key exactly like the enqueue one.
+	sel, ok := s.selectModel(w, "", "", req.Model)
+	if !ok {
+		return
+	}
 	if !s.acquireAnalyze() {
 		s.analyzeBusy(w)
 		return
 	}
 	if strings.Contains(r.Header.Get("Accept"), "application/x-ndjson") {
-		s.analyzeStream(w, r.Context(), req.RepoURL, req.Model, s.releaseAnalyze)
+		s.analyzeStream(w, r.Context(), req.RepoURL, sel, s.releaseAnalyze)
 		return
 	}
 	defer s.releaseAnalyze()
@@ -65,7 +72,7 @@ func (s *Server) analyze(w http.ResponseWriter, r *http.Request) {
 		Scan:    s.Scan,
 		Analyze: s.Analyze,
 		DB:      s.DB,
-	}).Run(r.Context(), req.RepoURL, analyzerclient.LLMOpts{Model: req.Model}, nil)
+	}).Run(r.Context(), req.RepoURL, sel.Opts, nil)
 	if err != nil {
 		status := http.StatusInternalServerError
 		var pipelineErr *analyzepipeline.Error
@@ -88,12 +95,10 @@ func (s *Server) analyze(w http.ResponseWriter, r *http.Request) {
 
 // analyzeStream runs analyze as a job and writes NDJSON events on this response.
 // done releases the caller's analyze slot when the job finishes.
-func (s *Server) analyzeStream(w http.ResponseWriter, ctx context.Context, repoURL, model string, done func()) {
-	// Legacy path: no picker, so the analyzer keeps its own environment.
-	j := s.startAnalyzeJob(analyzeJob{
-		repoURL: repoURL,
-		sel:     modelSelection{Opts: analyzerclient.LLMOpts{Model: model}},
-	}, done)
+func (s *Server) analyzeStream(w http.ResponseWriter, ctx context.Context, repoURL string, sel modelSelection, done func()) {
+	// Legacy path: sel carries no routing, so the analyzer keeps its own
+	// environment. The caller has already passed it through selectModel.
+	j := s.startAnalyzeJob(analyzeJob{repoURL: repoURL, sel: sel}, done)
 	s.streamJobEvents(w, ctx, j)
 }
 
@@ -207,7 +212,9 @@ func (s *Server) startAnalyzeJob(work analyzeJob, done func()) *job.Job {
 		for _, warn := range result.Warnings {
 			fmt.Fprintln(os.Stderr, "warning:", warn)
 		}
-		safeEmit(job.Event{Stage: "done", Map: result.Map})
+		// The terminal event carries the per-stage breakdown: a user who waited
+		// too long can see which stage spent it without reading server logs.
+		safeEmit(job.Event{Stage: "done", Map: result.Map, Timings: result.Timings})
 	})
 }
 

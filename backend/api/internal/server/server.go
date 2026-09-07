@@ -260,7 +260,14 @@ func (s *Server) ListenAndServe(addr string) error {
 // writes the 400 itself and reports ok=false when the request cannot run.
 func (s *Server) selectModel(w http.ResponseWriter, modelID, apiKey, fallbackModel string) (modelSelection, bool) {
 	if modelID == "" {
-		// No pick: legacy/operator behaviour, TERRA_LLM_* decides.
+		// No pick: legacy/operator behaviour, TERRA_LLM_* decides. That spends
+		// whatever key the analyzer holds, so a deployment that serves the
+		// public sets TERRA_REQUIRE_MODEL and every caller brings its own.
+		if s.Cfg != nil && s.Cfg.RequireModel {
+			httpError(w, http.StatusBadRequest,
+				"this deployment requires an explicit model_id; pick a model (GET /models) and send its key")
+			return modelSelection{}, false
+		}
 		return modelSelection{Opts: analyzerclient.LLMOpts{Model: fallbackModel}}, true
 	}
 	entry := catalog.Find(modelID)

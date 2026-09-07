@@ -212,6 +212,7 @@ Caps: `TERRA_PREVIEW_MAX` (default 2, counting **apps** not repos), idle TTL
 | `TERRA_LLM_TIMEOUT` | analyzer | `600` | Seconds to wait for a chat/completions response (read timeout) |
 | `TERRA_ANALYZE_TIMEOUT` | Go | `15m` | Wall-clock cap for one analyze job |
 | `TERRA_RATE_LIMIT` | Go | `2` | Per-IP requests/sec on jobs/preview/ask (0 disables) |
+| `TERRA_REQUIRE_MODEL` | Go | `false` | `1` makes `model_id` mandatory on analyze and ask; without it a caller that names no model runs on the analyzer's own `TERRA_LLM_*` key |
 | `TERRA_ANALYZE_CONCURRENCY` | Go | `4` | Max analyze jobs in flight; extra requests get 429 |
 | `TERRA_MODEL` | analyzer + local LLM | `Qwen/Qwen2.5-0.5B-Instruct-GGUF/qwen2.5-0.5b-instruct-q4_k_m.gguf` | GGUF quant as `<hf-repo>/<file>.gguf` |
 | `TERRA_N_CTX` | local LLM | `18432` | Context window; must clear the largest prompt plus 4096 output tokens |
@@ -220,11 +221,53 @@ Caps: `TERRA_PREVIEW_MAX` (default 2, counting **apps** not repos), idle TTL
 | `TERRA_PREVIEW_MODE` | Go | _(empty)_ = host | `docker` for Compose sibling previews |
 | `TERRA_CHECKOUT_DIR` | Go | user cache | Shared checkout root (Compose: `/data/checkouts`) |
 | `TERRA_PUBLIC_URL` | Go | `http://127.0.0.1:8080` | Origin used in `/__live/...` preview URLs |
-| `TERRA_PREVIEW_MAX` | Go | `2` | Max concurrent preview **apps** (host and Docker) |
+| `TERRA_PREVIEW_MAX` | Go | `2` | Max concurrent preview **apps** (host and Docker); `0` refuses every preview before checkout |
 | `TERRA_PREVIEW_TTL` | Go | `30m` | Idle TTL before a preview is stopped (host and Docker) |
 | `TERRA_DEVICE` | local LLM + Go | `auto` (`mps` / `cuda` / `cpu`) | Device for `make run-llm` / Compose `llm`; also reported by `GET /host/capabilities` |
 | `TERRA_LOCAL_LLM_URL` | Go | `http://localhost:8020` | Sidecar the workspace picker loads local models into (`http://llm:8020` in Compose) |
+| `VITE_TERRA_DEMO` | web build | _(empty)_ | `1` seeds the bundled memos map on an empty stage and shows the demo notice; see [Public demo build](#public-demo-build) |
 | `GITHUB_TOKEN` | Go scan | _(empty)_ | GitHub PAT for analyze/fetch; without it ~60 REST req/hour/IP, with it ~5,000/hour |
+
+## Public demo build
+
+A build for a public URL is deliberately less than the full app: it reads
+repositories, it does not run them.
+
+```sh
+# server
+TERRA_PREVIEW_MAX=0        # refuse every preview — the only path that executes
+                           # an analyzed repository's code
+TERRA_LLM_API_KEY=         # empty: analyze and ask are bring-your-own-key
+TERRA_REQUIRE_MODEL=1      # and refuse any request that names no model, so
+                           # BYOK holds in code and not just in configuration
+TERRA_TOKEN=<random>       # still required for a non-loopback bind
+TERRA_RATE_LIMIT=0.2
+GITHUB_TOKEN=<PAT, public repo read only>
+
+# web
+VITE_TERRA_DEMO=1 npm --prefix apps/web run build
+```
+
+`TERRA_PREVIEW_MAX=0` is checked before checkout
+(`backend/api/internal/preview/host.go`, `docker.go`), so `POST /preview` and
+the `/jobs/preview*` routes fail without fetching anything.
+
+`TERRA_REQUIRE_MODEL=1` closes the other half. A request that sends no
+`model_id` normally means "operator's choice" and leaves the analyzer on its
+own `TERRA_LLM_*` environment — the right default for a private deployment,
+and a way to spend the operator's key on a public one. With the gate on, every
+analyze and ask must name a catalog model and carry its own key.
+
+`VITE_TERRA_DEMO=1` changes two things in the UI: an empty stage renders the
+bundled `case-studies/memos.map.json` instead of nothing, so an arriving
+visitor reads a real map — components, evidence links, ask — without pasting a
+repo or a key; and a notice explains that live preview is a local-only feature.
+Dropping a repo still works and replaces the fixture with that run. `?nofixture`
+gets the empty stage back.
+
+Read [`docs/SECURITY.md`](docs/SECURITY.md) before putting any build on a
+public address: `TERRA_TOKEN` is a single shared secret, the API hands its
+cookie to everyone it serves the UI to, and there are no user accounts.
 
 ## Choosing a model in the workspace
 

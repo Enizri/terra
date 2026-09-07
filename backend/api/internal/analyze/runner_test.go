@@ -47,4 +47,7 @@ func TestRunUsesResolvedCacheBeforeScan(t *testing.T) {
 	if !got.Cached || got.Map.Project.RepositoryURL != res.RepositoryURL {
 		t.Fatalf("got %+v", got)
 	}
+	if len(got.Timings) == 0 {
+		t.Fatal("a cache hit still reports per-stage timings")
+	}
 }

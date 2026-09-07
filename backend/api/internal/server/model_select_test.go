@@ -110,6 +110,45 @@ func TestAnalyzeWithoutAModelIDKeepsTheEnvFallback(t *testing.T) {
 	}
 }
 
+func TestRequireModelRejectsAnUnroutedRequest(t *testing.T) {
+	// The public-demo posture: no model_id must not fall through to whatever
+	// key the analyzer's environment holds.
+	s, ts := testServer(t)
+	s.Cfg.RequireModel = true
+	for _, route := range []string{"/jobs/analyze", "/jobs/ask", "/analyze", "/ask"} {
+		resp, err := http.Post(ts.URL+route, "application/json",
+			strings.NewReader(`{"repo_url":"https://github.com/acme/notes","question":"what is this"}`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var got map[string]string
+		json.NewDecoder(resp.Body).Decode(&got)
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("%s: status = %d, want 400", route, resp.StatusCode)
+			continue
+		}
+		if !strings.Contains(got["error"], "explicit model_id") {
+			t.Errorf("%s: error = %q, want the explicit-model_id hint", route, got["error"])
+		}
+	}
+}
+
+func TestRequireModelStillAcceptsAPickedModel(t *testing.T) {
+	s, ts := testServer(t)
+	s.Cfg.RequireModel = true
+	var got analyzerclient.LLMOpts
+	s.Analyze = func(ctx context.Context, res *scan.Result, opts analyzerclient.LLMOpts) (*analysis.Map, []string, error) {
+		got = opts
+		return &analysis.Map{Components: []analysis.Component{{ID: "a"}}}, nil, nil
+	}
+	body := `{"repo_url":"https://github.com/acme/notes","model_id":"openai-gpt-5.4-mini","api_key":"` + leakKey + `"}`
+	runJob(t, ts, "/jobs/analyze", body)
+	if got.APIKey != leakKey || got.Model != "gpt-5.4-mini" {
+		t.Errorf("routed opts = %+v, want the caller's own key and model", got)
+	}
+}
+
 func TestAnalyzeReusesAProbeScan(t *testing.T) {
 	s, ts := testServer(t)
 	s.RepoMeta = func(string) (string, int64, error) { return "", 0, fmt.Errorf("skip") }

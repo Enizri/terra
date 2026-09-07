@@ -40,6 +40,11 @@
   --sh-space-5: 20px;
   --sh-space-6: 32px;
 
+  /* The two brand accents feature stylesheets kept retyping as raw hex: the
+     terra orange of the mark and the lilac wash under its chips. */
+  --sh-terra: #e8400d;
+  --sh-accent-soft: #f1e8ff;
+
   --sh-radius-sm: 8px;
   --sh-radius-md: 12px;
   --sh-radius-lg: 16px;

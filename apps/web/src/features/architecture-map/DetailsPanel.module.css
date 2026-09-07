@@ -1,152 +1,526 @@
+/* The reading column. It is chrome, not a card floating over the map: the
+   column is always there (stage.css owns the track), so it takes the window
+   surface and a left border like the rail rather than a shadow and a radius.
+   Every colour, radius and step is a token — the panel used to retype
+   #f1e8ff / #e8400d / #ac7eff by hand. */
+
 .slot {
-  min-height: 320px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
 }
 
 .panel {
-  position: relative;
-  background: #fff;
-  border: 1px solid var(--sh-border);
-  border-radius: 14px;
-  padding: 24px;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
 }
 
-.close {
-  position: absolute;
-  top: 14px;
-  right: 16px;
-  border: none;
+/* ---- head: where you are, and the way back ---- */
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--sh-space-3);
+  flex: none;
+  padding: var(--sh-space-3) var(--sh-space-4);
+  border-bottom: 1px solid var(--sh-border);
+}
+
+/* Deselecting returns to the table of contents, so it is navigation and reads
+   as a back link — not an × that dismisses the column out of existence. */
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: -6px;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: var(--sh-radius-sm);
   background: none;
-  font-size: 22px;
-  line-height: 1;
-  color: var(--sh-muted-2);
+  font: inherit;
+  font-size: var(--sh-text-md);
+  color: var(--sh-muted);
+  cursor: pointer;
 }
 
-.close:hover {
+.back:hover {
+  background: var(--sh-bg);
   color: var(--sh-ink);
+}
+
+.backChev {
+  display: grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  rotate: 90deg;
+}
+
+.backChev svg {
+  width: 14px;
+  height: 14px;
 }
 
 .kicker {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  font-size: 11px;
+  gap: var(--sh-space-2);
+  margin-left: auto;
+  font-size: var(--sh-text-xs);
   font-weight: 600;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
   color: var(--sh-muted-2);
+  white-space: nowrap;
 }
 
 .importance {
-  padding: 2px 10px;
-  border-radius: 999px;
-  background: #f1e8ff;
+  padding: 2px 8px;
+  border-radius: var(--sh-radius-pill);
+  background: var(--sh-accent-soft);
   color: var(--sh-ink);
+  letter-spacing: 0.06em;
 }
 
 .importance[data-importance="critical"] {
-  background: #e8400d;
+  background: var(--sh-terra);
   color: #fff;
 }
 
+/* ---- body ---- */
+
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sh-space-2);
+  padding: var(--sh-space-4) var(--sh-space-4) var(--sh-space-6);
+}
+
+.body section {
+  /* A flex item that can shrink would squash the evidence lists when the
+     column is short; the body scrolls instead. */
+  flex: none;
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  gap: var(--sh-space-2);
+}
+
+.titleIcon {
+  flex: none;
+  display: inline-flex;
+}
+
 .name {
-  font-size: 26px;
+  margin: 0;
+  font-size: 21px;
+  line-height: 1.2;
   color: var(--sh-ink);
-  margin: 10px 0 8px;
+  overflow-wrap: anywhere;
+}
+
+.crumb {
+  margin: 0;
+  font-size: var(--sh-text-md);
+  color: var(--sh-muted-2);
 }
 
 .purpose {
-  font-size: 15px;
-  line-height: 1.55;
+  margin: 2px 0 0;
+  font-size: var(--sh-text-xl);
+  line-height: 1.5;
   color: var(--sh-muted);
+}
+
+/* Why the badge in the header says "Core" — one sentence, not a colour to
+   decode. */
+.weight {
+  margin: 0;
+  font-size: var(--sh-text-md);
+  line-height: 1.45;
+  color: var(--sh-muted-2);
+}
+
+.hint {
+  margin: var(--sh-space-2) 0 0;
+  font-size: var(--sh-text-md);
+  line-height: 1.5;
+  color: var(--sh-muted-2);
 }
 
 .chips {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: 14px;
+  margin-top: var(--sh-space-2);
 }
 
 .chip {
-  padding: 4px 12px;
-  border-radius: 999px;
-  background: #f1e8ff;
+  padding: 3px 10px;
+  border-radius: var(--sh-radius-pill);
+  background: var(--sh-accent-soft);
   color: var(--sh-ink);
-  font-size: 12px;
+  font-size: var(--sh-text-sm);
   font-weight: 500;
 }
 
+/* ---- ask ---- */
+
+/* Sits above the evidence on purpose: the moment after "what is this?" is
+   "let me ask about it", and the dock is one column further right. */
+.ask {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: var(--sh-space-3) 0 var(--sh-space-1);
+  padding: var(--sh-space-3);
+  border: 1px solid var(--sh-border);
+  border-radius: var(--sh-radius-md);
+  background: var(--sh-bg);
+}
+
+.askMain {
+  display: flex;
+  align-items: center;
+  gap: var(--sh-space-2);
+  width: 100%;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: var(--sh-radius-sm);
+  background: var(--sh-ink);
+  color: #fff;
+  font: inherit;
+  font-size: var(--sh-text-lg);
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.askMain:hover {
+  background: var(--sh-terra);
+}
+
+.askArrow {
+  display: grid;
+  place-items: center;
+  margin-left: auto;
+  width: 16px;
+  height: 16px;
+}
+
+.askArrow svg {
+  width: 16px;
+  height: 16px;
+}
+
+.askChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.askChip {
+  padding: 5px 10px;
+  border: 1px solid var(--sh-border);
+  border-radius: var(--sh-radius-pill);
+  background: var(--sh-window);
+  font: inherit;
+  font-size: var(--sh-text-sm);
+  color: var(--sh-muted);
+  text-align: left;
+  cursor: pointer;
+}
+
+.askChip:hover {
+  border-color: var(--sh-ink);
+  color: var(--sh-ink);
+}
+
+.stacked {
+  margin: 2px 0 0;
+  font-size: var(--sh-text-sm);
+  color: var(--sh-muted-2);
+}
+
+/* ---- section headings ---- */
+
 .subhead {
-  margin-top: 20px;
-  margin-bottom: 8px;
-  font-size: 11px;
+  display: flex;
+  align-items: baseline;
+  gap: var(--sh-space-2);
+  margin: var(--sh-space-4) 0 var(--sh-space-1);
+  font-size: var(--sh-text-xs);
   font-weight: 600;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
   color: var(--sh-muted-2);
 }
 
-.files {
-  list-style: none;
-  padding: 0;
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 12px;
-  color: var(--sh-muted);
-  display: grid;
-  gap: 4px;
-  word-break: break-all;
-}
-
-.edges {
-  list-style: none;
-  padding: 0;
-  display: grid;
-  gap: 12px;
-}
-
-.edgeItem {
-  border-left: 3px solid #ac7eff;
-  padding-left: 12px;
-}
-
-.edgeHead {
-  font-size: 13.5px;
-  font-weight: 500;
-}
-
-.edgeHead em {
-  color: #e8400d;
-  font-style: italic;
-}
-
-.because {
-  margin-top: 3px;
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 11.5px;
+.subhead em {
+  margin-left: auto;
+  font-style: normal;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  font-size: var(--sh-text-sm);
   color: var(--sh-muted-2);
-  word-break: break-word;
 }
 
-.empty {
-  display: grid;
-  place-content: center;
-  text-align: center;
-  gap: 8px;
-  min-height: 320px;
-  border: 1.5px dashed rgba(0, 0, 0, 0.16);
-  border-radius: 14px;
-  padding: 24px;
+/* ---- connections ---- */
+
+.conns,
+.inside,
+.files,
+.paths {
+  list-style: none;
+  margin: 0;
+  padding: 0;
 }
 
-.emptyTitle {
-  font-family: var(--font);
-  font-size: 22px;
+.conns {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sh-space-3);
+}
+
+/* The rule is the direction: a link this part makes reads down the terra edge,
+   a link made to it reads down the quiet one. Colour carries it so the
+   sentence does not have to say "incoming". */
+.conn {
+  padding-left: 10px;
+  border-left: 2px solid var(--sh-border);
+}
+
+.conn[data-dir="out"] {
+  border-left-color: var(--sh-terra);
+}
+
+.sentence {
+  margin: 0;
+  font-size: var(--sh-text-lg);
+  line-height: 1.45;
   color: var(--sh-ink);
 }
 
-.emptyBody {
-  font-size: 14px;
+.self {
+  font-weight: 600;
+}
+
+.verb {
   color: var(--sh-muted);
-  max-width: 26em;
+}
+
+/* Following the wiring is a click on the other end's name. Underlined on
+   hover only — a panel of blue links would out-shout the sentences. */
+.jump {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--color-tint);
+  cursor: pointer;
+}
+
+.jump:hover,
+.jump:focus-visible {
+  text-decoration: underline;
+}
+
+.connTag {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0 0 2px;
+  font-size: var(--sh-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sh-muted-2);
+}
+
+/* Only the arrow takes the accent. Three orange headings stacked down the
+   column shouted louder than the sentences they label. */
+.conn[data-dir="out"] .connTag span {
+  color: var(--sh-terra);
+}
+
+/* The head of the panel when nothing is open — a label, not a shouted kicker:
+   a project "kind" runs to five words and would wrap the header twice. */
+.headTitle {
+  font-size: var(--sh-text-lg);
+  font-weight: 600;
+  color: var(--sh-ink);
+}
+
+/* Proof, kept to one line. The developer who wants it has it (and the full
+   string on hover); the reader who does not scans straight past. */
+.evidence {
+  margin: 3px 0 0;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: var(--sh-text-xs);
+  line-height: 1.4;
+  color: var(--sh-muted-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---- nested parts / table of contents ---- */
+
+.inside {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.insideRow {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 100%;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: var(--sh-radius-sm);
+  background: none;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.insideRow[data-nested] {
+  margin-left: var(--sh-space-3);
+  border-left: 1px solid var(--sh-border);
+  border-radius: 0 var(--sh-radius-sm) var(--sh-radius-sm) 0;
+}
+
+.insideRow:hover,
+.insideRow:focus-visible {
+  background: var(--sh-bg);
+}
+
+.insideRow b {
+  font-size: var(--sh-text-lg);
+  font-weight: 500;
+}
+
+.insideRow em {
+  font-style: normal;
+  font-size: var(--sh-text-md);
+  line-height: 1.4;
+  color: var(--sh-muted-2);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
+/* ---- where it lives ---- */
+
+.note {
+  margin: 0 0 var(--sh-space-1);
+  font-size: var(--sh-text-md);
+  color: var(--sh-muted-2);
+}
+
+.files {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fileRow,
+.fileGroup > summary {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sh-space-2);
+  margin: 0;
+  padding: 6px 8px;
+  border-radius: var(--sh-radius-sm);
+  cursor: default;
+}
+
+.fileGroup > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.fileGroup > summary::-webkit-details-marker {
+  display: none;
+}
+
+.fileGroup > summary:hover,
+.fileRow:hover {
+  background: var(--sh-bg);
+}
+
+.chev {
+  display: grid;
+  place-items: center;
+  width: 12px;
+  height: 12px;
+  flex: none;
+  color: var(--sh-muted-2);
+  rotate: -90deg;
+  transition: rotate 0.15s ease;
+}
+
+.chev svg {
+  width: 12px;
+  height: 12px;
+}
+
+.fileGroup[open] .chev {
+  rotate: 0deg;
+}
+
+/* Paths break at the slashes rather than mid-word: a folder name cut in half
+   is unreadable, and the column is 320px wide. */
+.path {
+  min-width: 0;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: var(--sh-text-sm);
+  line-height: 1.45;
+  color: var(--sh-muted);
+  overflow-wrap: anywhere;
+}
+
+.fileRow em,
+.fileGroup > summary em {
+  margin-left: auto;
+  flex: none;
+  font-style: normal;
+  font-size: var(--sh-text-xs);
+  color: var(--sh-muted-2);
+  white-space: nowrap;
+}
+
+.paths {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0 0 var(--sh-space-2);
+  padding: 2px 8px 2px 30px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: var(--sh-text-sm);
+  line-height: 1.5;
+  color: var(--sh-muted-2);
+  overflow-wrap: anywhere;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chev {
+    transition: none;
+  }
 }

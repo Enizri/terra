@@ -119,6 +119,7 @@ export default function RepoDiagram({
   remeasureKey,
   scriptHoverId = null,
   scripted = false,
+  dense = false,
 }: {
   nodes: DiagramNodeView[];
   edges: DiagramEdgeView[];
@@ -137,6 +138,12 @@ export default function RepoDiagram({
   scriptHoverId?: string | null;
   /** Inert scripted film: window-level listeners would leak to the page. */
   scripted?: boolean;
+  /** Fold the "Verified" row into the footer instead of giving it a row of its
+   *  own. A map of a real repository puts four cards in the middle column and
+   *  the canvas clips; the standalone row cost every card ~20px to say the
+   *  same word, so the dense card spends them on a second line of purpose and
+   *  keeps the green dot next to the file that earns it. */
+  dense?: boolean;
 }) {
   const byId = Object.fromEntries(nodes.map((n) => [n.id, n]));
   const reduced = useReducedMotion();
@@ -278,6 +285,15 @@ export default function RepoDiagram({
 
   const d = (delay: number) => (reduced ? 0 : delay);
 
+  const verifiedDot = (n: DiagramNodeView) => (
+    <motion.i
+      className="sh-diagram__status-dot"
+      initial={{ scale: 0, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      transition={{ ...spring, delay: d(nodeDelay(n) + 0.35) }}
+    />
+  );
+
   const cardBody = (n: DiagramNodeView) => (
     <>
       <span className="sh-diagram__node-top">
@@ -285,18 +301,19 @@ export default function RepoDiagram({
         <span className="sh-diagram__name">{n.label}</span>
       </span>
       <span className="sh-diagram__purpose">{n.purpose}</span>
-      <span className="sh-diagram__status">
-        <motion.i
-          className="sh-diagram__status-dot"
-          initial={{ scale: 0, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ ...spring, delay: d(nodeDelay(n) + 0.35) }}
-        />
-        Verified
-      </span>
-      {n.hint && (
+      {!dense && (
+        <span className="sh-diagram__status">
+          {verifiedDot(n)}
+          Verified
+        </span>
+      )}
+      {(n.hint || dense) && (
         <span className="sh-diagram__foot">
-          <span className="sh-diagram__hint">{n.hint}</span>
+          {dense && verifiedDot(n)}
+          <span className="sh-diagram__hint" title={n.hint}>
+            {n.hint}
+          </span>
+          {dense && n.meta && <span className="sh-diagram__size">{n.meta}</span>}
         </span>
       )}
     </>

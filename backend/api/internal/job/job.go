@@ -23,11 +23,25 @@ import (
 // Nothing secret goes here: events are replayed to every subscriber and to
 // the browser. In particular a request's API key must never reach an Event,
 // not even inside Label.
+
+// StageTiming is one pipeline stage's wall-clock cost, in milliseconds.
+type StageTiming struct {
+	Stage  string `json:"stage"`
+	Millis int64  `json:"ms"`
+}
+
 type Event struct {
 	Stage  string        `json:"stage"`
 	Label  string        `json:"label,omitempty"`
 	Map    *analysis.Map `json:"map,omitempty"`
 	Answer string        `json:"answer,omitempty"`
+
+	// ElapsedMS is milliseconds since the job started, stamped on every event
+	// so a client can show how long the user has actually been waiting and an
+	// operator can read the shape of a slow run straight off the stream.
+	ElapsedMS int64 `json:"elapsed_ms,omitempty"`
+	// Timings is the per-stage breakdown, carried on the terminal event only.
+	Timings []StageTiming `json:"timings,omitempty"`
 
 	// Probe job only: the handle analyze reuses, plus what the picker shows.
 	ProbeID        string                    `json:"probe_id,omitempty"`

@@ -21,6 +21,20 @@ def known_paths(res: ScanResult) -> set[str]:
     return set(res.files) | set(res.dirs)
 
 
+def path_choices(res: ScanResult, limit: int) -> list[str]:
+    """Directories the model may cite, shallowest first, capped at limit.
+
+    These become an enum in the decoding schema, so the order decides what a
+    large repository loses: depth first, because a component a non-engineer
+    would name lives near the top of the tree ("web/", "server/router/"), not
+    eight levels down. Directories only — the role prompt already says a
+    directory is usually the better citation, and enumerating every file would
+    blow past what a hosted structured-output endpoint accepts.
+    """
+    dirs = sorted(res.dirs, key=lambda path: (path.count("/"), path))
+    return [path + "/" for path in dirs[:limit]]
+
+
 def validate(draft: Draft, known: set[str], strict: bool) -> tuple[list[str], list[str]]:
     """Normalize draft in place. strict=True → issues as errors (retry); else warnings.
     Returns (warnings, errors)."""
@@ -128,6 +142,41 @@ def validate(draft: Draft, known: set[str], strict: bool) -> tuple[list[str], li
     if strict:
         return [], issues
     return issues, []
+
+
+# A second generation costs exactly as long as the first, which on a local
+# model is most of the user's wait. validate() already repairs everything it
+# can — dropping invented citations, un-nesting a child filed under the wrong
+# column, deleting edges that name components nobody defined — so a draft with
+# issues is usually still a map worth reading. Only these thresholds, which
+# describe a map that would be misleading rather than merely imperfect, are
+# worth paying for a retry.
+# Three cards is a complete small app (screens, logic, storage). The schema
+# still asks the model for more; this floor is what survives repair.
+MIN_COMPONENTS = 3
+MIN_EVIDENCE_SHARE = 0.5
+
+
+def unusable(draft: Draft) -> list[str]:
+    """Reasons the repaired draft should not be shown at all (empty = ship it)."""
+    reasons: list[str] = []
+    if len(draft.components) < MIN_COMPONENTS:
+        reasons.append(
+            f"only {len(draft.components)} components survived validation; "
+            f"a readable map needs at least {MIN_COMPONENTS}"
+        )
+    if not draft.relationships:
+        reasons.append(
+            "no relationship between any two components survived; a map with "
+            "no edges shows nothing about how the parts fit together"
+        )
+    cited = sum(1 for component in draft.components if component.files)
+    if draft.components and cited < len(draft.components) * MIN_EVIDENCE_SHARE:
+        reasons.append(
+            f"only {cited} of {len(draft.components)} components cite a real file "
+            "or directory; every component has to link back to its evidence"
+        )
+    return reasons
 
 
 def clean_path(path: str) -> str:

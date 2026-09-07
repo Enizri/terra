@@ -236,10 +236,25 @@
   font-size: 12px;
   line-height: 1.4;
   color: var(--dg-muted);
+  /* A generated purpose is a paragraph, not the landing's hand-written
+     one-liner. Two lines is what a card can spend and still leave a four-card
+     column inside the canvas; the whole sentence is in the details panel one
+     column to the right. The landing's own purposes fit on one line, so this
+     costs it nothing. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
 }
 
 .sh-diagram__foot {
-  display: block;
+  /* One row: the dense card (RepoDiagram's `dense`) puts the verified dot in
+     here beside the file that earns it, instead of spending a row above on the
+     word "Verified" alone. */
+  display: flex;
+  align-items: center;
+  gap: 6px;
   align-self: stretch;
   margin-top: 3px;
   padding-top: 8px;
@@ -247,8 +262,21 @@
   min-width: 0;
 }
 
+/* How much code is behind the card. Pinned right so the paths beside it stay
+   left-aligned down the column. */
+.sh-diagram__size {
+  flex: none;
+  margin-left: auto;
+  font-family: var(--dg-mono);
+  font-size: 10px;
+  line-height: 16px;
+  color: rgba(255, 255, 255, 0.32);
+  white-space: nowrap;
+}
+
 .sh-diagram__hint {
   display: block;
+  min-width: 0;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;

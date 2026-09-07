@@ -16,6 +16,7 @@ export function DropStage({
   map,
   selectedIds,
   onSelect,
+  onAsk,
   onElements,
   onModel,
 }: {
@@ -23,6 +24,7 @@ export function DropStage({
   map: TerraMap | null;
   selectedIds: string[];
   onSelect: (id: string | null, additive?: boolean) => void;
+  onAsk: (id: string, question?: string) => void;
   onElements: (picked: LiveSelection[]) => void;
   onModel: (choice: ModelChoice) => void;
 }) {
@@ -79,7 +81,13 @@ export function DropStage({
         />
       ) : map ? (
         <>
-          <MapStage map={map} selectedIds={selectedIds} onSelect={onSelect} onElements={onElements} />
+          <MapStage
+            map={map}
+            selectedIds={selectedIds}
+            onSelect={onSelect}
+            onAsk={onAsk}
+            onElements={onElements}
+          />
           {running && (
             <div className="sh-ws__mapping-bar" aria-live="polite">
               <StatusLine

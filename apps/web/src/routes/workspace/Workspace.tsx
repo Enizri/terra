@@ -13,11 +13,13 @@ import {
 } from "../../features/analysis";
 import { wsCache } from "./cache";
 import { useAnalyze } from "./useAnalyze";
-import { nextSelection } from "./selection";
+import { askSelection, nextSelection } from "./selection";
 import { extractGitHubURL } from "./githubUrl";
 import { toHistory, type HistoryEntry } from "./history";
 import { WorkspaceHeader } from "../../shared/shell/WorkspaceHeader";
+import { DemoBanner } from "../../shared/shell/DemoBanner";
 import { Sidebar } from "../../shared/shell/Sidebar";
+import { showFixture } from "../../shared/demo";
 import { DropStage } from "./sections/Stage";
 import { SessionModels } from "./sections/SessionModels";
 import "../../shared/styles/tokens.css";
@@ -37,6 +39,10 @@ export default function Workspace() {
   const [sessionModel, setSessionModel] = useState(wsCache.selectedModel);
   const [railOpen, setRailOpen] = useState(wsCache.railOpen);
   const [dockOpen, setDockOpen] = useState(wsCache.dockOpen);
+  /** Bumped when the map asks the dock for attention; see `askAbout`. */
+  const [askPending, setAskPending] = useState<{ nonce: number; question?: string }>({
+    nonce: 0,
+  });
 
   const toggleRail = () =>
     setRailOpen((v) => {
@@ -52,10 +58,12 @@ export default function Workspace() {
   const deletedIds = useRef(new Set<number>());
   const autoOpened = useRef(false);
 
-  const fixture =
-    import.meta.env.DEV && new URLSearchParams(search).has("fixture")
-      ? (memosFixture as TerraMap)
-      : null;
+  // A demo build seeds the memos map so an arriving visitor reads a real map
+  // before pasting anything; dev keeps its `?fixture` opt-in. See shared/demo.
+  const demo = import.meta.env.VITE_TERRA_DEMO === "1";
+  const fixture = showFixture(search, import.meta.env.DEV, demo)
+    ? (memosFixture as TerraMap)
+    : null;
   // Live run wins; else stored map; else last finished run / fixture.
   const map = analyze.running ? analyze.map : (storedMap ?? analyze.map ?? fixture);
 
@@ -159,6 +167,19 @@ export default function Workspace() {
     setSelectedIds((prev) => nextSelection(prev, id, additive));
   };
 
+  /** The one gesture from "I clicked this card" to "I asked about this card":
+   *  make it the subject, make sure the dock is on screen, and hand the
+   *  composer the cursor — or send the question outright when the panel's
+   *  starter chips name one. */
+  const askAbout = (id: string, question?: string) => {
+    setSelectedIds((prev) => askSelection(prev, id));
+    setDockOpen(() => {
+      wsCache.dockOpen = true;
+      return true;
+    });
+    setAskPending((prev) => ({ nonce: prev.nonce + 1, question }));
+  };
+
   const selected = useMemo(
     () =>
       selectedIds
@@ -171,7 +192,7 @@ export default function Workspace() {
     <div
       className={`sh-root sh-ws${railOpen ? "" : " is-rail-collapsed"}${
         dockOpen ? "" : " is-dock-hidden"
-      }`}
+      }${demo ? " has-demo-banner" : ""}`}
     >
       <WorkspaceHeader
         slug={slug}
@@ -184,6 +205,7 @@ export default function Workspace() {
         onToggleDock={toggleDock}
         onRepo={(raw) => analyze.start(extractGitHubURL(raw) ?? raw)}
       />
+      {demo && <DemoBanner />}
       <Sidebar
         map={map}
         history={history}
@@ -199,6 +221,7 @@ export default function Workspace() {
         map={map}
         selectedIds={selectedIds}
         onSelect={select}
+        onAsk={askAbout}
         onElements={setElements}
         onModel={chooseModel}
       />
@@ -207,6 +230,7 @@ export default function Workspace() {
         selected={selected}
         elements={elements}
         askReady={!!map && !analyze.partial}
+        pending={askPending}
         model={sessionModel ?? undefined}
         modelPicker={
           map ? <SessionModels selected={sessionModel} onChoose={chooseModel} /> : null

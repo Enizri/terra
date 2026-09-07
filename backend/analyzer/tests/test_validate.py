@@ -1,9 +1,12 @@
 from terra_analyzer.contracts import Draft
+from terra_analyzer.tasks.architecture.schema import MAX_PATH_CHOICES, draft_schema
 from terra_analyzer.tasks.architecture.validate import (
     clean_path,
     count_files,
     known_paths,
+    path_choices,
     retry_message,
+    unusable,
     validate,
 )
 
@@ -167,3 +170,29 @@ def test_retry_message_sorted_and_capped():
     assert msg.count("\n- ") == 20
     assert "problem 01" in msg and "problem 30" not in msg
     assert "copied exactly from the FILES list" in msg
+
+
+def test_path_choices_are_directories_shallowest_first(scan):
+    choices = path_choices(scan, MAX_PATH_CHOICES)
+    assert choices == ["server/", "store/", "web/", "web/src/"]
+
+
+def test_draft_schema_pins_real_directories_as_an_enum(scan):
+    schema = draft_schema(path_choices(scan, MAX_PATH_CHOICES))
+    item = schema["properties"]["components"]["items"]["properties"]["files"]["items"]
+    assert item["enum"] == ["server/", "store/", "web/", "web/src/"]
+    # Over the cap the enum is dropped so hosted structured-output stays valid.
+    unbounded = draft_schema(["a/"] * (MAX_PATH_CHOICES + 1))
+    assert "enum" not in unbounded["properties"]["components"]["items"]["properties"]["files"]["items"]
+
+
+def test_unusable_rejects_a_map_that_would_mislead():
+    thin = draft([comp(), comp(id="server", files=["server/"])])
+    assert any("no relationship" in reason for reason in unusable(thin))
+    ok = draft(
+        [comp(), comp(id="server", files=["server/"]),
+         comp(id="store", files=["store/"])],
+        [{"from": "web", "to": "server", "type": "calls", "because": ["x"]},
+         {"from": "server", "to": "store", "type": "reads_writes", "because": ["x"]}],
+    )
+    assert unusable(ok) == []
