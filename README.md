@@ -41,7 +41,9 @@ Nothing here is a wrapper around a chat endpoint: the Go API owns scanning,
 storage and previews; a separate Python analyzer owns model work; and they only
 speak over an HTTP contract. Models are reached exclusively through
 OpenAI-compatible Chat Completions, so local and hosted providers are
-interchangeable.
+interchangeable: a llama.cpp server that ships with the repo, running GGUF
+weights on your own machine, or OpenAI and anything else that speaks the same
+protocol. Local runs need no API key, and your code never leaves the machine.
 
 ## Quickstart
 
