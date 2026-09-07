@@ -259,14 +259,14 @@ export const copy = {
     primary: { label: "Get started", href: "/new" },
     secondary: { label: "See how teams use Terra", href: "#power" },
   },
-  /** Screen capture of a real run: memos dropped on the workspace, mapped by a
-      local Qwen2.5 7B, then asked about. Poster-first — see `HeroDemo`. */
+  /** Capture of one full pass of the scripted hero's inner card: scan, map,
+      preview, and the closing chat. Poster-first — see `HeroDemo`. */
   heroDemo: {
     src: "/videos/landing/workspace-demo.mp4",
     poster: "/videos/landing/workspace-demo-poster.jpg",
     play: "Play the Terra workspace demo",
     alt: "The Terra workspace showing the mapped architecture of the memos repository",
-    caption: "A real run: drop a repo, watch Terra map it, then ask the map anything.",
+    caption: "A scripted walkthrough: load a repo, explore its map, open the app preview, and ask for a change.",
   },
   ops: [
     {

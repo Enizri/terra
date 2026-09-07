@@ -14,9 +14,15 @@ ask the map questions and run the software.
 ![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-React_19-3178C6?logo=typescript&logoColor=white)
 
-<!-- DEMO VIDEO: replace this comment with the github.com/user-attachments/assets/... URL -->
+<a href="apps/web/public/videos/landing/workspace-demo.mp4">
+  <img
+    src="apps/web/public/videos/landing/workspace-demo.gif"
+    alt="Terra clones a repository, maps its architecture, opens the Memos live preview, and takes a change request"
+    width="840"
+  />
+</a>
 
-*A real run: drop a repo, watch Terra map it, then ask the map anything.*
+<sub>Scripted walkthrough of the workspace &middot; <a href="apps/web/public/videos/landing/workspace-demo.mp4">watch the full-quality MP4</a></sub>
 
 </div>
 
