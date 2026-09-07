@@ -4,8 +4,8 @@
 workspace card, covering one complete pass of the film: the repository clone and
 scan, the architecture map landing, the cursor tracing components and opening
 Web App, the Memos live preview, and the closing chat exchange.
-`workspace-demo.gif` is a lighter 25 fps, 800 px preview embedded in the root
-README and linked to the full-quality MP4. A matching JPEG poster is also included.
+`workspace-demo.gif` is a lighter 25 fps, 800 px preview, and the copy embedded
+in the root README. A matching JPEG poster is also included.
 The surrounding landing page, external captions, and closing title are excluded.
 
 The recorder starts at a loop seam — the frame where the film tears the map down

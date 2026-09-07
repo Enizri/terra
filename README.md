@@ -14,15 +14,13 @@ ask the map questions and run the software.
 ![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-React_19-3178C6?logo=typescript&logoColor=white)
 
-<a href="apps/web/public/videos/landing/workspace-demo.mp4">
-  <img
-    src="apps/web/public/videos/landing/workspace-demo.gif"
-    alt="Terra clones a repository, maps its architecture, opens the Memos live preview, and takes a change request"
-    width="840"
-  />
-</a>
+<img
+  src="apps/web/public/videos/landing/workspace-demo.gif"
+  alt="Terra clones a repository, maps its architecture, opens the Memos live preview, and takes a change request"
+  width="840"
+/>
 
-<sub>Scripted walkthrough of the workspace &middot; <a href="apps/web/public/videos/landing/workspace-demo.mp4">watch the full-quality MP4</a></sub>
+<sub>Scripted walkthrough of the workspace</sub>
 
 </div>
 
