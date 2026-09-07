@@ -48,12 +48,12 @@
   width: 100%;
   max-width: var(--sh-content-width); /* 1100px */
   margin-inline: auto;
-  padding: 64px var(--sh-gutter);
+  padding: 128px var(--sh-gutter);
 }
 
 @media (min-width: 640px) {
   .terra-section {
-    padding-block: 96px;
+    padding-block: 200px;
   }
 }
 
@@ -321,7 +321,7 @@
 .terra-finale {
   display: grid;
   grid-template-columns: 1fr;
-  padding: 16px 16px 0;
+  padding: 96px 16px 0;
   background: var(--wl-bg);
   /* The grab handle lives on the sticky globe sheet under this card. Without
      this, the chrome box swallows every press meant to spin the sphere. */
@@ -511,7 +511,7 @@
 
 @media (min-width: 640px) {
   .terra-finale {
-    padding: 24px 24px 0;
+    padding: 120px 24px 0;
   }
 
   .terra-finale__chrome {

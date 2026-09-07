@@ -99,12 +99,9 @@
   margin-top: 32px;
 }
 
-/* Shared pill — the hero and the drawer CTA are the same control.
-   Selector carries `.sh-root a` weight on purpose: `tokens.css` sets
-   `.sh-root a { color: inherit }` (0,1,1), which beats a bare class and
-   would paint the label in the copy ink, i.e. invisible on the dark fill. */
-.sh-root a.hx-cta__btn,
-.sh-root a.sh-power-cta {
+/* Shared pill — selector carries `.sh-root a` weight on purpose: `tokens.css`
+   sets `.sh-root a { color: inherit }` (0,1,1), which beats a bare class. */
+.sh-root a.hx-cta__btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -127,14 +124,12 @@
     transform 0.15s ease;
 }
 
-.sh-root a.hx-cta__btn:hover,
-.sh-root a.sh-power-cta:hover {
+.sh-root a.hx-cta__btn:hover {
   /* Not `brightness()` — lifting #2e2e38 is invisible at this size. */
   opacity: 0.95;
 }
 
-.sh-root a.hx-cta__btn:active,
-.sh-root a.sh-power-cta:active {
+.sh-root a.hx-cta__btn:active {
   transform: scale(0.98);
 }
 
@@ -157,13 +152,11 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sh-root a.hx-cta__btn,
-  .sh-root a.sh-power-cta {
+  .sh-root a.hx-cta__btn {
     transition: none;
   }
 
-  .sh-root a.hx-cta__btn:active,
-  .sh-root a.sh-power-cta:active {
+  .sh-root a.hx-cta__btn:active {
     transform: none;
   }
 }

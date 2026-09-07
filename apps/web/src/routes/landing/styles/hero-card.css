@@ -1,0 +1,365 @@
+/* First hero: drop window, GitHub flight tile, scripted film. */
+
+.sh-flight-anchor {
+  position: absolute;
+  top: -72px;
+  right: -200px;
+  z-index: 12;
+  width: var(--sh-flight-tile, 88px);
+  height: var(--sh-flight-tile, 88px);
+  pointer-events: none;
+  visibility: hidden;
+}
+
+@media (max-width: 900px) {
+  .sh-flight-anchor {
+    right: 0;
+    top: auto;
+    bottom: -120px;
+  }
+}
+
+.sh-pencil-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+
+/* Painting card: near-full-bleed, 40px corners. */
+
+.sh-section--hero .sh-stage--hero {
+  position: relative;
+  margin-top: 0;
+  margin-bottom: 0;
+  width: 100%;
+  max-width: var(--sh-hero-window, 720px);
+  padding-inline: 0;
+  box-sizing: border-box;
+  overflow: visible;
+  flex: 0 0 auto;
+  transition: max-width 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.sh-section--hero[data-dropped="1"] .sh-power-theater.sh-hero-card {
+  padding-top: 12px;
+  padding-bottom: 36px;
+  /* Stay inside the sticky pin — leftover height is for the film, not growth
+     that overflow:hidden would clip against the painting's bottom edge. */
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 100%;
+}
+
+.sh-section--hero[data-dropped="1"] .sh-stage--hero {
+  max-width: min(96%, 1240px);
+  margin-top: 0;
+  margin-bottom: 0;
+  padding-inline: 16px;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* Extra pin height stays below the film — do not center it, or the
+     expanding window slides down and opens a gap under the title. */
+  justify-content: flex-start;
+}
+
+.sh-section--hero[data-dropped="1"] .sh-window-wrap {
+  flex: 0 0 auto;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.sh-section--hero .sh-window {
+  min-height: 0;
+}
+
+.sh-power-theater.sh-hero-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  width: min(100%, 1560px);
+  max-width: none;
+  margin-inline: auto;
+  min-height: min(calc(80svh - 20px), 730px);
+  padding: 120px 0 88px;
+  border-radius: 0;
+  overflow: visible;
+  isolation: auto;
+  background: none;
+}
+
+.sh-power-theater.sh-hero-card,
+.sh-section--hero .sh-power-theater {
+  isolation: auto;
+  overflow: visible;
+  background: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.sh-section--hero .sh-power-theater::after {
+  content: none;
+}
+
+@media (min-width: 640px) {
+  .sh-power-theater.sh-hero-card {
+    min-height: min(calc(80svh - 108px), 1020px);
+    padding: 160px 0 140px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .sh-power-theater.sh-hero-card {
+    padding: 180px 0 140px;
+  }
+}
+
+/* Hero screen = the 720px video slot. */
+
+.sh-hero-theater .sh-power-theater__screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--sh-hero-window, 720px);
+  max-width: 100%;
+  height: 412px;
+  min-height: 412px;
+  padding: 8px;
+  margin-inline: auto;
+  border-radius: 24px;
+  /* Grow wider/taller from this top edge so expansion does not slide down. */
+  transform-origin: top center;
+  background: #f3f3f3;
+  box-shadow:
+    0 25px 50px rgba(0, 0, 0, 0.05),
+    0 12px 24px rgba(0, 0, 0, 0.04),
+    0 6px 12px rgba(0, 0, 0, 0.03),
+    0 0 0 1px rgba(14, 10, 7, 0.08);
+  transition:
+    width 0.9s cubic-bezier(0.22, 1, 0.36, 1),
+    height 0.9s cubic-bezier(0.22, 1, 0.36, 1),
+    max-width 0.9s cubic-bezier(0.22, 1, 0.36, 1),
+    min-height 0.9s cubic-bezier(0.22, 1, 0.36, 1),
+    padding 0.9s cubic-bezier(0.22, 1, 0.36, 1),
+    border-radius 0.9s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.9s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.sh-section--hero[data-dropped="1"] .sh-hero-theater .sh-power-theater__screen {
+  /* Grow from the 720×412 drop slot, but stay inside the painting. The
+     workspace shell scales to this box. Explicit height — the film is
+     position:absolute, so the mat cannot collapse. */
+  width: min(100%, 1160px);
+  max-width: none;
+  height: min(640px, calc(100dvh - 260px));
+  min-height: min(520px, calc(100dvh - 320px));
+  max-height: min(640px, calc(100dvh - 260px));
+  padding: 16px;
+  border-radius: 26px;
+}
+
+.sh-hero-theater .sh-power-theater__screen .sh-window {
+  max-width: none;
+}
+
+.sh-hero-screen {
+  display: flex;
+  width: 100%;
+  max-width: 704px;
+  height: 396px;
+  aspect-ratio: 16 / 9;
+  transition:
+    max-width 0.9s cubic-bezier(0.22, 1, 0.36, 1),
+    height 0.9s cubic-bezier(0.22, 1, 0.36, 1),
+    aspect-ratio 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.sh-hero-screen.is-expanded {
+  max-width: none;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  aspect-ratio: auto;
+}
+
+.sh-hero-screen .sh-window {
+  width: 100%;
+  min-height: 0;
+  transition: border-radius 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.sh-hero-screen:not(.is-expanded) .sh-window {
+  border-radius: 17px;
+  outline: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.sh-hero-screen:not(.is-expanded) .sh-window::before {
+  content: none;
+}
+
+.sh-hero-mini {
+  flex: 1;
+  display: flex;
+  align-self: stretch;
+  width: 100%;
+}
+
+.sh-hero-mini .sh-ws-drop {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 17px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sh-hero-screen,
+  .sh-hero-screen .sh-window {
+    transition: none;
+  }
+}
+
+.sh-hero-demo,
+.sh-hero-demo__film {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  width: 100%;
+  min-height: 100%;
+  align-self: stretch;
+}
+
+.sh-hero-demo {
+  position: relative;
+}
+
+.sh-ws-embed {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #faf9f5;
+  z-index: 1;
+}
+
+.sh-ws-embed__scale {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.sh-hero-demo .sh-ws {
+  grid-template-columns: 200px minmax(0, 1fr) 320px;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  transition: grid-template-columns 0.5s ease;
+}
+
+.sh-hero-demo .sh-ws.is-preview {
+  grid-template-columns: 0px minmax(0, 1fr) 320px;
+}
+
+.sh-hero-demo .sh-ws.is-preview .sh-ws__rail {
+  padding-left: 0;
+  padding-right: 0;
+  border-right-width: 0;
+  min-width: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.sh-hero-demo .sh-diagram__col {
+  flex: 0 0 auto;
+}
+
+.sh-hero-demo .sh-diagram__flow {
+  justify-content: center;
+  gap: 34px;
+}
+
+.sh-hero-demo .sh-diagram__canvas {
+  padding-left: 14px;
+  padding-right: 14px;
+}
+
+.sh-hero-demo .sh-ws__stage.is-map {
+  gap: 10px;
+  padding: 14px;
+}
+
+.sh-hero-demo .sh-ws__find {
+  display: none;
+}
+
+.sh-hero-demo .sh-ws__rail {
+  display: flex;
+}
+
+.sh-hero-demo .sh-ws__dock {
+  border-left: 1px solid var(--sh-border);
+  border-top: 0;
+}
+
+.sh-hero-demo .sh-ws__dock .sh-terra-chat {
+  height: 100%;
+}
+
+.sh-theater__panel--ws-preview {
+  position: relative;
+  flex: 1;
+  width: auto;
+  height: auto;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.sh-theater__panel--ws-preview .sh-theater__chrome {
+  display: none;
+}
+
+.sh-theater__panel--ws-preview .sh-replica {
+  padding: 0;
+  flex: none;
+  width: 125%;
+  height: 125%;
+  transform: scale(0.8);
+  transform-origin: 0 0;
+}
+
+.sh-theater__panel--ws-preview .rp-home {
+  padding-bottom: 28px;
+}
+
+.sh-demo-cursor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 40;
+  pointer-events: none;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.35));
+}
+
+.sh-demo-cursor__ripple {
+  position: absolute;
+  left: -9px;
+  top: -9px;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  border: 2px solid rgba(60, 55, 51, 0.45);
+  animation: sh-demo-ripple 0.5s ease-out forwards;
+}

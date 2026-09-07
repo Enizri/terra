@@ -155,16 +155,12 @@
 
 .sh-section--hero[data-dropped="1"] .sh-power-theater__screen {
   max-width: none;
-  /* Room for the expanded film — wider than the preview slot, but held
-     back from the card edges so the mat still reads. */
-  width: min(100%, 1220px);
-  /* Fills the wrap, which fills the card's leftover height. */
-  height: 100%;
-  max-height: 100%;
-  min-height: 0;
+  /* Width only — height is capped in hero-card.css so the film cannot
+     outgrow the painting and get clipped. */
+  width: min(100%, 1160px);
   box-sizing: border-box;
-  padding: 20px;
-  border-radius: 28px;
+  padding: 16px;
+  border-radius: 26px;
 }
 
 @keyframes sh-demo-ripple {

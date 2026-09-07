@@ -1,12 +1,11 @@
 import { copy } from "../data";
 import { CircleArrowIcon } from "../primitives";
-// HeroDemo stays in this folder (and copy.heroDemo in data.ts) until the
-// workspace-demo clip exists. Do not mount it against a missing mp4.
+// Parked: the live first hero is sections/Hero.tsx (GitHub drag + screen).
+// HeroDemo (the mp4 card) stays in this folder until the clip exists.
 
 export function HeroChars() {
   return (
     <section
-      id="top"
       className="sh-section sh-section--hero sh-section--herochars"
       aria-label="Hero"
     >

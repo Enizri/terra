@@ -31,7 +31,7 @@ test("every nav link lands on a section that exists", () => {
   const targets = [...nav.matchAll(/href="#([\w-]+)"/g)].map((m) => m[1]);
   assert.deepEqual(targets, ["top", "power", "faq"]);
 
-  assert.match(read("sections/HeroChars.tsx"), /id="top"/);
+  assert.match(read("sections/Hero.tsx"), /id="top"/);
   assert.match(read("sections/PowerSection.tsx"), /id="power"/);
   assert.match(read("sections/Faq.tsx"), /id="faq"/);
   // The hero's secondary CTA rides the same handler.

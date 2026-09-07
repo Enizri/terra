@@ -4,8 +4,6 @@ import { inView, rise, stagger } from "../../../shared/motion";
 import { copy, diagramNodes, MONITOR_DEMO_SPANS } from "../data";
 import { ASK_HINTS, IMPLEMENT_HINTS, TheaterPanel } from "../theater";
 import {
-  CircleArrowIcon,
-  MotionLink,
   RepoMapDiagram,
   RepoWindowHeader,
   TerraMark,
@@ -18,20 +16,17 @@ function OpsPreview({
   chatHints,
   designMode = false,
   demoReplica,
-  zoomOut = false,
 }: {
   chatHints?: readonly string[];
   designMode?: boolean;
   demoReplica: "home" | "explore";
-  /** Read the replica from a step back — see `.sh-theater__panel--zoom`. */
-  zoomOut?: boolean;
 }) {
   const web = diagramNodes.find((n) => n.id === "web")!;
   return (
     <TheaterPanel
       node={web}
       onClose={() => {}}
-      className={`sh-theater__panel--inline${zoomOut ? " sh-theater__panel--zoom" : ""}`}
+      className="sh-theater__panel--inline"
       chatHints={chatHints}
       designMode={designMode}
       demoReplica={demoReplica}
@@ -126,7 +121,7 @@ function OpsStage({
     <motion.div className="sh-ops" variants={rise}>
       <div className="sh-ops__frame">
         <div className="sh-ops__state">
-          {pane("ask", <OpsPreview chatHints={ASK_HINTS} demoReplica="home" zoomOut />)}
+          {pane("ask", <OpsPreview chatHints={ASK_HINTS} demoReplica="home" />)}
           {pane(
             "implement",
             <OpsPreview chatHints={IMPLEMENT_HINTS} designMode demoReplica="explore" />,
@@ -230,10 +225,6 @@ export function PowerSection() {
         <motion.div className="sh-power-stage" variants={rise}>
           <div className="sh-power-rail">
             <OpsCapabilityList active={active} onSelect={selectTab} />
-            <MotionLink className="sh-power-cta" to="/new" whileTap={{ scale: 0.98 }}>
-              Try Terra
-              <CircleArrowIcon />
-            </MotionLink>
           </div>
           <div className="sh-window-wrap">
             <div className="sh-power-theater">

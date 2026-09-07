@@ -2,7 +2,7 @@
 
 .sh-root--landing {
   --sh-hero-window: 720px;
-  --sh-flight-tile: 128px;
+  --sh-flight-tile: 88px;
   --sh-section-canvas-max: min(calc(100vw - 32px), 1400px);
   /* Power runs wider than the copy sections — the demo card is the subject. */
   --sh-power-canvas-max: calc(100vw - 32px);
@@ -38,14 +38,14 @@
 @media (min-width: 901px) {
   .sh-root--landing {
     --sh-read: 1.5;
-    --sh-flight-tile: 164px;
+    --sh-flight-tile: 104px;
   }
 
   /* The drawer runs a notch under the reference's `lg:text-3xl` / `lg:text-md`;
      the `--sh-read` inflation the rest of the page uses would blow it past the
      card beside it, and the card is the subject of this section. */
   .sh-root--landing .sh-power-list__btn {
-    font-size: 27px;
+    font-size: 21px;
   }
 }
 

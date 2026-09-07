@@ -19,26 +19,12 @@
   height: 100%;
 }
 
-/* The OS cursor is hidden once, on <html>, and the page inherits that. The
-   class is set at mount and never toggled, so nothing here re-runs. */
-html.is-custom-pointer {
-  cursor: none !important;
-}
-
+/* The OS cursor stays hidden for the whole session — clickable and text
+   targets keep the same custom glyph, so the tip never jumps to a native
+   hand or caret. Hit-testing still drives clicks; only the paint changes. */
+html.is-custom-pointer,
 html.is-custom-pointer * {
-  cursor: inherit !important;
-}
-
-/* Over a press target or a field the OS cursor takes back over, so the
-   affordance is the real one. JS marks the single element under the tip and
-   its subtree inherits from it: a rule keyed on <html> would restyle every
-   element on the page each time the pointer crossed a link. */
-html.is-custom-pointer .sh-cursor-pointer {
-  cursor: pointer !important;
-}
-
-html.is-custom-pointer .sh-cursor-text {
-  cursor: text !important;
+  cursor: none !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -9,6 +9,7 @@ function clamp(n: number, min: number, max: number) {
 
 function resolveDragBounds(fallback: HTMLElement | null, shell: HTMLElement) {
   return (
+    shell.closest<HTMLElement>(".sh-power-theater__screen") ??
     shell.closest<HTMLElement>(".sh-power-theater") ??
     shell.closest<HTMLElement>(".sh-stage") ??
     shell.closest<HTMLElement>(".sh-ws") ??
@@ -93,8 +94,10 @@ export function useFloatingDrag(boundsRef: RefObject<HTMLElement | null>) {
     const sr = shell.getBoundingClientRect();
     const restingLeft = sr.left - offset.current.x;
     const restingTop = sr.top - offset.current.y;
-    const w = shell.offsetWidth;
-    const h = shell.offsetHeight;
+    // Visual size (not offsetWidth): a parent `transform: scale` would
+    // otherwise mix layout px with viewport rects and collapse the clamp.
+    const w = sr.width;
+    const h = sr.height;
 
     gesture.current = {
       pointerId: e.pointerId,

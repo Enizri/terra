@@ -9,7 +9,7 @@ import "../../shared/styles/ui.css";
 import "./landing.css";
 import { anchorId, anchorScrollTop } from "./anchors";
 import { SiteNav } from "./sections/SiteNav";
-import { HeroChars } from "./sections/HeroChars";
+import { Hero } from "./sections/Hero";
 import { GlobeJourney } from "./sections/GlobeJourney";
 import { PowerSection } from "./sections/PowerSection";
 import { Faq } from "./sections/Faq";
@@ -187,8 +187,9 @@ export default function TerraLanding() {
       <div className="sh-root sh-root--landing">
         <SiteNav />
 
+        <Hero />
+
         <GlobeJourney>
-          <HeroChars />
           <PowerSection />
           <Faq />
           <Final />

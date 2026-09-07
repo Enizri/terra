@@ -177,13 +177,23 @@
   position: sticky;
   top: var(--hero-stick-top, 0px);
   /* Pinned box: a fixed height, not a floor. Content that outgrows it would
-     hang below the fold with no scroll left to reach it. */
-  height: calc(100vh - var(--hero-stick-top, 0px));
-  height: calc(100dvh - var(--hero-stick-top, 0px));
-  /* Opaque over later sections while sticky — same floor as the root. */
-  background-color: var(--sh-bg);
+     hang below the fold with no scroll left to reach it.
+     Negative `--hero-stick-top` lifts the painting so the drop window sits
+     in the middle; do not add that lift into the height or the flex-centered
+     card recenters in a taller box and the stick target runs away. */
+  height: 100vh;
+  height: 100dvh;
+  height: calc(100vh - max(0px, var(--hero-stick-top, 0px)));
+  height: calc(100dvh - max(0px, var(--hero-stick-top, 0px)));
+  /* No fill. The dotted paper lives on `.sh-root--landing`; the cursor trail
+     is a z-0 body overlay on that paper. Painting this box would hide the
+     trail and read as a fake second sheet. Sticky pin + z-index stay. */
+  background: none;
   z-index: 1;
-  overflow-x: clip;
+  /* Visible on both axes. `overflow-x: clip` would compute overflow-y to
+     `auto` and cut the expanding inner card against this 100dvh box. The
+     painting already clips its own contents. */
+  overflow: visible;
   /* Override .sh-section's 0 16px — the card uses its own 16px inset. */
   padding: calc(16px * var(--sh-read, 1)) calc(16px * var(--sh-read, 1)) 0;
 }
@@ -207,13 +217,12 @@
 /* Power sits after the hero split. */
 
 .sh-section--power {
-  padding-top: clamp(80px, 8vw, 140px);
-  /* The FAQ brings 96px of its own; together that is the gap to the demo. */
-  padding-bottom: clamp(64px, 7vw, 120px);
+  padding-top: clamp(280px, 22vw, 480px);
+  /* FAQ also pads the top of its column; together that is the gap after Power. */
+  padding-bottom: clamp(160px, 14vw, 280px);
 }
 
-.sh-root h2.sh-hero-title,
-.sh-section-title,
+.sh-root h2.sh-section-title,
 .sh-final h2 {
   font-family: var(--font-display);
   font-optical-sizing: auto;

@@ -172,9 +172,9 @@ export function createPointerSprite(
   return { canvas, hotX: -box.minX, hotY: -box.minY, width, height };
 }
 
-/** Anything you can press — native hand, not the custom glyph. `[data-sel]`
- *  covers the replica elements you pick inside the Ask Terra card, which are
- *  plain boxes with a click handler rather than buttons. */
+/** Anything you can press. `[data-sel]` covers the replica elements you pick
+ *  inside the Ask Terra card, which are plain boxes with a click handler
+ *  rather than buttons. */
 export const CLICKABLE =
   "button,summary,label[for],select,a[href],a.sh-btn,[data-sel],.rp-btn," +
   "[role='button'],[role='link'],[role='tab'],[role='menuitem'],[role='option']," +
@@ -182,7 +182,8 @@ export const CLICKABLE =
   "input[type='button'],input[type='submit'],input[type='reset']," +
   "input[type='checkbox'],input[type='radio'],input[type='file'],input[type='color']";
 
-/** Text entry — native caret, so the glyph never sits on top of one. */
+/** Text entry. The custom glyph stays on; this only marks the tip for
+ *  hit-testing callers that care about fields. */
 export const TEXT_FIELD =
   "textarea,[contenteditable=''],[contenteditable='true']," +
   "input:not([type='button'],[type='submit'],[type='reset'],[type='checkbox']," +
@@ -197,16 +198,13 @@ export function isClickableElement(el: Element | null): boolean {
   return Boolean(hit) && !inert(hit as Element);
 }
 
-export type NativeCursor = "pointer" | "text";
+export type HoverCursor = "pointer" | "text";
 
-/** Which native cursor to hand back to the OS here and, just as importantly,
- *  the element to hang it on — the override is scoped to that subtree so
- *  crossing a link does not restyle the whole document. `null` keeps the
- *  custom glyph. Clickable wins over text: a checkbox inside a label is a
- *  press target, not a field. */
-export function nativeCursorTarget(
+/** Classify what sits under the tip without changing the custom glyph. Clickable wins over text: a checkbox inside a label
+ *  is a press target, not a field. `null` is plain paper. */
+export function hoverCursorTarget(
   el: Element | null,
-): { target: Element; kind: NativeCursor } | null {
+): { target: Element; kind: HoverCursor } | null {
   if (!el) return null;
   const press = el.closest(CLICKABLE);
   if (press && !inert(press)) return { target: press, kind: "pointer" };
@@ -214,3 +212,8 @@ export function nativeCursorTarget(
   if (field && !inert(field)) return { target: field, kind: "text" };
   return null;
 }
+
+/** @deprecated Prefer `hoverCursorTarget` — the custom glyph no longer yields
+ *  to a native cursor. Kept as an alias so older call sites keep compiling. */
+export const nativeCursorTarget = hoverCursorTarget;
+export type NativeCursor = HoverCursor;

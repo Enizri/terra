@@ -23,7 +23,7 @@
 }
 
 .sh-stage--power .sh-window {
-  min-height: 800px;
+  min-height: 640px;
 }
 
 @media (min-width: 640px) {
@@ -43,30 +43,23 @@
   width: 100%;
 }
 
-.sh-power-cta {
-  align-self: flex-start;
-  margin-top: 16px;
-}
-
 .sh-power-rail {
   display: flex;
   flex-direction: column;
-  /* Narrower than the reference's `lg:w-1/2 max-w-[550px]`: the card is the
-     subject here, and the width the drawer gives up goes straight to it. */
+  /* Keep the original column width — zoom the list instead of collapsing it. */
   flex: 0 0 clamp(300px, 34%, 470px);
-  /* Reference centres the drawer against the media, which is taller than the
-     five rows; top-aligning it left the list stranded at the card's top edge. */
   justify-content: center;
-  gap: 16px;
+  gap: 12px;
   min-width: 0;
-  /* Left inset gives the active-row marker somewhere to sit. */
   padding: 0 0 0 34px;
+  transform: scale(0.9);
+  transform-origin: left center;
 }
 
 @media (min-width: 901px) {
   .sh-power-rail {
-    /* `lg:px-8` on the right — that 32px is the whole column gap. */
-    padding: 0 32px 0 58px;
+    /* Less right pad so the card can sit closer without shrinking the list. */
+    padding: 0 12px 0 58px;
   }
 }
 
@@ -75,14 +68,14 @@
   min-width: 0;
   /* Power card runs to the right edge of the canvas — no hero width cap. */
   max-width: none;
-  margin-left: auto;
+  margin-left: 0;
 }
 
 @media (min-width: 901px) {
   /* Reference insets the media on three sides (`p-12`) and lets it bleed
      left towards the drawer (`lg:pl-0`). */
   .sh-power-stage > .sh-window-wrap {
-    padding: 48px 48px 48px 0;
+    padding: 48px 16px 48px 0;
   }
 }
 
@@ -121,7 +114,7 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  padding: 14px 16px;
+  padding: 10px 12px;
   border-bottom: 1px solid color-mix(in srgb, var(--wl-grey) 20%, transparent);
   transition: background-color 0.075s ease;
 }
@@ -136,11 +129,10 @@
 
 .sh-power-list__mark {
   position: absolute;
-  left: -30px;
-  top: 19px;
-  /* The nav's 38px star is far too loud beside a 27px label. */
-  width: 18px;
-  height: 18px;
+  left: -26px;
+  top: 14px;
+  width: 14px;
+  height: 14px;
   opacity: 0;
   transition: opacity 0.4s ease-in-out;
 }
@@ -158,7 +150,7 @@
   background: transparent;
   text-align: left;
   font-family: var(--font-heading);
-  font-size: clamp(22px, 2vw, 27px);
+  font-size: clamp(17px, 1.55vw, 21px);
   font-weight: 400;
   letter-spacing: -0.06em;
   line-height: 1.2;
@@ -194,8 +186,8 @@
 }
 
 .sh-power-list__caption {
-  margin: 8px 0 0;
-  font-size: 15px;
+  margin: 6px 0 0;
+  font-size: 13px;
   line-height: 1.45;
   color: var(--wl-grey-150);
   text-wrap: pretty;
@@ -252,14 +244,6 @@
 
 .sh-section--power .sh-power-theater {
   box-shadow: var(--wl-card-shadow);
-  /* Sits 10% zoomed out inside its slot. The section still reserves the
-     full-bleed box, so the 10% the card gives back reads as margin around it
-     instead of a shorter section. A uniform transform rather than `width` or
-     `zoom`: the card's height comes from `.sh-window`'s 800px floor and the ops
-     frame's aspect ratio, so shrinking one axis would re-lay out the replica
-     inside instead of scaling it. Origin stays centred — the breathing room
-     splits evenly on all four sides. */
-  transform: scale(0.9);
 }
 
 .sh-power-theater::after {
@@ -297,6 +281,11 @@
   padding: 28px;
 }
 
+.sh-section--power .sh-power-theater__screen {
+  /* Clip the floating chat to this mat — drag bounds match. */
+  overflow: hidden;
+}
+
 @media (max-width: 720px) {
 .sh-power-theater__screen {
     padding: 24px 14px;
@@ -316,7 +305,7 @@
 /* Power card: full hero width, no 1280 cap. */
 .sh-section--power .sh-power-theater__screen .sh-window {
   max-width: none;
-  min-height: 800px;
+  min-height: 640px;
 }
 
 /* Ops screen inside the Power of Terra window: dark diagram shell, header
@@ -619,22 +608,6 @@
   bottom: 12px;
 }
 
-/* Ask tab is read a step back. The replica keeps filling the card but lays out
-   in ~18% more CSS pixels, so the notes column stretches across the frame
-   instead of stacking dense blocks and the whole app — rail, composer, feed —
-   stays on screen: small, still legible. `zoom` rather than `transform: scale`
-   so the app genuinely re-lays out at the wider size instead of being shrunk
-   as a picture. Percentages inside a zoomed box get no compensation (same rule
-   as `.sh-ws`), so the stage fill is divided by hand. */
-
-.sh-theater__panel--zoom .sh-replica {
-  --sh-ask-zoom: 0.85;
-  zoom: var(--sh-ask-zoom);
-  flex: none;
-  width: calc(100% / var(--sh-ask-zoom));
-  height: calc(100% / var(--sh-ask-zoom));
-}
-
 /* Let the floating chat overhang the preview onto the wallpaper. Keep the
    live stage clipped so only the dock escapes the product chrome. */
 
@@ -677,8 +650,9 @@
   position: relative;
   overflow: hidden;
   width: 100%;
-  /* 16:9-ish stage ratio — contain fills edge-to-edge, no letterbox. */
-  aspect-ratio: 2330 / 1390;
+  /* 16:9-ish, a notch wider than the old 2330/1390 so the card reads
+     shorter and wider at the 80% overlay. */
+  aspect-ratio: 21 / 11;
   border-radius: 16px;
   background: #111318;
   box-shadow:

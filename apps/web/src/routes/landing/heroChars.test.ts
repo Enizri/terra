@@ -15,7 +15,7 @@ const pointerCss = readFileSync(
   "utf8",
 );
 
-test("hero is a 1:1 split with the globe on charcoal", () => {
+test("parked globe-hero CSS stays a 1:1 split with the globe on charcoal", () => {
   assert.match(css, /grid-template-columns:\s*1fr 1fr/);
   // Both stops of the shared journey disc must stay charcoal, independent of
   // the CTA fill in the token palette.
@@ -28,12 +28,11 @@ test("hero is a 1:1 split with the globe on charcoal", () => {
   assert.doesNotMatch(source, /HeroPixelType/);
   assert.match(appSource, /HeroPixelField/);
   assert.match(pointerCss, /is-custom-pointer[\s\S]*?cursor:\s*none/);
-  // Press targets hand back the real OS cursor, marked by JS on the one
-  // element under the tip. Keying it on <html> restyles the whole document
-  // every time the pointer crosses a link, so the value must not live there.
-  assert.match(pointerCss, /html\.is-custom-pointer \*[\s\S]*?cursor:\s*inherit/);
-  assert.match(pointerCss, /\.sh-cursor-pointer[\s\S]*?cursor:\s*pointer/);
-  assert.match(pointerCss, /\.sh-cursor-text[\s\S]*?cursor:\s*text/);
+  // The custom glyph stays on over press targets and fields — the OS hand
+  // and caret must not take over, or the tip jumps and clickables feel off.
+  assert.match(pointerCss, /html\.is-custom-pointer,\s*\nhtml\.is-custom-pointer \*/);
+  assert.doesNotMatch(pointerCss, /\.sh-cursor-pointer/);
+  assert.doesNotMatch(pointerCss, /\.sh-cursor-text/);
   assert.doesNotMatch(pointerCss, /--sh-native-cursor/);
   const fieldSource = readFileSync(
     path.join(import.meta.dirname, "sections/HeroPixelField.tsx"),
@@ -44,8 +43,9 @@ test("hero is a 1:1 split with the globe on charcoal", () => {
   assert.match(fieldSource, /getBoundingClientRect/);
   assert.match(fieldSource, /useLocation/);
   assert.match(fieldSource, /pathname === "\/"/);
-  assert.match(fieldSource, /nativeCursorTarget/);
-  assert.match(fieldSource, /sh-cursor-pointer/);
+  // Hover must keep the same sprite instead of switching to a larger glyph.
+  assert.doesNotMatch(fieldSource, /POINTER_HOT_SCALE|hotSprite/);
+  assert.doesNotMatch(fieldSource, /sh-cursor-pointer/);
   // The loop has to be able to stop: a `hovering` that only ever goes true
   // pins the page at 60fps for the rest of the session.
   assert.match(fieldSource, /hovering = false/);

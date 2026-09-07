@@ -12,8 +12,6 @@ import {
 } from "../pixelField";
 import {
   createPointerSprite,
-  nativeCursorTarget,
-  type NativeCursor,
   type PointerSprite,
 } from "../pointerArrow";
 
@@ -28,14 +26,6 @@ const NO_TRAIL =
  *  testing therefore misses it and the trail would paint on the paper
  *  behind — use the card box instead. */
 const NO_TRAIL_BOX = ".terra-finale__floor,.terra-finale__fore";
-
-/** Class per native cursor. The override rides the one element under the tip,
- *  so the style invalidation stays inside that subtree — keyed on `<html>` it
- *  would restyle every element on the page each time you crossed a link. */
-const CURSOR_CLASS: Record<NativeCursor, string> = {
-  pointer: "sh-cursor-pointer",
-  text: "sh-cursor-text",
-};
 
 /** How often a pointer that is not moving re-tests what sits under it. */
 const HIT_BEAT = 90;
@@ -115,29 +105,14 @@ export function HeroPixelField() {
     let hitY = -1;
     let hovering = false;
     let onLayer = false;
-    let nativeEl: Element | null = null;
-    let nativeKind: NativeCursor | null = null;
     // The glyph's last blit, so a frame clears what it drew rather than the
     // whole viewport.
     let painted: { x: number; y: number; w: number; h: number } | null = null;
     // Something the canvases show has changed. Without it the loop parks.
     let dirty = false;
 
-    const applyNative = (hit: { target: Element; kind: NativeCursor } | null) => {
-      const target = hit?.target ?? null;
-      const kind = hit?.kind ?? null;
-      if (target === nativeEl && kind === nativeKind) return;
-      if (nativeEl && nativeKind) nativeEl.classList.remove(CURSOR_CLASS[nativeKind]);
-      nativeEl = target;
-      nativeKind = kind;
-      if (nativeEl && nativeKind) nativeEl.classList.add(CURSOR_CLASS[nativeKind]);
-      dirty = true;
-    };
-
-    /** One hit test drives both answers, so the trail and the cursor can never
-     *  disagree about what is under the tip. It costs a style-and-layout
-     *  flush, so it runs at most once a frame — never once per `pointermove`,
-     *  which arrives faster than frames do. */
+    /** Hit testing controls where the trail is painted. Run at most once
+     *  per frame rather than once per pointer event. */
     const syncHit = () => {
       if (mx < 0) return;
       hitX = mx;
@@ -149,7 +124,6 @@ export function HeroPixelField() {
         onLayer = layer;
         dirty = true;
       }
-      applyNative(nativeCursorTarget(el));
     };
 
     /** The heat field exists only where the trail is drawn. Off it, there is
@@ -283,19 +257,20 @@ export function HeroPixelField() {
         paintLayer(trailCtx, trail, size, "trail", hues);
       }
 
-      // Same size, same rim, everywhere — the glyph must not restyle itself
-      // depending on what happens to sit under it.
+      // Keep the same sprite across component boundaries. Swapping sizes on
+      // hover makes the cursor pop even when the pointer has barely moved.
       if (painted) {
         cursorCtx.clearRect(painted.x - 1, painted.y - 1, painted.w + 2, painted.h + 2);
         painted = null;
       }
-      if (hovering && mx >= 0 && !nativeKind && sprite) {
+      const glyph = sprite;
+      if (hovering && mx >= 0 && glyph) {
         // Land the blit on the device pixel grid — the real cursor does, and
         // a half-pixel offset costs the glyph its crisp rim.
-        const x = Math.round((mx - sprite.hotX) * dpr) / dpr;
-        const y = Math.round((my - sprite.hotY) * dpr) / dpr;
-        cursorCtx.drawImage(sprite.canvas, x, y, sprite.width, sprite.height);
-        painted = { x, y, w: sprite.width, h: sprite.height };
+        const x = Math.round((mx - glyph.hotX) * dpr) / dpr;
+        const y = Math.round((my - glyph.hotY) * dpr) / dpr;
+        cursorCtx.drawImage(glyph.canvas, x, y, glyph.width, glyph.height);
+        painted = { x, y, w: glyph.width, h: glyph.height };
       }
 
       dirty = false;
@@ -330,7 +305,6 @@ export function HeroPixelField() {
       document.removeEventListener("pointerleave", onLeave, true);
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("resize", resize);
-      applyNative(null);
       root.classList.remove("is-custom-pointer");
     };
   }, [reduced, host]);

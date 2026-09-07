@@ -205,9 +205,8 @@ export const copy = {
   },
   heroEyebrow: "A map of any GitHub repo.",
   heroHeadline: "See the whole codebase. Then ask it anything.",
-  /** Two-tone hero headline: `lead` in ink, `muted` in grey, split on an
-      explicit line break. Distinct from `heroTitle`, which feeds the retired
-      word-swap hero in `sections/Hero.tsx`. */
+  /** Two-tone split used by the parked `HeroChars` globe hero. Distinct from
+      `heroTitle`, which feeds the word-swap headline in `sections/Hero.tsx`. */
   heroHeadlineParts: {
     lead: "See the whole codebase.",
     muted: "Then ask it anything.",

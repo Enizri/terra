@@ -5,6 +5,7 @@ import {
   ARROW_PATH,
   POINTER_FILL,
   POINTER_REST,
+  hoverCursorTarget,
   isClickableElement,
   nativeCursorTarget,
 } from "./pointerArrow.ts";
@@ -62,7 +63,7 @@ test("the pressable bits of the Ask Terra card count as buttons", () => {
   assert.equal(isClickableElement(q(".sh-anchor")), false, "anchor with no href");
 });
 
-test("press targets get the hand, fields get the caret, paper keeps the glyph", () => {
+test("press targets and fields mark the tip; paper keeps the resting glyph", () => {
   const { document } = new JSDOM("<!doctype html><html><body></body></html>").window;
   document.body.innerHTML = `
     <button id="go">Go</button>
@@ -71,7 +72,7 @@ test("press targets get the hand, fields get the caret, paper keeps the glyph", 
     <label id="pick" for="agree"><input id="agree" type="checkbox" /> Agree</label>
     <p id="copy">paper</p>`;
   const q = (id: string) => document.getElementById(id)!;
-  const kind = (id: string) => nativeCursorTarget(q(id))?.kind ?? null;
+  const kind = (id: string) => hoverCursorTarget(q(id))?.kind ?? null;
   assert.equal(kind("go"), "pointer");
   assert.equal(kind("ask"), "text");
   assert.equal(kind("send"), "pointer", "submit is a press target");
@@ -79,11 +80,13 @@ test("press targets get the hand, fields get the caret, paper keeps the glyph", 
   assert.equal(kind("pick"), "pointer");
   assert.equal(kind("copy"), null, "custom glyph stays on plain copy");
   q("go").setAttribute("aria-disabled", "true");
-  assert.equal(kind("go"), null, "a dead button keeps the glyph");
+  assert.equal(kind("go"), null, "a dead button keeps the resting glyph");
 
-  // The override rides the press target itself, not the span you happened to
-  // be over — that is what keeps the restyle inside one subtree.
+  // The hit rides the press target itself, not the span you happened to
+  // be over — that is what keeps clickable detection accurate.
   const inner = q("go").appendChild(document.createElement("span"));
   q("go").removeAttribute("aria-disabled");
+  assert.equal(hoverCursorTarget(inner)?.target, q("go"));
+  // Alias kept so older call sites still resolve.
   assert.equal(nativeCursorTarget(inner)?.target, q("go"));
 });
