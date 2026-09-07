@@ -347,18 +347,24 @@ export const footer = {
   headline: ["One map of", "your repo."],
   cta: { label: "Get started", href: "/new" },
   tagline: "One map of your repo. A human approves every merge.",
+  /** `#` is a placeholder the click handler swallows — a page that does not
+      exist yet. A leading `/` is a real route; only an absolute URL leaves the
+      site. */
   cols: [
     {
       title: "Product",
-      links: ["The film", "Pricing", "Changelog", "Blog"],
+      links: [
+        { label: "Changelog", href: "#" },
+        { label: "About us", href: "/about" },
+        { label: "GitHub", href: "https://github.com/Enizri/terra" },
+      ],
     },
     {
       title: "Legal",
-      links: ["Privacy", "Terms"],
-    },
-    {
-      title: "Account",
-      links: ["Get started", "Sign in"],
+      links: [
+        { label: "Privacy", href: "#" },
+        { label: "Terms", href: "#" },
+      ],
     },
   ],
 };

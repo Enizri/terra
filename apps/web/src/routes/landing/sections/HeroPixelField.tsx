@@ -12,9 +12,15 @@ import {
 } from "../pixelField";
 import {
   createPointerSprite,
+  isClickableElement,
+  POINTER_SCALE,
   type PointerSprite,
 } from "../pointerArrow";
 
+/** Surfaces the trail must not paint on. Tags and cards only — every press
+ *  target is caught by `isClickableElement` instead, which knows the ones that
+ *  are plain boxes with a handler (`[role]`, `[data-sel]`, `.rp-btn`) and
+ *  would otherwise take the colour across a component you are hovering. */
 const NO_TRAIL =
   "a,button,[role='button'],input,textarea,select,label,summary," +
   "img,video,picture,canvas," +
@@ -119,7 +125,10 @@ export function HeroPixelField() {
       hitY = my;
       const el = hitFromPoint(mx, my);
       const layer =
-        !allowTrailRef.current || overNoTrailBox(mx, my) || Boolean(el?.closest(NO_TRAIL));
+        !allowTrailRef.current ||
+        overNoTrailBox(mx, my) ||
+        Boolean(el?.closest(NO_TRAIL)) ||
+        isClickableElement(el);
       if (layer !== onLayer) {
         onLayer = layer;
         dirty = true;
@@ -154,7 +163,7 @@ export function HeroPixelField() {
       // Resizing the canvas clears it and resets the transform; the glyph is
       // baked at the new ratio and there is nothing left to erase.
       cursorCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      sprite = createPointerSprite(dpr);
+      sprite = createPointerSprite(dpr, POINTER_SCALE);
       painted = null;
       dirty = true;
       play();

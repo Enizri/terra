@@ -1,5 +1,5 @@
 import { MotionConfig, useReducedMotion } from "motion/react";
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import "@fontsource-variable/geist";
 import "@fontsource-variable/geist-mono";
 // Newsreader: landing display face. opsz so large headlines use the display cut.
@@ -7,8 +7,8 @@ import "@fontsource-variable/newsreader/opsz.css";
 import "../../shared/styles/tokens.css";
 import "../../shared/styles/ui.css";
 import "./landing.css";
+import { SiteNav } from "../../shared/site/SiteNav";
 import { anchorId, anchorScrollTop } from "./anchors";
-import { SiteNav } from "./sections/SiteNav";
 import { Hero } from "./sections/Hero";
 import { GlobeJourney } from "./sections/GlobeJourney";
 import { PowerSection } from "./sections/PowerSection";
@@ -177,15 +177,52 @@ function useSmoothAnchors(glideRef: { current: (y: number) => void }) {
   }, [glideRef]);
 }
 
+/** A reload lands on the hero, wherever the reader had scrolled to.
+ *
+ *  Two browser behaviours have to be turned off for that. Scroll restoration
+ *  puts a reload back where the reader left off, and a fragment left in the
+ *  URL by an anchor click (`/#faq`) is re-resolved on load as the section it
+ *  names mounts. The landing is a scripted ride — the pinned hero scrub, the
+ *  globe flight, the reveal sequences all read from a scroll position they
+ *  expect to have watched arrive — so dropping a reader into the middle of it
+ *  restores a scroll offset without the state that earned it.
+ *
+ *  A layout effect is early enough for both: React mounts while the module
+ *  script runs, before `load`, and the fragment's target does not exist in the
+ *  served HTML, so the browser has nothing to scroll to until we have already
+ *  taken the hash off the URL. Restoration goes back to `auto` on the way out,
+ *  since it is a property of the whole history, not of this route. */
+function useTopOnLoad() {
+  useLayoutEffect(() => {
+    const previous = history.scrollRestoration;
+    history.scrollRestoration = "manual";
+    const { pathname, search, hash } = window.location;
+    // replaceState, not the hash itself: clearing location.hash would scroll.
+    if (hash) history.replaceState(null, "", pathname + search);
+    window.scrollTo(0, 0);
+    return () => {
+      history.scrollRestoration = previous;
+    };
+  }, []);
+}
+
+/** Nav destinations. `#power` rides the eased glide handler below; `/about` is
+ *  a route, so SiteNav renders it as a Link rather than a reloading anchor. */
+const NAV_LINKS = [
+  { href: "#power", label: "How it works" },
+  { href: "/about", label: "About" },
+];
+
 export default function TerraLanding() {
   // No splash/loader — paint nav + hero immediately.
   // The theater opens inside whichever repo card was clicked, so each
   // RepoMapDiagram owns it — nothing to lift up here.
+  useTopOnLoad();
   useSmoothAnchors(useSmoothScroll());
   return (
     <MotionConfig reducedMotion="user">
       <div className="sh-root sh-root--landing">
-        <SiteNav />
+        <SiteNav home="#top" links={NAV_LINKS} />
 
         <Hero />
 

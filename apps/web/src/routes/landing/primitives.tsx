@@ -1,8 +1,8 @@
 import { AnimatePresence, motion, type Transition } from "motion/react";
 import { useImperativeHandle, useState, type ReactNode, type Ref } from "react";
-import { Link } from "react-router-dom";
 import { RepoDiagram } from "../../features/architecture-map";
 import { rise, spring } from "../../shared/motion";
+import { ArrowIcon, MotionLink, TerraMark } from "../../shared/site/marks";
 import { diagramEdges, diagramGroups, diagramNodes, type DiagramNode } from "./data";
 import {
   TheaterModal,
@@ -11,17 +11,11 @@ import {
   type TheaterScriptHandle,
 } from "./theater";
 
-export const MotionLink = motion.create(Link);
+// Nav chrome moved to shared/ when /about arrived. Re-exported so the rest of
+// the landing keeps reaching for its atoms in one place.
+export { ArrowIcon, MotionLink, TerraMark };
 
 /* ---------- icons ---------- */
-
-export function ArrowIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-      <path d="M5 12h14M13 5l7 7-7 7" />
-    </svg>
-  );
-}
 
 /** Trailing mark on the pill CTAs — circled, matching the hero and drawer. */
 export function CircleArrowIcon() {
@@ -93,11 +87,6 @@ export function Picture({
       />
     </picture>
   );
-}
-
-/** Brand gradient mark. */
-export function TerraMark({ className }: { className?: string }) {
-  return <span className={`sh-terra-mark${className ? ` ${className}` : ""}`} aria-hidden />;
 }
 
 export function WindowChrome({

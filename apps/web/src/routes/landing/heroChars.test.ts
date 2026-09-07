@@ -15,12 +15,8 @@ const pointerCss = readFileSync(
   "utf8",
 );
 
-test("parked globe-hero CSS stays a 1:1 split with the globe on charcoal", () => {
+test("parked globe-hero CSS stays a 1:1 split", () => {
   assert.match(css, /grid-template-columns:\s*1fr 1fr/);
-  // Both stops of the shared journey disc must stay charcoal, independent of
-  // the CTA fill in the token palette.
-  assert.match(css, /#232323 0%/);
-  assert.match(css, /#232323 78%/);
   assert.doesNotMatch(source, /HeroTitle/);
   assert.doesNotMatch(source, /sh-hero-pin/);
   // Clip is not in public/ yet — HeroDemo.tsx stays, but must not mount.
@@ -107,7 +103,7 @@ test("the FAQ-to-footer flight does not keep a still globe at display rate", () 
   // scroll and drag wake it. CSS filters on the WebGL canvas did the same
   // job as the glow and are gone — drop-shadow on that sheet was the jank.
   assert.doesNotMatch(journeySource, /dockInView/);
-  assert.match(journeySource, /easing \|\| progress < 1/);
+  assert.match(journeySource, /return dragging \|\| spinning \|\| tossing \|\| easing;/);
   assert.match(journeySource, /classList.toggle\("is-lit", cleanActive\)/);
   assert.doesNotMatch(css, /is-clean-flight \.gx-journey__sphere \{[\s\S]*?filter:/);
   assert.doesNotMatch(css, /drop-shadow\(0 0 130px/);
@@ -121,11 +117,4 @@ test("the FAQ-to-footer flight does not keep a still globe at display rate", () 
     /\.terra-finale__sun \.terra-finale__sky \{\s*filter:/,
   );
   assert.doesNotMatch(footerCss, /\.terra-finale__glow \{[\s\S]*?will-change:/);
-});
-
-test("reload plays the character bloom before the globe settles", () => {
-  assert.match(journeySource, /let globeT = 0/);
-  assert.match(journeySource, /globeT \+= dt \* globeJourneyClockRate\(progress\)/);
-  assert.match(journeySource, /t:\s*globeT/);
-  assert.doesNotMatch(journeySource, /t:\s*2 \+/);
 });

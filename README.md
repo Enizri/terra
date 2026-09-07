@@ -1,362 +1,462 @@
 # Terra
 
-Turns a GitHub repository into an architecture map a non-engineer can read:
-components, relationships, and the evidence for them.
+Terra turns a GitHub repository into an interactive architecture map: the main
+components, how they connect, and the source files behind them. Explore a project,
+ask questions grounded in its code, and open its running software in a workspace.
 
 ## Status
 
-Terra is pre-1.0 and built in the open. The full loop works end to end today:
+Terra is pre-1.0 and built in the open. The current workspace flow is:
 
-**Paste or drop a GitHub URL → Terra fetches and scans it → recommends a model and
-stops at a hard gate (no LLM call, no tokens spent, until you pick one) → analyzes
-and streams the map in as it builds → you get a diagram whose every component links
-back to the files that prove it → ask questions answered against that map → boot the
-analyzed repo's own dev server in a live preview and select elements in it.**
+1. Paste or drop a GitHub repository URL.
+2. Terra fetches repository metadata and scans its contents, then recommends a
+   model. This probe makes no LLM call. A map already stored for the same commit
+   can be reopened immediately.
+3. Choose a local model or supply a key for a hosted model, then continue.
+   Terra streams progress events and returns the completed architecture map.
+4. Explore components and file evidence, ask the read-only guide questions, and
+   start a live preview when the repository and available toolchains support it.
 
-Run it yourself with [Quickstart](#quickstart), or read a real map with no setup at
-all: [`case-studies/memos.map.json`](case-studies/memos.map.json) is Terra's output
-for [usememos/memos](https://github.com/usememos/memos), checked in as the golden
-fixture the test suite runs against.
+Saved analyses live in SQLite. The workspace lists recent analyses, can reopen or
+delete them, and automatically opens the newest one when entering an empty
+workspace. The URL slug is not a server-side session: chat, selections, and view
+state are temporary. Model preferences and provider keys are stored in the browser.
 
-What is **not** done, so you don't go looking for it:
-
-| Gap | Where |
+| Page | Purpose |
 |---|---|
-| **Export JSON** and **Share map** are placeholder chips — visibly present, not wired | `apps/web/src/shared/shell/WorkspaceHeader.tsx` |
-| The workspace session is not persisted. The URL slug is cosmetic, never sent to the server, and in-memory state is lost on reload | `apps/web/src/routes/workspace/cache.ts` |
-| Live preview boots every app in the checkout (web + API, plus mobile/desktop when previewable). Docker mode still needs the Node image for JS apps; Go/Python run on the host. | `backend/api/internal/preview/` |
-| No user accounts. `TERRA_TOKEN` is one shared secret, and empty leaves the API open | [`docs/SECURITY.md`](docs/SECURITY.md) |
+| `/` | Marketing page with a scripted workspace demonstration and capability previews |
+| `/about` | What Terra does and the planned team workflow, marked **Coming soon** |
+| `/new` | Creates a workspace URL at `/new/s/:slug` |
+| `/new/s/:slug` | Repository intake, model picker, architecture map, history, Ask, and preview |
 
-Live preview runs the analyzed repository's own code — in host-exec mode, directly on
-your machine. The editor write path (`POST /preview/patch`) is confined to that
-checkout and does not git commit, but it still mutates untrusted-repo files. Read
-[`docs/SECURITY.md`](docs/SECURITY.md) before pointing preview at a repository you
-don't trust.
+The marketing demonstrations include illustrative interactions; they are not a
+complete inventory of implemented workspace features.
+
+| Current limitation | Details |
+|---|---|
+| Team collaboration | Shared team sessions and concurrent editing are planned, not shipped. There are no user accounts or per-user permissions. |
+| Export and sharing | **Export JSON** and **Share map** in the workspace are disabled placeholders. The CLI and analysis API already return JSON. |
+| Editing | The analyzer has a separate `editor` task with patch/restart tools. Workspace Ask uses the read-only `agent` task. There is no integrated Git commit, review, or merge workflow. |
+| Preview support | Depends on the detected app and installed toolchains. The default Compose API image cannot run Go/Python previews through its host fallback. |
+| Marketing links | Changelog, Privacy, and Terms in the footer are placeholders. About and GitHub are linked. |
+
+Try the [Quickstart](#quickstart), or inspect
+[`case-studies/memos.map.json`](case-studies/memos.map.json), the checked-in
+architecture map for [usememos/memos](https://github.com/usememos/memos) used by
+Terra's fixture checks.
+
+Live preview installs dependencies and executes the analyzed repository's code.
+The editor can modify its preview checkout, but does not commit changes. Read
+[`docs/SECURITY.md`](docs/SECURITY.md) before running an unfamiliar repository or
+exposing the stack outside a trusted environment.
 
 ## Architecture
 
-```
-User (CLI / HTTP)
+```text
+Browser / CLI / HTTP client
         |
         v
-   Go backend  ──────────────► SQLite (terra.db)
-   tarball ingest, scan, API, storage
+   Go API (:8080) ──────────────► SQLite (terra.db)
+   repository scan, map assembly, jobs, storage, preview
         |
-        | POST /analyze  {scan, model}
+        | HTTP: /analyze or /tasks/{name}
         v
-   Python analyzer (FastAPI, :8010)
-   analyzer tasks (architecture, …), validate, retry
+   Python analyzer (:8010)
+   architecture, qa, agent, editor
         |
         | OpenAI-compatible POST /v1/chat/completions
         v
-   Local GGUF server (:8020/v1)  — or any OpenAI-compatible endpoint
-   llama.cpp (llama-cpp-python)
-        |
-        v
-   Qwen2.5 0.5B Instruct Q4_K_M (HF cache)
+   Local GGUF server (:8020/v1), or a hosted compatible endpoint
+   Local runtime: llama.cpp via llama-cpp-python
 ```
 
-Go and Python never import each other — they talk over HTTP. The analyzer
-talks to the model only through the **OpenAI-compatible** Chat Completions API,
-so a laptop HF server, vLLM, or a hosted provider are drop-in replacements.
+Go and Python never import each other. The analyzer reaches a model only through
+OpenAI-compatible **Chat Completions**. The bundled local default is Qwen2.5 0.5B
+Instruct Q4_K_M; the workspace catalog offers other local and hosted choices.
 
-[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) has the folder maps, the import
-rules between them, and what to add for a new product under this repo. See
-[`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) for where new feature code goes,
-`make check`, and PR expectations — GitHub default is **`main`**; branch from
-**`staging`**, open PRs into **`staging`**, then promote **`staging` → `main`**.
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for module ownership and import
+rules, [`docs/CONTEXT.md`](docs/CONTEXT.md) for domain terms, and
+[`packages/contracts/README.md`](packages/contracts/README.md) for versioned wire
+schemas and compatibility rules.
 
 ## Quickstart
 
+Run commands from the repository root unless shown otherwise.
+
+| Prerequisite | Version / use |
+|---|---|
+| Go | 1.25+; the exact version is in `backend/api/go.mod` |
+| Python | 3.11+ with venv support; CI uses 3.12 |
+| Node.js | 22.18+ on the Node 22 line, as used by CI, with npm |
+| CMake and a C++ compiler | Needed when installing the local `llama-cpp-python` runtime from source |
+| Docker with Compose | Optional for the container stack and Docker previews |
+
+### Local models
+
+Create `.env` if you do not already have one:
+
 ```sh
-# once (compiles llama-cpp-python for local GGUF serving; needs cmake and a
-# C++ compiler — the published wheels are corrupt). ~1 min.
-make venv-local
-
-# one terminal: llm (:8020) + analyzer (:8010) + api (:8080) + web (vite)
-# opens http://localhost:5173/ (API GET / redirects there too)
-# loads repo .env (GITHUB_TOKEN, TERRA_*, …) like Compose
-make dev
-# backend only (no web): make dev-api
-
-# then, in another terminal:
-(cd backend/api && go run ./cmd/terra map https://github.com/usememos/memos -o ../../memos.map.json)
-# or hit the HTTP API:
-curl -X POST localhost:8080/analyze -d '{"repo_url":"https://github.com/usememos/memos"}'
-curl localhost:8080/analyses
-curl localhost:8080/analyses/1
+[ -f .env ] || cp .env.example .env
 ```
 
-`make run-llm`, `make run-analyzer`, `make run-server`, and `make run-web` still
-exist if you want to run one service alone.
+Edit these values in `.env` for local inference. The example file currently points
+at a hosted endpoint and enables offline Hugging Face access, so it needs these
+changes before a first local run:
 
-Point `TERRA_LLM_URL` at any other OpenAI-compatible `/v1` endpoint (cloud, vLLM,
-Ollama’s OpenAI mode) without changing analyzer code.
+```dotenv
+TERRA_LLM_URL=http://localhost:8020/v1
+TERRA_MODEL=Qwen/Qwen2.5-0.5B-Instruct-GGUF/qwen2.5-0.5b-instruct-q4_k_m.gguf
+TERRA_LLM_API_KEY=
+HF_HUB_OFFLINE=0
+```
 
-## Production-shaped playground (Docker Compose)
-
-One origin on loopback: Go serves the built UI + API; analyzer (and optional local LLM)
-stay on the Compose network.
-
-Hosted-key quickstart:
+Then install the Python environment and start the stack:
 
 ```sh
-cp .env.example .env
-cat >> .env <<'EOF'
-TERRA_TOKEN=change-me
-TERRA_LLM_URL=https://api.openai.com/v1
-TERRA_LLM_API_KEY=sk-...
-TERRA_MODEL=gpt-4o-mini
-EOF
+make venv-local
+make dev
+```
 
-make up          # api + analyzer → http://127.0.0.1:8080
-docker compose logs analyzer | head -5   # must show model= and base_url=
+`make dev` starts the local LLM on `8020`, analyzer on `8010`, Go API on `8080`,
+and Vite on `5173`. It installs web dependencies if needed and opens
+`http://localhost:5173/`. First local-model startup downloads and loads the GGUF
+weights; allow time for that to finish. GPU offload requires a llama.cpp build
+with the matching accelerator backend. The Compose LLM image uses CPU inference.
+
+`make dev-api` starts the same stack without Vite. Stop either run with Ctrl-C.
+
+### Hosted models without a local LLM
+
+Set `.env` to your provider's OpenAI-compatible base URL, API key, and model ID.
+For example, the repository's OpenAI catalog includes this configuration:
+
+```dotenv
+TERRA_LLM_URL=https://api.openai.com/v1
+TERRA_LLM_API_KEY=your-provider-key
+TERRA_MODEL=gpt-5.4-mini
+```
+
+```sh
+make venv
+./scripts/dev.sh analyzer api web
+```
+
+This starts only the analyzer, API, and web UI. The workspace picker uses its own
+catalog choice and asks for the provider key in the browser; `.env` configures the
+fallback for CLI and API requests that do not select a catalog model.
+
+Both development commands load the root `.env`, which overrides existing shell
+exports. Individual `make run-llm`, `make run-analyzer`, `make run-server`, and
+`make run-web` targets do not load that file themselves; export the variables
+first when running services separately.
+
+### CLI and HTTP examples
+
+With the analyzer and its model endpoint running:
+
+```sh
+(cd backend/api && go run ./cmd/terra scan https://github.com/usememos/memos)
+(cd backend/api && go run ./cmd/terra map https://github.com/usememos/memos -o ../../memos.map.json)
+```
+
+`scan` reads a GitHub tarball without a local Git clone or model call. `map` also
+calls the analyzer and stores its result in `terra.db` in the command's working
+directory. Use `--db ''` to skip storage or `--db /path/to/terra.db` to choose it.
+
+For HTTP, load the same token used by the API into the second terminal:
+
+```sh
+set -a
+. ./.env
+set +a
+curl -sS -X POST http://127.0.0.1:8080/analyze \
+  -H "Authorization: Bearer ${TERRA_TOKEN:-}" \
+  -H 'Content-Type: application/json' \
+  -d '{"repo_url":"https://github.com/usememos/memos"}'
+curl -sS -H "Authorization: Bearer ${TERRA_TOKEN:-}" http://127.0.0.1:8080/analyses
+```
+
+`POST /analyze` uses the analyzer's configured model directly; it has no picker
+step and can spend provider tokens. With `TERRA_REQUIRE_MODEL=1`, use the
+model-aware `/jobs/analyze` endpoint instead.
+
+## Docker Compose playground
+
+Go serves the built UI and API at `http://127.0.0.1:8080/`. Analyzer and optional
+LLM ports are available only inside the Compose network.
+
+Create `.env` as above, set a nonempty `TERRA_TOKEN` to your own shared secret,
+and configure the hosted-model values from the previous section:
+
+```sh
+make up
 curl -sf http://127.0.0.1:8080/healthz
+docker compose logs --tail=20 analyzer
+# When finished:
 make down
 ```
 
-Local HF instead: `TERRA_LLM_URL=http://llm:8020/v1`, leave `TERRA_LLM_API_KEY`
-empty, run `make up-llm`. Set `GITHUB_TOKEN` to a classic PAT with public-repo
-read (`contents:read`); without it analyze shares GitHub’s ~60 REST req/hour/IP
-quota and will rate-limit quickly (~5,000/hour with a token).
+`make up` builds and starts API + analyzer. For local GGUF inference, set
+`TERRA_LLM_URL=http://llm:8020/v1`, restore the local GGUF `TERRA_MODEL`, clear
+`TERRA_LLM_API_KEY`, set `HF_HUB_OFFLINE=0` for downloads, and run `make up-llm`.
 
-Troubleshooting (`docker compose logs analyzer`):
+The `terra-data` volume holds `/data/terra.db` and `/data/checkouts`; the
+`terra-hf-cache` volume holds local model weights. `make down` preserves these
+volumes. The API image serves the web bundle from `/app/apps/web/dist`.
 
-| Log line | Fix |
+`TERRA_TOKEN` is required because the API binds `0.0.0.0` inside its container.
+When serving the UI, Go sets an HttpOnly cookie so the browser does not need a
+manual token entry. Local `make dev` forwards the token through Vite's proxy.
+This shared token is not user authentication: anyone served the UI receives the
+cookie. See [`docs/SECURITY.md`](docs/SECURITY.md).
+
+| Symptom | Check |
 |---|---|
-| `llm UNREACHABLE: …` | Wrong `TERRA_LLM_URL` or missing/invalid `TERRA_LLM_API_KEY` |
-| `serving X, not Y` | `TERRA_MODEL` doesn't match what the endpoint serves |
-| `points at localhost, but inside a container` | Use a hosted URL or `http://llm:8020/v1` — `localhost` inside Compose is the analyzer itself |
+| `llm UNREACHABLE` | Endpoint URL, provider key, and whether the model server is ready |
+| `serving X, not Y` | `TERRA_MODEL` must identify a model served by that endpoint |
+| URL points at `localhost` inside Compose | Use a hosted URL or `http://llm:8020/v1`; container localhost is not the host machine |
+| Local weights cannot download | Check network access and `HF_HUB_OFFLINE`; offline mode needs already-cached weights |
+| GitHub requests are rate-limited | Set `GITHUB_TOKEN` for authenticated repository requests |
 
-Open `http://127.0.0.1:8080/`. The workspace opens without pasting a token:
-the API sets an HttpOnly cookie when it serves the UI (`make up`). `make dev`
-forwards `TERRA_TOKEN` from `.env` through the Vite proxy.
+The analyzer's `/healthz` can return HTTP 200 with `llm_ok: false`. A healthy
+container alone does not confirm that inference works; inspect that field and the
+analyzer's startup logs.
 
-`TERRA_TOKEN` is required for `make up` — the api container binds `0.0.0.0`
-inside Compose and `terra serve` refuses a non-loopback bind with an empty
-token. `make dev` (loopback) stays open.
+### Live preview
 
-### Verifying the whole loop end to end
+Preview detects runnable apps and boots supported web/API apps, plus mobile or
+desktop apps with a supported preview path. Libraries and CLIs have dedicated
+stages for repository information, tests, or CLI output. These operations depend
+on the tools installed where the runner executes.
 
-`make check` stubs scan, analyze, and preview, so it says nothing about the
-assembled deployment. `make smoke` drives the real Compose stack instead:
+In host mode, repository processes run directly on the API host. In Docker mode,
+supported Node apps run in sibling containers using `TERRA_PREVIEW_IMAGE`.
+Go/Python and other host-only launch paths run in the API process's environment;
+in the supplied Compose API image, the Go/Python toolchains are absent, so those
+previews cannot boot. Docker mode is not a universal container runner.
 
-```sh
-TERRA_SMOKE=1 make smoke
-```
-
-It boots the stack and asserts, in order: the analyzer actually reached the
-provider; `TERRA_TOKEN` gates what it should and leaves `/healthz`, `/models`,
-`/host/capabilities` open while `GET /` sets the HttpOnly cookie; the probe gate
-spends no tokens; analyze returns a map whose components carry evidence files and
-whose API key never appears in an event or a log; the stored map survives
-`docker compose restart api` on the `terra-data` volume; ask and the read-only
-guide answer; a Node app boots in docker mode and serves HTML through `/__live/`;
-`/preview/routes` and `/preview/probe` work against it; `/preview/patch` writes,
-`/preview/restart` recovers, and a `../../` path escape is refused; and a burst
-from one address gets a 429. Knobs are in `.env.example` under "Tests only".
-
-One stage pins a known limitation rather than hiding it: `dockerable()` is false
-for Go and Python apps, so in docker mode they fall back to host-exec *inside* the
-api container, which has neither toolchain. Their preview cannot boot today, and
-the suite asserts it fails as a readable error instead of hanging.
-
-A green run is **not** a production sign-off. It does not test preview isolation
-(the container has no capability drops, no read-only root, no resource limits, and
-the api mounts the Docker socket — see [`docs/SECURITY.md`](docs/SECURITY.md)),
-concurrent load or SQLite durability under writers, or anything multi-user
-(`TERRA_TOKEN` is one shared secret). The workspace session is still lost on
-reload.
-
-**Live preview (Phase 1b):** Compose sets `TERRA_PREVIEW_MODE=docker`, mounts the
-host Docker socket, and shares checkouts via the named `terra-data` volume
-(`TERRA_CHECKOUT_VOLUME`) so Docker Desktop can mount them into siblings.
-`POST /preview` starts every previewable app in the checkout and returns
-`{url, primary_id, apps}`. `POST /jobs/preview` streams the same boot as NDJSON
-(`checkout → detect → install → boot → ready`) so the workspace can show
-progress and cancel. Node apps run in a
-sibling container and return `/__live/{id}/` (same origin) when the framework
-takes a base path on the command line (Vite, Angular, CRA); the rest are served
-at their own loopback origin instead, since their absolute asset paths cannot be
-moved under a prefix. Go and Python apps boot on the host — the default Node
-image has none of those toolchains.
-Caps: `TERRA_PREVIEW_MAX` (default 2, counting **apps** not repos), idle TTL
-`TERRA_PREVIEW_TTL` (default 30m). Both apply in host-exec and Docker.
-
-## Commands
-
-| Command | What it does |
-|---|---|
-| `make dev` | Local full stack: LLM + analyzer + Go API + web |
-| `make dev-api` | Same as `make dev` without the web UI |
-| `make up` | Docker Compose: build/start api + analyzer (detached) |
-| `make up-llm` | Same as `make up` with local HF `llm` profile |
-| `make down` | Docker Compose: stop and remove containers |
-| `make check` | Fixtures + Go/Python/web tests + lint (CI entry point; Python `-m 'not slow'`) |
-| `make test` | Fixtures + Go/Python/web tests |
-| `make eval` | Harness evals in `terra_analyzer/evals/` (no live LLM) |
-| `make smoke` | End-to-end run against the Compose stack (opt-in: `TERRA_SMOKE=1`) |
-| `make sync-fixtures` | Copy `case-studies/memos.map.json` → `apps/web/src/data/` |
-| `terra scan <url>` | Clone + deterministic scan, JSON to stdout |
-| `terra map <url>` | Scan, ask the analyzer for a map, store in `terra.db` |
-| `terra serve` | HTTP API: `POST /jobs/probe`, `POST /jobs/analyze`, `POST /jobs/ask`, `POST /jobs/agent`, `POST /jobs/preview`, `GET /models`, `GET /host/capabilities`, `GET /analyses`, `POST /preview`, `POST /preview/patch`, `POST /preview/restart`, `POST /ask`, `GET /files` |
-
-## Environment variables
-
-| Variable | Read by | Default | Meaning |
-|---|---|---|---|
-| `TERRA_ANALYZER_URL` | Go | `http://localhost:8010` | Where the Python analyzer listens (`http://analyzer:8010` in Compose) |
-| `TERRA_API_URL` | analyzer | `http://127.0.0.1:8080` | Go API for `read_snippet` (`GET /files`) and editor writes (`POST /preview/patch`, `POST /preview/restart`; `http://api:8080` in Compose) |
-| `TERRA_LLM_URL` | analyzer | `http://localhost:8020/v1` | OpenAI-compatible base URL (`…/v1`); Compose hosted or `http://llm:8020/v1` |
-| `TERRA_LLM_API_KEY` | analyzer | _(empty)_ | Optional Bearer token for hosted providers |
-| `TERRA_LLM_TIMEOUT` | analyzer | `600` | Seconds to wait for a chat/completions response (read timeout) |
-| `TERRA_ANALYZE_TIMEOUT` | Go | `15m` | Wall-clock cap for one analyze job |
-| `TERRA_RATE_LIMIT` | Go | `2` | Per-IP requests/sec on jobs/preview/ask (0 disables) |
-| `TERRA_REQUIRE_MODEL` | Go | `false` | `1` makes `model_id` mandatory on analyze and ask; without it a caller that names no model runs on the analyzer's own `TERRA_LLM_*` key |
-| `TERRA_ANALYZE_CONCURRENCY` | Go | `4` | Max analyze jobs in flight; extra requests get 429 |
-| `TERRA_MODEL` | analyzer + local LLM | `Qwen/Qwen2.5-0.5B-Instruct-GGUF/qwen2.5-0.5b-instruct-q4_k_m.gguf` | GGUF quant as `<hf-repo>/<file>.gguf` |
-| `TERRA_N_CTX` | local LLM | `18432` | Context window; must clear the largest prompt plus 4096 output tokens |
-| `TERRA_N_GPU_LAYERS` | local LLM | `-1` (all) on GPU/Metal, `0` on CPU | Layers offloaded to the accelerator; unset, the server falls back to 16 then CPU if the weights do not fit |
-| `TERRA_TOKEN` | Go + analyzer | _(empty)_ | Shared secret; empty leaves API open (local-only). Analyzer sends it on `GET /files` and preview write routes |
-| `TERRA_PREVIEW_MODE` | Go | _(empty)_ = host | `docker` for Compose sibling previews |
-| `TERRA_CHECKOUT_DIR` | Go | user cache | Shared checkout root (Compose: `/data/checkouts`) |
-| `TERRA_PUBLIC_URL` | Go | `http://127.0.0.1:8080` | Origin used in `/__live/...` preview URLs |
-| `TERRA_PREVIEW_MAX` | Go | `2` | Max concurrent preview **apps** (host and Docker); `0` refuses every preview before checkout |
-| `TERRA_PREVIEW_TTL` | Go | `30m` | Idle TTL before a preview is stopped (host and Docker) |
-| `TERRA_DEVICE` | local LLM + Go | `auto` (`mps` / `cuda` / `cpu`) | Device for `make run-llm` / Compose `llm`; also reported by `GET /host/capabilities` |
-| `TERRA_LOCAL_LLM_URL` | Go | `http://localhost:8020` | Sidecar the workspace picker loads local models into (`http://llm:8020` in Compose) |
-| `VITE_TERRA_DEMO` | web build | _(empty)_ | `1` seeds the bundled memos map on an empty stage and shows the demo notice; see [Public demo build](#public-demo-build) |
-| `GITHUB_TOKEN` | Go scan | _(empty)_ | GitHub PAT for analyze/fetch; without it ~60 REST req/hour/IP, with it ~5,000/hour |
-
-## Public demo build
-
-A build for a public URL is deliberately less than the full app: it reads
-repositories, it does not run them.
-
-```sh
-# server
-TERRA_PREVIEW_MAX=0        # refuse every preview — the only path that executes
-                           # an analyzed repository's code
-TERRA_LLM_API_KEY=         # empty: analyze and ask are bring-your-own-key
-TERRA_REQUIRE_MODEL=1      # and refuse any request that names no model, so
-                           # BYOK holds in code and not just in configuration
-TERRA_TOKEN=<random>       # still required for a non-loopback bind
-TERRA_RATE_LIMIT=0.2
-GITHUB_TOKEN=<PAT, public repo read only>
-
-# web
-VITE_TERRA_DEMO=1 npm --prefix apps/web run build
-```
-
-`TERRA_PREVIEW_MAX=0` is checked before checkout
-(`backend/api/internal/preview/host.go`, `docker.go`), so `POST /preview` and
-the `/jobs/preview*` routes fail without fetching anything.
-
-`TERRA_REQUIRE_MODEL=1` closes the other half. A request that sends no
-`model_id` normally means "operator's choice" and leaves the analyzer on its
-own `TERRA_LLM_*` environment — the right default for a private deployment,
-and a way to spend the operator's key on a public one. With the gate on, every
-analyze and ask must name a catalog model and carry its own key.
-
-`VITE_TERRA_DEMO=1` changes two things in the UI: an empty stage renders the
-bundled `case-studies/memos.map.json` instead of nothing, so an arriving
-visitor reads a real map — components, evidence links, ask — without pasting a
-repo or a key; and a notice explains that live preview is a local-only feature.
-Dropping a repo still works and replaces the fixture with that run. `?nofixture`
-gets the empty stage back.
-
-Read [`docs/SECURITY.md`](docs/SECURITY.md) before putting any build on a
-public address: `TERRA_TOKEN` is a single shared secret, the API hands its
-cookie to everyone it serves the UI to, and there are no user accounts.
+Compose mounts the Docker socket and shares checkouts through `terra-data`.
+Frameworks with configurable base paths (Vite, Angular, CRA) can use the same-origin
+`/__live/{id}/` proxy. Other Node frameworks use their own loopback origin.
+`TERRA_PREVIEW_MAX` limits concurrent **apps**, not repositories (default `2`);
+`TERRA_PREVIEW_TTL` controls idle shutdown (default `30m`).
 
 ## Choosing a model in the workspace
 
-Pasting a repo URL runs a **probe** first — fetch, scan, and a rule-based
-recommendation — and then stops at a hard gate. No LLM call happens until you
-press Continue.
+A probe stops at the model gate before inference unless the current commit already
+has a stored map. Job creation and event streaming are separate HTTP requests:
 
+```text
+POST /jobs/probe {repo_url} → {job_id}
+GET /jobs/{job_id}/events → NDJSON: fetch → [recommend] → scan → done
+  done contains probe_id + repository/recommendation, or an existing map
+
+User selects a model and continues
+
+POST /jobs/analyze {repo_url, probe_id, model_id, api_key?} → {job_id}
+GET /jobs/{job_id}/events → NDJSON: [scan] → [ensure_model] → analyze → store → done
+POST /jobs/{job_id}/cancel → cancel the running job
 ```
-POST /jobs/probe {repo_url}      → NDJSON: fetch → [recommend] → scan → done{probe_id, repo, recommendation}
-                                   (a repo already mapped at this commit skips
-                                    the gate: done carries the stored map)
-   ↓ user picks a model
-POST /jobs/analyze {repo_url, probe_id, model_id, api_key?}
-                                 → NDJSON: [scan] → [ensure_model] → analyze → store → done
+
+- **Catalog:** `GET /models` returns the static allowlist in
+  [`backend/api/internal/catalog/catalog.go`](backend/api/internal/catalog/catalog.go).
+  Catalog IDs such as `openai-gpt-5.4-mini` differ from provider model IDs such as
+  `gpt-5.4-mini`.
+- **Host fit:** `GET /host/capabilities` reports RAM and accelerator information.
+  Both the picker and API reject local choices that do not meet eligibility rules.
+- **Local models:** analyze asks the sidecar to load the selected weights and
+  streams `ensure_model` progress. One sidecar serves one loaded model at a time.
+- **Hosted models:** keys live in browser `localStorage` under
+  `terra_key_<provider>` and accompany analyze/Ask requests. They are forwarded to
+  the provider, not stored in SQLite or job events; provider errors are scrubbed.
+- **Ask:** the workspace uses `/jobs/agent`, a read-only guide, with the selected
+  model. Opening a saved map keeps the session's model choice. Ask does not load
+  local weights; after a sidecar restart or model switch, ensure the chosen model
+  is available before asking.
+- **Fallback:** callers without `model_id` use the analyzer's `TERRA_LLM_*`
+  configuration unless the API requires an explicit model. The CLI uses this
+  fallback and can override the provider model with `--model`.
+
+Probe results expire from memory after 15 minutes; analyze rescans if needed.
+Model preferences persist in the browser, independently of stored analyses.
+
+## Commands and API
+
+| Command | What it does |
+|---|---|
+| `make venv` / `make venv-local` | Install Python services and dev tools; the latter adds the local GGUF runtime |
+| `make dev` / `make dev-api` | Local stack, with or without the web UI |
+| `make up` / `make up-llm` / `make down` | Start Compose, include its local LLM profile, or stop containers |
+| `make build-web` | Type-check and build the web UI into `apps/web/dist` |
+| `make check` | Contract checks, fixture sync, Go/Python/web tests, and lint |
+| `make test` / `make eval` | Default tests, or analyzer harness evals only |
+| `make smoke` | Opt-in Compose end-to-end suite (`TERRA_SMOKE=1`) |
+| `make sync-fixtures` | Copy the golden map to the web's bundled fixture |
+| `terra scan <url>` / `terra map <url>` | Deterministic scan, or scan + analysis + optional SQLite storage |
+| `terra serve` | Serve the API; `--addr`, `--db`, and `--static` configure listening, storage, and built UI |
+
+Go API routes are registered in
+[`backend/api/internal/server/server.go`](backend/api/internal/server/server.go):
+
+| Routes | Purpose |
+|---|---|
+| `GET /healthz`, `/models`, `/host/capabilities` | Open health and model-picker metadata |
+| `POST /analyze` | Synchronous analysis with the operator-configured model |
+| `POST /jobs/probe`, `/jobs/analyze`, `/jobs/ask`, `/jobs/agent` | Background scan, analysis, QA, or read-only guide |
+| `GET /jobs/{id}/events`, `POST /jobs/{id}/cancel` | NDJSON events and cancellation |
+| `GET /analyses`, `GET /analyses/{id}`, `DELETE /analyses/{id}` | List, retrieve, or delete stored maps |
+| `POST /preview`, `/jobs/preview` | Start or reuse preview, synchronously or as a job |
+| `POST /jobs/preview/test`, `/jobs/preview/cli` | Run repository tests or its CLI |
+| `POST /preview/patch`, `/preview/restart` | Modify the preview checkout or restart it |
+| `GET /preview/routes`, `POST /preview/probe` | Inspect routes and send an API-console request |
+| `POST /ask`, `GET /files` | Synchronous QA and source-file reads |
+| `GET /traces`, `POST /traces/ingest` | SSE preview trace stream and trace ingestion |
+
+The analyzer on `8010` exposes `GET /healthz`, `GET /tasks`, `POST /analyze`
+(the Go-to-Python contract), and `POST /tasks/{name}`. Registered tasks are
+`architecture`, `qa`, `agent`, and `editor`. Requests accept model routing fields
+`model`, `base_url`, and `api_key`. Agent/editor responses stream NDJSON progress
+and a final answer. The editor can call Go's patch/restart endpoints; it is not
+exposed through the workspace's read-only `/jobs/agent` route.
+
+The local sidecar on `8020` exposes `GET /healthz`, `GET /v1/models`,
+`POST /v1/chat/completions`, `GET /admin/status`, `POST /admin/load`, and
+`POST /admin/cancel`.
+Status reports `ready`, `loading`, `error`, or `empty`. Loading returns immediately;
+requesting the same model reuses its load, while choosing another supersedes the
+previous request. Cancellation prevents an abandoned result from being installed,
+although its download may still finish.
+
+## Environment variables
+
+Defaults below describe code defaults. `.env`, Compose, and CLI flags can change
+them. Never commit real keys or a populated `.env`.
+
+| Variable | Read by | Default / purpose |
+|---|---|---|
+| `TERRA_ANALYZER_URL` | Go | `http://localhost:8010`; Compose uses `http://analyzer:8010` |
+| `TERRA_API_URL` | Analyzer tools | `http://127.0.0.1:8080`; Compose uses `http://api:8080` for file/patch/restart calls |
+| `TERRA_LLM_URL` | Analyzer | `http://localhost:8020/v1`; OpenAI-compatible base URL |
+| `TERRA_LLM_API_KEY` | Analyzer | Empty; optional operator provider key |
+| `TERRA_MODEL` | Analyzer / local LLM | `Qwen/Qwen2.5-0.5B-Instruct-GGUF/qwen2.5-0.5b-instruct-q4_k_m.gguf`; provider model ID for hosted inference |
+| `TERRA_LLM_TIMEOUT` | Analyzer | `600` seconds per model read timeout |
+| `TERRA_ANALYZE_TIMEOUT` | Go | `15m` job timeout |
+| `TERRA_ANALYZE_CONCURRENCY` | Go | `4` concurrent analyze jobs; excess requests receive 429 |
+| `TERRA_RATE_LIMIT` | Go | `2` requests/second per IP on rate-limited routes; `0` disables |
+| `TERRA_REQUIRE_MODEL` | Go | `false`; require an explicit catalog model for analysis/Ask |
+| `TERRA_TOKEN` | Go / analyzer / Vite | Empty; shared API secret, required for a non-loopback API bind |
+| `TERRA_LOCAL_LLM_URL` | Go | `http://localhost:8020`; sidecar for loading selected local models; Compose uses `http://llm:8020` |
+| `TERRA_DEVICE` | Local LLM / Go host detection | `auto` (`mps`, `cuda`, or `cpu`); supplied Compose services pin `cpu` |
+| `TERRA_N_CTX` | Local LLM | `18432` token context window |
+| `TERRA_N_THREADS` | Local LLM | Half the logical CPU count, minimum 1; `0` also selects this default |
+| `TERRA_N_GPU_LAYERS` | Local LLM | All layers on an accelerator, with fallback to 16 then CPU; explicit values disable fallback |
+| `HF_HUB_OFFLINE` | Hugging Face client | Set `0` to allow downloads; `1` requires cached weights. `.env.example` currently sets `1` |
+| `HF_HOME` | Hugging Face client | Model/cache location; Compose mounts the weight cache at `/hf` |
+| `TERRA_PREVIEW_MODE` | Go | Empty means host execution; Compose sets `docker` |
+| `TERRA_PREVIEW_MAX` | Go | `2` concurrent preview apps; `0` refuses preview before checkout |
+| `TERRA_PREVIEW_TTL` | Go | `30m` idle TTL; nonpositive durations disable expiry |
+| `TERRA_PREVIEW_IMAGE` | Go | `node:22-bookworm` for Docker preview apps |
+| `TERRA_PREVIEW_NETWORK` | Go | Empty; Compose sets `terra-net` for sibling containers |
+| `TERRA_DOCKER` | Go | `docker`; override the executable path |
+| `TERRA_CHECKOUT_DIR` | Go | User cache directory; Compose sets `/data/checkouts` |
+| `TERRA_CHECKOUT_VOLUME` | Go | Empty; Compose sets `terra-data` for sibling checkout mounts |
+| `TERRA_HOST_CHECKOUT_DIR` | Go | Empty; optional host path remapping for bind-mounted checkouts |
+| `TERRA_PUBLIC_URL` | Go | Defaults to loopback with the API's listen port; Compose sets `http://127.0.0.1:8080` |
+| `TERRA_TRACE_HOST` | Go | Trace callback host for preview apps; Compose sets `host.docker.internal` |
+| `TERRA_WEB_URL` | Go / dev launcher | Empty in Go; `make dev` uses `http://localhost:5173/` for opening the UI and redirecting API `/` |
+| `TERRA_API` | Vite config | `http://localhost:8080`; development API proxy target |
+| `VITE_TERRA_DEMO` | Web build | Empty; `1` enables the bundled-map demo mode below |
+| `GITHUB_TOKEN` | Go repository fetch | Empty; optional token for authenticated GitHub requests |
+
+Set the API listen address with `terra serve --addr`; the CLI currently overrides
+`TERRA_ADDR`. Set the SQLite path with `--db` (default `terra.db`).
+
+## Public demo build
+
+A public demo can show architecture maps with repository execution disabled. Use
+these settings in the server environment, supplying your own token:
+
+```dotenv
+TERRA_PREVIEW_MAX=0
+TERRA_LLM_API_KEY=
+TERRA_REQUIRE_MODEL=1
+TERRA_TOKEN=replace-with-your-own-shared-secret
+TERRA_RATE_LIMIT=0.2
 ```
 
-- **Catalog** — `GET /models` (open, no token) is a static allowlist shipped in
-  `backend/api/internal/catalog`: local Hugging Face weights and curated remote
-  OpenAI-compatible endpoints. IDs are provisional; the shape is not.
-- **Host fit** — `GET /host/capabilities` (open) reports this machine's RAM and
-  accelerator. Local models that cannot fit stay visible but disabled.
-- **Local models** load on the Terra sidecar during analyze: the API calls
-  `POST /admin/load {model_id}` and polls `GET /admin/status` until the weights
-  are ready, streaming `ensure_model` events. No `.env` edit, no restart.
-- **Remote models are BYOK.** The key is stored in the browser's `localStorage`
-  under `terra_key_<provider>`, sent on the analyze request, forwarded to the
-  provider, and dropped. It is never written to SQLite, a job event, or a log;
-  provider errors are scrubbed before they become event labels.
-- **Ask** reuses the model the workspace analyzed with. It does not run
-  `ensure_model` — the weights are already loaded from the analyze that
-  preceded it.
-- **Operator fallback is unchanged.** A request without `model_id` (the CLI,
-  `POST /analyze`, any older client) behaves exactly as before and uses
-  `TERRA_LLM_URL` / `TERRA_MODEL` / `TERRA_LLM_API_KEY`.
-
-Probe results are cached in memory for 15 minutes. If the gate sits open longer
-than that, analyze rescans and says so.
-
-## Analyzer HTTP surface
-
-| Route | Purpose |
-|---|---|
-| `GET /healthz` | Status, model, whether the LLM `/v1/models` probe succeeded |
-| `POST /analyze` | Architecture map (Go wire contract) |
-| `GET /tasks` | Registered analyzer tasks |
-| `POST /tasks/{name}` | Run a named task (`architecture`, `qa`, `agent`) |
-
-`POST /analyze` and `POST /tasks/qa` accept optional `base_url` and `api_key`
-alongside `model`, which override `TERRA_LLM_*` for that request only.
-`POST /tasks/agent` streams NDJSON `{stage, label}` lines, then `{answer}`.
-
-Local model sidecar (`make run-llm`, port 8020):
-
-| Route | Purpose |
-|---|---|
-| `GET /admin/status` | `{model_id, device, state: ready\|loading\|error\|empty, error}` |
-| `POST /admin/load` | Switch the served weights; returns immediately, 409 while another load is in flight |
-
-## Tests
+Build the UI with:
 
 ```sh
-make check              # fixtures + Go + Python + web + lint (CI entry point)
-make test               # fixtures + Go + Python + web (no lint)
-make eval               # harness evals (ask goldens, trajectories, policy; no live LLM)
-make test-integration   # opt-in live suites (needs TERRA_INTEGRATION=1)
-make sync-fixtures      # copy case-studies/memos.map.json → apps/web/src/data/
+VITE_TERRA_DEMO=1 npm --prefix apps/web run build
 ```
 
-| Suite | Location | Default command |
-|---|---|---|
-| Go unit/integration | `backend/api/internal/*/*_test.go` (colocated) | `make test-go` |
-| Python | `backend/analyzer/tests/` | `make test-py` (excludes `@pytest.mark.slow`) |
-| Harness evals | `backend/analyzer/terra_analyzer/evals/` + `case-studies/memos.ask.json` | `make eval` (same `-m 'not slow'`) |
-| Web logic | `apps/web/src/**/*.test.ts` | `make test-web` (`node --test`) |
-| Web components | `apps/web/src/**/*.test.tsx` | part of `make test-web` (vitest) |
-| Fixture sync | `case-studies/` ↔ `apps/web/src/data/` | `make test-fixtures` |
-| Live GitHub | `backend/api/internal/scan/live_test.go` | `TERRA_INTEGRATION=1 make test-integration` |
-| Live LLM | `backend/analyzer/tests/test_slow_llm.py` + `evals/test_live_llama.py` | same (`TERRA_SLOW=1` still works alone) |
+Serve that bundle with Go's `--static` option. This flag applies to the web build;
+the supplied Compose Dockerfile builds its own bundle and does not forward this
+build flag automatically.
 
-The wire contract between Go and Python is the draft JSON in
-`backend/analyzer/terra_analyzer/contracts/models.py` mirrored by `backend/api/internal/analysis/types.go`;
-the enums and model JSON schema live only in
-`backend/analyzer/terra_analyzer/tasks/architecture/schema.py`.
-`case-studies/memos.map.json` is the golden answer key and is checked by
-`backend/analyzer/tests/test_app.py` and `backend/api/internal/analysis/contract_test.go`.
+`TERRA_PREVIEW_MAX=0` refuses preview boot before checkout. Preview test/CLI jobs
+require an already-mounted preview and return 409 when none exists.
+`TERRA_REQUIRE_MODEL=1` removes the operator-model
+fallback from the Go analysis/Ask routes. Remote catalog models require the
+caller's provider key. Local catalog entries remain available when a sidecar is
+reachable and the host passes eligibility checks; this flag is not a remote-only
+allowlist.
+
+Demo mode fills an empty workspace with the bundled memos map and shows a preview
+limitation notice. Its map can be explored without a key; new model-generated
+answers still need an available model and any required provider key. Dropping a
+repository starts the normal probe/model flow. `?nofixture` suppresses the bundled
+map; in development, `?fixture` opts into it.
+
+This is still a shared, pre-1.0 deployment with no user accounts. Review
+[`docs/SECURITY.md`](docs/SECURITY.md) before publishing it.
+
+## Tests and promotion
+
+```sh
+make venv              # first-time test setup; no GGUF runtime required
+# Install the Go linter version used by CI if it is not already available:
+go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2
+make check
+make build-web         # production TypeScript/Vite build, separate from make check
+```
+
+`make check` runs contract/fixture validation, Go build/tests, Python unit tests and
+harness evals, web logic/component tests, and lint. Python tests marked `slow` are
+excluded. Contract schema validation uses `jsonschema` when available to the
+`python3` running the script; otherwise it runs structural checks plus the
+language-native fixture tests.
+
+| Suite | Location / command |
+|---|---|
+| Go | `backend/api/internal/`; `make test-go` |
+| Analyzer and local LLM | `backend/analyzer/tests/`, `backend/local-llm/tests/`; `make test-py` |
+| Harness evals | `backend/analyzer/terra_analyzer/evals/`; `make eval` |
+| Web logic and components | `apps/web/src/**/*.test.ts` (Node) and `*.test.tsx` (Vitest); `make test-web` |
+| Versioned contracts | `packages/contracts/`; `make check-contracts` |
+| Golden fixture sync | `case-studies/memos.map.json` → `apps/web/src/data/`; `make test-fixtures` |
+| Live GitHub + LLM | `TERRA_INTEGRATION=1 make test-integration`; needs network and a running model endpoint |
+| Compose end-to-end | `TERRA_SMOKE=1 make smoke`; needs Docker, a configured provider, and its key |
+
+The live suites fetch repositories and can spend model tokens. The Compose smoke
+suite checks provider connectivity, authentication, the probe gate, analysis,
+stored-map persistence across API restart, Ask, preview, patch/restart, and rate
+limits. It also checks the known Go-preview limitation. See the `TERRA_SMOKE_*`
+options in `.env.example`; it tears down Compose afterward unless
+`TERRA_SMOKE_KEEP=1` is set, and preserves data volumes.
+
+A passing default check does not validate the assembled deployment, preview
+isolation, or multi-user behavior. Harness evals use programmatic assertions and
+recorded trajectories, not an LLM judge.
+
+GitHub's default branch is **`main`**. Branch from **`staging`**, open feature PRs
+into **`staging`**, and promote **`staging` → `main`** after verification. Before a
+PR, run `make check`; the merge gate also requires the `actionlint` workflow to
+pass for the PR's current commit. See
+[`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md).
 
 ## License
 
-MIT — see [`LICENSE`](LICENSE).
-
-The bundled celestial globe model is CC0 (Virtual Museums of Małopolska); its
-provenance is recorded in `apps/web/public/terra/models/celestial-globe-license.txt`.
+MIT — see [`LICENSE`](LICENSE). Bundled third-party assets retain their own
+licenses. The celestial globe model is CC0; its provenance is recorded in
+[`celestial-globe-license.txt`](apps/web/public/terra/models/celestial-globe-license.txt).

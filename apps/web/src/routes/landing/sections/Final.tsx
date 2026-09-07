@@ -2,10 +2,6 @@ import { Link } from "react-router-dom";
 import { footer, IMG } from "../data";
 import { CircleArrowIcon } from "../primitives";
 
-function hrefFor(link: string) {
-  return link === "Get started" ? "/new" : "#";
-}
-
 /** Closing card: headline and CTA over the docked globe, links along the floor. */
 export function Final() {
   return (
@@ -61,14 +57,23 @@ export function Final() {
           {footer.cols.map((col) => (
             <div key={col.title} className="terra-finale__col">
               <h4>{col.title}</h4>
-              {col.links.map((link) =>
-                hrefFor(link).startsWith("/") ? (
-                  <Link key={link} to={hrefFor(link)}>
-                    {link}
+              {col.links.map(({ label, href }) =>
+                // A leading `/` is a route and has to go through Link, or the
+                // click is a full page reload. `#` rows are placeholders the
+                // anchor handler swallows; only the absolute ones leave the site.
+                href.startsWith("/") ? (
+                  <Link key={label} to={href}>
+                    {label}
                   </Link>
                 ) : (
-                  <a key={link} href={hrefFor(link)}>
-                    {link}
+                  <a
+                    key={label}
+                    href={href}
+                    {...(href.startsWith("http")
+                      ? { target: "_blank", rel: "noreferrer" }
+                      : {})}
+                  >
+                    {label}
                   </a>
                 ),
               )}

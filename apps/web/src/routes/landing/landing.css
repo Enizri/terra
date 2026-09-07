@@ -1,5 +1,7 @@
 /* Landing page skin. Import order preserves the original cascade. */
 @import "./styles/landing-scale.css";
+/* Nav pill: shared chrome, so it lands where the landing skin used to hold it. */
+@import "../../shared/site/site-nav.css";
 @import "./styles/foundations.css";
 @import "./styles/showcase.css";
 @import "./styles/drop-and-flight.css";

@@ -1,6 +1,7 @@
 import { motion, useMotionValueEvent, useReducedMotion, useScroll } from "motion/react";
 import { useRef, useState } from "react";
-import { ArrowIcon, MotionLink, TerraMark } from "../primitives";
+import { Link } from "react-router-dom";
+import { ArrowIcon, MotionLink, TerraMark } from "./marks";
 
 const navCollapseSpring = {
   type: "spring",
@@ -39,20 +40,61 @@ function useNavCollapse() {
 /** Width collapse used by every slot the pill opens and closes. */
 const slot = (open: boolean) => (open ? { width: "auto", opacity: 1 } : { width: 0, opacity: 0 });
 
-export function SiteNav() {
+export type NavLink = {
+  /** `#id` stays a plain anchor so the landing's eased glide handler owns it;
+   *  anything else is a route and must not full-page reload. */
+  href: string;
+  label: string;
+  /** The page the reader is already on. */
+  current?: boolean;
+};
+
+/** One rule decides the element: a fragment is a same-page anchor, everything
+ *  else is a route. Getting this wrong is a full page reload, not a style bug. */
+function NavAnchor({ href, label, current }: NavLink) {
+  const props = {
+    className: "sh-nav__link",
+    ...(current ? { "aria-current": "page" as const } : {}),
+  };
+  return href.startsWith("#") ? (
+    <a {...props} href={href}>
+      {label}
+    </a>
+  ) : (
+    <Link {...props} to={href}>
+      {label}
+    </Link>
+  );
+}
+
+/** Site chrome, worn by every marketing page. `home` is where the logo goes —
+ *  the landing keeps `#top` so the glide handler catches it, other pages route
+ *  back to `/`. */
+export function SiteNav({ home, links }: { home: string; links: NavLink[] }) {
   const collapsed = useNavCollapse();
   const reduce = useReducedMotion();
   const transition = reduce ? { duration: 0 } : navCollapseSpring;
   const showLinks = !collapsed;
+  const mark = (
+    <>
+      <TerraMark className={collapsed ? "sh-terra-mark--collapsed" : ""} />
+      <span className="sh-nav__word">Terra</span>
+    </>
+  );
 
   return (
     <nav className="sh-nav">
       <div className="sh-nav__pill">
         <div className="sh-nav__slot">
-          <a className="sh-nav__logo" href="#top">
-            <TerraMark className={collapsed ? "sh-terra-mark--collapsed" : ""} />
-            <span className="sh-nav__word">Terra</span>
-          </a>
+          {home.startsWith("#") ? (
+            <a className="sh-nav__logo" href={home}>
+              {mark}
+            </a>
+          ) : (
+            <Link className="sh-nav__logo" to={home}>
+              {mark}
+            </Link>
+          )}
         </div>
         <motion.div
           id="sh-nav-links"
@@ -65,12 +107,9 @@ export function SiteNav() {
           // but still focusable, so tabbing parked the ring on invisible content.
           inert={showLinks ? undefined : true}
         >
-          <a className="sh-nav__link" href="#power">
-            How it works
-          </a>
-          <a className="sh-nav__link" href="#faq">
-            Case study
-          </a>
+          {links.map((link) => (
+            <NavAnchor key={link.href} {...link} />
+          ))}
         </motion.div>
         <div className="sh-nav__slot">
           <MotionLink

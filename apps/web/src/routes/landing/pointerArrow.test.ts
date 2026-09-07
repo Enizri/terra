@@ -1,13 +1,17 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import test from "node:test";
 import { JSDOM } from "jsdom";
 import {
   ARROW_PATH,
   POINTER_FILL,
   POINTER_REST,
+  POINTER_SCALE,
   hoverCursorTarget,
   isClickableElement,
   nativeCursorTarget,
+  pointerSpriteBox,
 } from "./pointerArrow.ts";
 
 test("the Codex-style cursor is a taupe pointer whose tip is the hotspot", () => {
@@ -24,6 +28,25 @@ test("the Codex-style cursor is a taupe pointer whose tip is the hotspot", () =>
 
 test("the pointer stays at a fixed 180° tilt", () => {
   assert.ok(POINTER_REST > 1.8 && POINTER_REST < 2.5);
+});
+
+test("the glyph is drawn a shade under the contour it was traced from", () => {
+  // Small enough to stop the body covering what the tip is on, not so small
+  // it stops reading as a cursor.
+  assert.ok(POINTER_SCALE < 1, "smaller than the traced contour");
+  assert.ok(POINTER_SCALE >= 0.75, "still a cursor, not a speck");
+  // Scaling is about the tip: the hotspot stays put, so a smaller sprite does
+  // not move where the glyph claims the pointer is.
+  const box = pointerSpriteBox(POINTER_SCALE, POINTER_REST);
+  const full = pointerSpriteBox(1, POINTER_REST);
+  assert.ok(box.maxX - box.minX < full.maxX - full.minX, "the sprite shrinks");
+  assert.ok(box.minX <= 0 && box.minY <= 0, "the tip stays inside the box");
+  // The one caller draws at that scale rather than the 1 default.
+  const source = readFileSync(
+    path.join(import.meta.dirname, "sections/HeroPixelField.tsx"),
+    "utf8",
+  );
+  assert.match(source, /createPointerSprite\(dpr, POINTER_SCALE\)/);
 });
 
 test("buttons show the native pointer; plain text does not", () => {
@@ -89,4 +112,34 @@ test("press targets and fields mark the tip; paper keeps the resting glyph", () 
   assert.equal(hoverCursorTarget(inner)?.target, q("go"));
   // Alias kept so older call sites still resolve.
   assert.equal(nativeCursorTarget(inner)?.target, q("go"));
+});
+
+test("the colour trail is held off every press target, not just the tags", () => {
+  const source = readFileSync(
+    path.join(import.meta.dirname, "sections/HeroPixelField.tsx"),
+    "utf8",
+  );
+  // The tag list misses the components that are a plain box with a handler,
+  // so the trail used to keep painting across them.
+  assert.match(source, /isClickableElement\(el\)/);
+  assert.doesNotMatch(source, /data-sel.*\n.*NO_TRAIL/);
+  // Same hit test as the one the tag list uses, so the two cannot disagree.
+  assert.match(
+    source,
+    /const el = hitFromPoint\(mx, my\);[\s\S]{0,240}isClickableElement\(el\)/,
+  );
+});
+
+test("clickables the tag list never covered still suppress the trail", () => {
+  const { document } = new JSDOM("<!doctype html><html><body></body></html>").window;
+  document.body.innerHTML = `
+    <div id="card" role="button">Open</div>
+    <div id="pick" data-sel="x"><span id="inner">pick</span></div>
+    <div id="chip" class="rp-btn">chip</div>
+    <p id="copy">paper</p>`;
+  const q = (id: string) => document.getElementById(id)!;
+  assert.equal(isClickableElement(q("card")), true, "role=button card");
+  assert.equal(isClickableElement(q("inner")), true, "inside a replica pick target");
+  assert.equal(isClickableElement(q("chip")), true, "replica chip");
+  assert.equal(isClickableElement(q("copy")), false, "paper still takes the trail");
 });

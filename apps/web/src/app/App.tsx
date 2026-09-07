@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from "react-router-dom";
+import AboutPage from "../routes/about/AboutPage";
 import TerraLanding from "../routes/landing/TerraLanding";
 import Workspace from "../routes/workspace/Workspace";
 import { HeroPixelField } from "../routes/landing/sections/HeroPixelField";
@@ -16,6 +17,7 @@ export default function App() {
       <HeroPixelField />
       <Routes>
         <Route path="/" element={<TerraLanding />} />
+        <Route path="/about" element={<AboutPage />} />
         <Route path="/new" element={<NewSession />} />
         <Route path="/new/s/:slug" element={<Workspace />} />
         <Route path="*" element={<Navigate replace to="/" />} />

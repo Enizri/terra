@@ -1,0 +1,113 @@
+.sh-root.sh-root--about {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100svh;
+}
+
+.sh-root--about .sh-nav__link[aria-current="page"] {
+  background: var(--sh-bg);
+  color: var(--sh-ink);
+}
+
+.ab-main {
+  flex: 1;
+  width: min(100% - 48px, 660px);
+  margin-inline: auto;
+  padding-block: clamp(56px, 7vw, 88px) 72px;
+}
+
+.ab-header {
+  margin-bottom: clamp(40px, 6vw, 64px);
+  text-align: center;
+}
+
+.sh-root--about h1 {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 2.75rem);
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: -.035em;
+}
+
+.ab-article p {
+  font-family: Georgia, "Times New Roman", serif;
+  color: #30302d;
+  font-size: clamp(1.0625rem, 1.5vw, 1.1875rem);
+  line-height: 1.65;
+}
+
+.ab-article p + p { margin-top: 24px; }
+
+.ab-section { margin-top: 40px; }
+
+.sh-root--about .ab-section h2 {
+  margin: 0 0 16px;
+  font-size: clamp(1.25rem, 2.5vw, 1.4375rem);
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: -.02em;
+}
+
+.ab-section__heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.sh-root--about .ab-section__heading h2 { margin: 0; }
+
+.ab-coming-soon {
+  padding: 4px 10px;
+  border: 1px solid var(--sh-border);
+  border-radius: var(--sh-radius-pill);
+  color: var(--sh-muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.sh-root--about .ab-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 40px;
+  padding: 14px 22px;
+  border-radius: var(--sh-radius-pill);
+  background: #141510;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.sh-root--about .ab-cta:hover { background: #34352f; }
+.ab-cta svg { width: 18px; height: 18px; flex: none; }
+
+.sh-root--about a:focus-visible {
+  outline: 2px solid var(--sh-ink);
+  outline-offset: 5px;
+}
+
+.ab-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  width: min(100% - 48px, 660px);
+  margin-inline: auto;
+  padding-block: 24px;
+  border-top: 1px solid var(--sh-border);
+  color: var(--sh-muted);
+  font-size: 13px;
+}
+
+.sh-root--about .ab-wordmark {
+  color: var(--sh-ink);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -.025em;
+}

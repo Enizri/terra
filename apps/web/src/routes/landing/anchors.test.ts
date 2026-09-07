@@ -27,9 +27,20 @@ const read = (file: string) =>
   readFileSync(path.join(import.meta.dirname, file), "utf8");
 
 test("every nav link lands on a section that exists", () => {
-  const nav = read("sections/SiteNav.tsx");
-  const targets = [...nav.matchAll(/href="#([\w-]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(targets, ["top", "power", "faq"]);
+  // The nav itself is shared chrome now; the landing declares its own
+  // destinations, and the fragments among them are the ones that must resolve.
+  const landing = read("TerraLanding.tsx");
+  const targets = [...landing.matchAll(/"#([\w-]+)"/g)].map((m) => m[1]);
+  assert.deepEqual([...new Set(targets)].sort(), ["power", "top"]);
+  // "About" is a route, not a fragment — an <a href> there is a full reload.
+  assert.match(landing, /\{ href: "\/about", label: "About" \}/);
+  assert.match(
+    readFileSync(
+      path.join(import.meta.dirname, "../../shared/site/SiteNav.tsx"),
+      "utf8",
+    ),
+    /href\.startsWith\("#"\)/,
+  );
 
   assert.match(read("sections/Hero.tsx"), /id="top"/);
   assert.match(read("sections/PowerSection.tsx"), /id="power"/);

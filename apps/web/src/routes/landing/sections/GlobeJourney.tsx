@@ -10,9 +10,7 @@ import {
   dragBy,
   grab,
   release,
-  spinChurn,
 } from "../globeDrag";
-import { createGlobeRenderer } from "../globeGL";
 import {
   advanceToss,
   createToss,
@@ -29,17 +27,9 @@ import {
   FINALE_HAZE_SPREAD,
   FINALE_SUN_BLUR_RADIUS,
   finaleGlobeFit,
-  globeJourneyClockRate,
-  globeJourneyInk,
-  globeJourneyProgress,
-  globeJourneyTravel,
-  layoutGlobeJourney,
   smoothGlobeJourneyProgress,
 } from "../globeLayout";
 
-const MAP_FILL = 0.72;
-/** Past this the globe is flying into the screen and stops being a handle. */
-const GRAB_UNTIL = 0.03;
 /** Matches `.terra-finale__floor` so the clip and the card share a corner. */
 const FINALE_RADIUS = 24;
 /** Easing leftover smaller than this is a still frame — park the loop. */
@@ -63,29 +53,20 @@ function setDim(
   el.style[prop] = value;
 }
 
-/** One canvas owns the globe from the hero through its entry into the screen. */
+/** The closing globe renders only inside the footer artwork. */
 export function GlobeJourney({ children }: { children: ReactNode }) {
   const reduced = useReducedMotion();
   const rootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const sphereCanvasRef = useRef<HTMLCanvasElement>(null);
-  const backdropRef = useRef<HTMLDivElement>(null);
   const grabRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const reduceMotion = Boolean(reduced);
     const root = rootRef.current;
     const canvas = canvasRef.current;
-    const sphereCanvas = sphereCanvasRef.current;
-    const backdrop = backdropRef.current;
     const pad = grabRef.current;
-    if (!root || !canvas || !sphereCanvas || !backdrop || !pad) return;
-    const renderer = createGlobeRenderer(canvas);
-    if (!renderer || renderer === "lost") return;
+    if (!root || !canvas || !pad) return;
     let sphereRenderer: CelestialGlobeRenderer | null = null;
-    const screen = root.querySelector<HTMLElement>(
-      ".sh-power-theater__screen .sh-window",
-    );
     const dock = root.querySelector<HTMLElement>(".gx-journey__footer-dock");
     const glow = root.querySelector<HTMLElement>(".terra-finale__glow");
     const sun = root.querySelector<HTMLElement>(".terra-finale__sun");
@@ -99,9 +80,6 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
     let width = 0;
     let height = 0;
     let last = 0;
-    let globeT = 0;
-    let cleanT = 0;
-    let shownProgress = 0;
     let shownCleanProgress = 0;
     const spin = createSpin();
     const toss = createToss();
@@ -124,16 +102,10 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
       if (disposed || width <= 0 || height <= 0) return false;
       const rootRect = root.getBoundingClientRect();
       if (rootRect.bottom < 0 || rootRect.top > height) return false;
-      if (!screen || !dock) return false;
+      if (!dock) return false;
 
       const canvasRect = canvas.getBoundingClientRect();
-      const screenRect = screen.getBoundingClientRect();
       const dockRect = dock.getBoundingClientRect();
-      const targetProgress = reduceMotion
-        ? 0
-        : globeJourneyProgress(window.scrollY, screenRect.top, height);
-      shownProgress = smoothGlobeJourneyProgress(shownProgress, targetProgress, dt);
-      const progress = shownProgress;
       const targetCleanProgress = cleanGlobeJourneyProgress(dockRect.top, height);
       shownCleanProgress = reduceMotion
         ? targetCleanProgress
@@ -142,61 +114,14 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
           targetCleanProgress,
           dt,
         );
-      if (!reduceMotion) globeT += dt * globeJourneyClockRate(progress);
-      const desktop = width > 900;
-      const size = desktop
-        ? Math.min(width * 0.48, height * 0.82)
-        : Math.min(width * 0.9, height * 0.58);
-      const startX = desktop ? width * 0.75 : width * 0.5;
-      // On phones the original globe owns the second hero row, below the copy.
-      // Keep its centre below the first fold so it cannot cover either CTA.
-      const startY = desktop ? height * 0.46 : height + size * 0.08;
-      const targetX = screenRect.left + screenRect.width / 2 - canvasRect.left;
-      const targetY = Math.min(height - 8, screenRect.top + 14 - canvasRect.top);
       spinning = advanceSpin(spin, dt, dragging);
-      const yaw = spin.yaw + progress * 0.42;
-      const pitch = spin.pitch + progress * -0.08;
-
-      const glyphs = layoutGlobeJourney(
-        {
-          size,
-          width,
-          height,
-          t: globeT,
-          churnRate: spinChurn(spin),
-          yaw,
-          pitch,
-          reduced: reduceMotion,
-          progress,
-          startX,
-          startY,
-          targetX,
-          targetY,
-        },
-        renderer.data,
-      );
-      renderer.render({ glyphs });
-
-      const travel = globeJourneyTravel(progress);
-      const centerX = startX + (targetX - startX) * travel;
-      const centerY = startY + (targetY - startY) * travel;
-      const discFade = 1 - globeJourneyInk(progress);
-      setDim(backdrop, "width", `${size}px`);
-      setDim(backdrop, "height", `${size}px`);
-      setDim(backdrop, "opacity", String(discFade));
-      setDim(
-        backdrop,
-        "transform",
-        `translate3d(${centerX - size / 2}px, ${centerY - size / 2}px, 0)`,
-      );
-      if (!reduceMotion && shownCleanProgress > 0 && !dragging) cleanT += dt;
+      const yaw = spin.yaw + 0.42;
+      const pitch = spin.pitch - 0.08;
       const fit = finaleGlobeFit(dockRect, canvasRect);
       const cleanOpacity = cleanGlobeJourneyOpacity(shownCleanProgress);
       const cleanDiameter = fit.diameter * cleanGlobeJourneyScale(shownCleanProgress);
       const cleanActive = cleanOpacity > 0.001;
-      // Same press-and-spin handle as the hero: it rides whichever globe is
-      // on screen. The finale chrome is pointer-events none except its links,
-      // so the press reaches this disc instead of the photo.
+      // The finale chrome lets a press reach the globe through the artwork.
       const finaleGrab = cleanActive && cleanOpacity > 0.35;
       tossable = finaleGrab;
       // The box a thrown globe flies in: the rounded inner edge of the sky
@@ -217,7 +142,8 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
       // reader has thrown it.
       const cleanX = fit.x + toss.x;
       const cleanY = fit.y + toss.y;
-      const sticky = sphereCanvas.parentElement;
+      const sticky = canvas.parentElement;
+      setDim(sticky, "opacity", cleanActive ? "1" : "0");
       sticky?.classList.toggle("is-clean-flight", cleanActive);
       setCss(
         sticky,
@@ -265,25 +191,20 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
       sphereRenderer?.render({
         width,
         height,
-        diameter: cleanActive ? cleanDiameter : size * MAP_FILL,
-        x: cleanActive ? cleanX : centerX,
-        y: cleanActive ? cleanY : centerY,
+        diameter: cleanDiameter,
+        x: cleanX,
+        y: cleanY,
         yaw,
         // A ground-level view of a sphere hung high in the sky: the reader is
         // looking slightly up at it, like the figures on the terrace.
-        pitch: cleanActive ? pitch + 0.12 : pitch,
+        pitch: pitch + 0.12,
         // Docked, the roll is the tumble the throw put on it.
-        spin: reduceMotion
-          ? 0.35
-          : cleanActive
-          ? 0.22 + toss.roll
-          : globeT * 0.22 + cleanT * 0.18,
-        opacity: cleanActive ? cleanOpacity : discFade,
+        spin: reduceMotion ? 0.35 : 0.22 + toss.roll,
+        opacity: cleanActive ? cleanOpacity : 0,
         hallLight: cleanActive ? 2.6 * cleanOpacity : 0,
       });
 
-      // The handle rides whichever globe is on screen, and remembers where
-      // its centre landed so a press can tell a rim grab from a centre one.
+      // Remember the centre so a press can distinguish a rim grab.
       if (finaleGrab) {
         grabRadius = cleanDiameter / 2;
         grabCenterX = canvasRect.left + cleanX;
@@ -295,26 +216,14 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
           "transform",
           `translate3d(${cleanX - cleanDiameter / 2}px, ${cleanY - cleanDiameter / 2}px, 0)`,
         );
-      } else {
-        grabRadius = size / 2;
-        grabCenterX = canvasRect.left + centerX;
-        grabCenterY = canvasRect.top + centerY;
-        setDim(pad, "width", `${size}px`);
-        setDim(pad, "height", `${size}px`);
-        setDim(
-          pad,
-          "transform",
-          `translate3d(${centerX - size / 2}px, ${centerY - size / 2}px, 0)`,
-        );
       }
-      pad.classList.toggle("is-grabbable", finaleGrab || progress < GRAB_UNTIL);
+      pad.classList.toggle("is-grabbable", finaleGrab);
       // A still docked globe is a still frame. Sitting on the FAQ used to
       // keep this loop at display rate, so every pointer composite
       // re-blended the flight. Scroll, drag, and an unfinished ease wake it.
       const easing =
-        Math.abs(shownProgress - targetProgress) > SETTLE ||
         Math.abs(shownCleanProgress - targetCleanProgress) > SETTLE;
-      return dragging || spinning || tossing || easing || progress < 1;
+      return dragging || spinning || tossing || easing;
     };
 
     const tick = (now: number) => {
@@ -322,7 +231,8 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
       if (disposed || document.hidden) return;
       const dt = last ? Math.min(0.05, (now - last) / 1000) : 1 / 60;
       last = now;
-      if (!reduceMotion && draw(dt)) frame = requestAnimationFrame(tick);
+      const animate = draw(dt);
+      if (!reduceMotion && animate) frame = requestAnimationFrame(tick);
     };
     const play = () => {
       if (disposed || document.hidden) return;
@@ -335,15 +245,13 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
       width = rect.width;
       height = rect.height;
       if (width <= 0 || height <= 0) return;
-      renderer.resize(width, height, Math.min(1.5, window.devicePixelRatio || 1));
       sphereRenderer?.resize(width, height, window.devicePixelRatio || 1);
       play();
     };
     const onDown = (event: PointerEvent) => {
       dragging = true;
       grab(spin);
-      // Only the docked globe is throwable. In the hero the glyph field is
-      // scroll-morphed into the streams, so moving it would fight the layout.
+      // A press on the footer globe can turn or throw it.
       tossHeld = tossable;
       if (tossHeld) {
         grabToss(
@@ -388,7 +296,7 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
       play();
     };
 
-    void createCelestialGlobeRenderer(sphereCanvas, play).then((created) => {
+    void createCelestialGlobeRenderer(canvas, play).then((created) => {
       if (disposed) {
         created?.dispose();
         return;
@@ -416,9 +324,7 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
     // Coarse pointers keep the globe inert so a swipe over it still scrolls.
     const grabbable =
       !reduceMotion && window.matchMedia("(pointer: fine)").matches;
-    if (!reduceMotion) {
-      window.addEventListener("scroll", play, { passive: true });
-    }
+    window.addEventListener("scroll", play, { passive: true });
     window.addEventListener("resize", resize);
     if (grabbable) {
       pad.addEventListener("pointerdown", onDown);
@@ -428,21 +334,13 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
     }
     document.addEventListener("visibilitychange", onVisibility);
     resize();
-    if (document.fonts && document.fonts.status !== "loaded") {
-      void document.fonts.ready.then(() => {
-        if (!disposed) {
-          renderer.refreshAtlas();
-          play();
-        }
-      });
-    }
 
     return () => {
       disposed = true;
       if (frame) cancelAnimationFrame(frame);
       resizeObserver.disconnect();
       intersectionObserver.disconnect();
-      if (!reduceMotion) window.removeEventListener("scroll", play);
+      window.removeEventListener("scroll", play);
       window.removeEventListener("resize", resize);
       if (grabbable) {
         pad.removeEventListener("pointerdown", onDown);
@@ -452,17 +350,14 @@ export function GlobeJourney({ children }: { children: ReactNode }) {
       }
       document.removeEventListener("visibilitychange", onVisibility);
       sphereRenderer?.dispose();
-      renderer.dispose();
-      sphereCanvas.parentElement?.style.removeProperty("clip-path");
+      canvas.parentElement?.style.removeProperty("clip-path");
     };
   }, [reduced]);
 
   return (
     <div ref={rootRef} className="gx-journey">
       <div className="gx-journey__sticky" aria-hidden>
-        <div ref={backdropRef} className="gx-journey__disc" />
-        <canvas ref={sphereCanvasRef} className="gx-journey__sphere" />
-        <canvas ref={canvasRef} className="gx-journey__canvas" />
+        <canvas ref={canvasRef} className="gx-journey__sphere" />
         <div ref={grabRef} className="gx-journey__grab" />
       </div>
       {children}

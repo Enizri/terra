@@ -297,8 +297,7 @@
   pointer-events: none;
 }
 
-/* One sticky bridge: the existing globe buffer unravels while the real Power
-   screen scrolls up beneath it. The screen's own stacking layer is the mask. */
+/* Shared page floor and a footer-only globe layer. */
 .gx-journey {
   position: relative;
   isolation: isolate;
@@ -315,6 +314,7 @@
   width: 100%;
   height: 100svh;
   margin-bottom: -100svh;
+  opacity: 0;
   overflow: hidden;
   pointer-events: none;
   background-color: var(--wl-bg);
@@ -323,27 +323,9 @@
   background-attachment: fixed;
 }
 
-.gx-journey__disc,
-.gx-journey__sphere,
-.gx-journey__canvas {
+.gx-journey__sphere {
   position: absolute;
   inset: 0;
-}
-
-.gx-journey__disc {
-  border-radius: 50%;
-  background: radial-gradient(
-    circle closest-side,
-    #232323 0%,
-    #232323 78%,
-    color-mix(in srgb, #232323 35%, var(--wl-bg)) 90%,
-    transparent 100%
-  );
-  will-change: transform, opacity;
-}
-
-.gx-journey__sphere,
-.gx-journey__canvas {
   display: block;
   width: 100%;
   height: 100%;
@@ -364,13 +346,7 @@
    questions down. The amber grade is the renderer's hall light; the halo is
    `.terra-finale__glow`. */
 
-.gx-journey__canvas {
-  z-index: 2;
-}
-
-/* Press-and-spin handle: a disc riding the globe, inert until the globe is
-   parked in the hero or the finale (the sticky layer itself takes no pointer
-   events). */
+/* The handle becomes interactive only when the footer globe is visible. */
 .gx-journey__grab {
   position: absolute;
   top: 0;
@@ -427,11 +403,4 @@
 
 .gx-journey > .sh-section.sh-section--herochars .hx-copy {
   pointer-events: auto;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .gx-journey__sticky {
-    position: absolute;
-    margin-bottom: 0;
-  }
 }

@@ -114,7 +114,10 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  padding: 10px 12px;
+  /* Most of the row's height is the button's own padding, not the item's, so
+     the press target fills the row instead of being a label floating in it.
+     What is left here is the gap between one row's target and the next. */
+  padding: 4px 12px;
   border-bottom: 1px solid color-mix(in srgb, var(--wl-grey) 20%, transparent);
   transition: background-color 0.075s ease;
 }
@@ -130,7 +133,9 @@
 .sh-power-list__mark {
   position: absolute;
   left: -26px;
-  top: 14px;
+  /* Tracks the label, which the button's padding moved down. Same 1.6px sit
+     above the label's optical centre it had before the row grew. */
+  top: 17px;
   width: 14px;
   height: 14px;
   opacity: 0;
@@ -145,7 +150,11 @@
   display: block;
   width: 100%;
   margin: 0;
-  padding: 0;
+  /* The label is one 21px line — a ~25px box in a 45px row, so most of what
+     looks pressable was the item around it and a press near the row's edge
+     landed on nothing. The padding is the target: it takes the button to
+     roughly the full row while the row itself grows only a few px. */
+  padding: 9px 0;
   border: 0;
   background: transparent;
   text-align: left;

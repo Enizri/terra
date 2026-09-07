@@ -41,6 +41,11 @@ export const POINTER_FILL = "rgba(97,92,89,0.98)";
 export const POINTER_STROKE = "rgba(230,230,230,0.92)";
 /** Fixed tilt so the tip aims up-left, then flipped 180° and nudged left. */
 export const POINTER_REST = -0.55 + Math.PI - 0.55;
+/** Drawn size against the recovered 21px contour. A shade under 1: the glyph
+ *  covers less of what it is pointing at, so the edge of a small target stays
+ *  visible while the tip is on it. Scaling is about the tip, which does not
+ *  move — the hit point is the pointer's, not the sprite's. */
+export const POINTER_SCALE = 0.85;
 
 function mapPoint(x: number, y: number): { x: number; y: number } {
   return {
